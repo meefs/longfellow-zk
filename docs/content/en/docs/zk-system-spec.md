@@ -11,7 +11,7 @@ The list of the parameters and their values are not defined in the standard and 
 
 This document describes which parameters should be used by users of Longfellow ZK System. Those parameters are currently used by Google Wallet and Multipaz Wallet/RP.
 
-For the Longfellow ZK the following parameters and values should be used:
+For the Longfellow ZK, the following parameters and values should be used:
 * **zkSystemId**: <any value, we recommend using circuit_hash to avoid confusion>
 * **system**: 'longfellow-libzk-v1'
 
