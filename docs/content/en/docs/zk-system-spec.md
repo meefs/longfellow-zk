@@ -23,7 +23,7 @@ The following parameters must be present:
 * **block_enc_sig**: The `block_enc` parameter for the ZK proof of the signature component.
 
 **The paramters change relatively often. We are releasing new circuits regularly, so it's strongly recommended not to build ZKSpecs manually nor hardcode them, but instead to use [`kZkSpecs`](https://github.com/google/longfellow-zk/blob/main/lib/circuits/mdoc/zk_spec.cc) as a source of truth for the parameters
-and convert it to CBOR/JSON as needed for corresponsing protocols.**
+and convert it to CBOR/JSON as needed for corresponding protocols.**
 
 
 ## ZK Spec Parameters in ISO 18013-5
