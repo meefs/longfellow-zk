@@ -9,7 +9,7 @@ description: >-
 ISO 18013-5 and and OpenId4VP allow RPs to request ZKP responses and specify any ZKP system and some parameters required to make sure RP will be able to verify the proof correctly.
 The list of the parameters and their values are not defined in the standard and are specific for each ZKP system. 
 
-This document describes which paramters should be used by users of Longfellow ZK System. Those paramters are currently used by Google Wallet and Multipaz Wallet/RP.
+This document describes which parameters should be used by users of Longfellow ZK System. Those parameters are currently used by Google Wallet and Multipaz Wallet/RP.
 
 For the Longfellow ZK the following parameters and values should be used:
 * **zkSystemId**: <any value, we recommend using circuit_hash to avoid confusion>
