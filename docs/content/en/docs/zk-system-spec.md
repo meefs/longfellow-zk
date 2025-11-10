@@ -43,7 +43,7 @@ ZkSystemId = tstr
 ZkParams = { * tstr => Ext}
 ```
 
-Example of correctly filled ZKSystemSpec:
+This is an example of a correctly filled `ZKSystemSpec`:
 ```
 Spec1 = {
  "zkSystemId": "137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6"
