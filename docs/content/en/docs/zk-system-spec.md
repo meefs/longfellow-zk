@@ -28,7 +28,7 @@ and convert it to CBOR/JSON as needed for corresponding protocols.**
 
 ## ZK Spec Parameters in ISO 18013-5
 
-[ISO 18013-5 Second Edition](https://github.com/ISOWG10/ISO-18013/tree/main/Working%20Documents) section 10.2.7 defines ZkSystemSpec like this:
+[ISO 18013-5 Second Edition](https://github.com/ISOWG10/ISO-18013/tree/main/Working%20Documents) section 10.2.7 defines `ZkSystemSpec` like this:
 
 ```
 ZkSystemSpec = {
