@@ -60,7 +60,7 @@ Spec1 = {
 
 ## ZK Spec Parameters in OpenID4VP DCQL
 
-Currently there is no standard DCQL for OpenID4VP, we recommend using [mso_mdoc_zk](https://google.github.io/longfellow-zk/docs/protocols/) format for requesting an ISO mDL via OpenId4VP. This is an example of correctly filled zk_system_type for this type of request:
+Currently there is no standard DCQL for OpenID4VP. We recommend using [`mso_mdoc_zk`](https://google.github.io/longfellow-zk/docs/protocols/) format to request an ISO mDL via OpenId4VP. This is an example of a correctly filled `zk_system_type` for this type of request:
 ```
 "zk_system_type": [
    {
