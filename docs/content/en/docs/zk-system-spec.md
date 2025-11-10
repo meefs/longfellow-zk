@@ -1,6 +1,6 @@
 ---
 title: "Longfellow ZK System spec parameters"
-linkTitle: "ZkSystemSpec"
+linkTitle: "Zk System Spec"
 weight: 100
 description: >-
      List of ZK System spec parameters expected by Longfellow ZK library
