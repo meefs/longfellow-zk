@@ -57,7 +57,7 @@ jobs:
     - name: Build Spec
       working-directory: ./docs/specs
       run: |
-        make libzk.html
+        make
         mv libzk.html ../static/spec/draft-google-cfrg-libzk-01.html
 
     - name: Install Docsy dependencies
