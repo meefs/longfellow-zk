@@ -82,7 +82,7 @@ It is important in this formulation to treat the input digests as a sequence, i.
 ```
 
 ### Verifying a proof of inclusion
-This section describes how to verify a compressed Merkle proof. The claim to verify is that "the commitment `root` defines an `n`-leaf Merkle tree that contains `k` digests s[0],..s[k-1] at corresponding indicies i[0],...i[k-1]."  The strategy of this verification procedure is to deduce which nodes are needed along the `k` verification paths from index to root, then read these values from the purported proof, and then recompute the Merkle tree and the consistency of the `root` digest. As an optimization, the `defined[]` array avoids recomputing internal portions of the Merkle tree that are not relevant to the verification. By convention, a proof for the degenerate case of `k=0` digests is defined to fail. It is assumed that the `indicies[]` array does not contain duplicates.
+This section describes how to verify a compressed Merkle proof. The claim to verify is that "the commitment `root` defines an `n`-leaf Merkle tree that contains `k` digests `s[0], ...,s[k-1]` at corresponding indicies `i[0], ...,i[k-1]`."  The strategy of this verification procedure is to deduce which nodes are needed along the `k` verification paths from index to root, then read these values from the purported proof, and then recompute the Merkle tree and the consistency of the `root` digest. As an optimization, the `defined[]` array avoids recomputing internal portions of the Merkle tree that are not relevant to the verification. By convention, a proof for the degenerate case of `k=0` digests is defined to fail. It is assumed that the `indicies[]` array does not contain duplicates.
 
 ```
     def verify_merkle(self, root, n, k, s, indices, proof):
