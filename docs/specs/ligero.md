@@ -322,7 +322,7 @@ def prove(transcript, digest, linear[], lqc[])  {
     A = inner_product_vector(linear, alpha_l, lqc, alpha_q)
 
     dot = dot_proof(A);
-    uquad = transcript.generate_challenge(NQT)
+    uquad = transcript.generate_challenge([NQT])
 
     qpr = quadratic_proof(lqc, uquad)
 
