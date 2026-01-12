@@ -406,8 +406,10 @@ class MdocHash {
     //    j7j6: specifies the index in the previous array of elementValue
 
     // Verify the cbor prefix for IssuerSignedItem.
-    assert_bytes_at(3, buf, (uint8_t[]){0xD8, 0x18, 0x58});
-    assert_bytes_at(1, &buf[4], (uint8_t[]){0xA4});
+    static const uint8_t cbor_tag[] = {0xD8, 0x18, 0x58};
+    static const uint8_t cbor_array[] = {0xA4};
+    assert_bytes_at(3, buf, cbor_tag);
+    assert_bytes_at(1, &buf[4], cbor_array);
 
     // Verify all of the indices and lengths are contiguous and consistent.
     vind five = lc_.template vbit<kCborIndexBits>(5);
