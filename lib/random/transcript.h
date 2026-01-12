@@ -73,7 +73,7 @@ class Transcript : public RandomEngine {
  public:
   // A transcript must be explicitly initialized so that each instance of
   // the Random oracle is unique.
-  Transcript(const uint8_t init[], size_t init_len, size_t version = 3)
+  Transcript(const uint8_t init[], size_t init_len, size_t version = 6)
       : sha_(), prf_(), version_(version) {
     write(init, init_len);
   }
@@ -143,11 +143,7 @@ class Transcript : public RandomEngine {
   template <class Field>
   void write(const typename Field::Elt e[/*n*/], size_t ince, size_t n,
              const Field& F) {
-    if (version_ > 3) {
-      tag(TAG_ARRAY);
-    } else {
-      tag(1);  // in version 3, the TAG_ARRAY was 1.
-    }
+    tag(TAG_ARRAY);
     length(n);
 
     for (size_t i = 0; i < n; ++i) {

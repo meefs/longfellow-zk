@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <vector>
 
 #include "circuits/mdoc/mdoc_examples.h"
 #include "circuits/mdoc/mdoc_test_attributes.h"
@@ -64,7 +65,7 @@ class MdocZKTest : public testing::Test {
     const ZkSpecStruct zk_spec = num_attrs == 1 ? kZkSpecs[0] : kZkSpecs[1];
     EXPECT_TRUE(circuit != nullptr);
 
-    uint8_t* zkproof;
+    uint8_t* zkproof = nullptr;
     size_t proof_len;
 
     log(INFO, "========== Test %s", test_name);
@@ -85,6 +86,9 @@ class MdocZKTest : public testing::Test {
           test->transcript, test->transcript_size, attrs, num_attrs,
           (const char*)test->now, zkproof, proof_len, test->doc_type, &zk_spec);
       EXPECT_EQ(ret, MDOC_VERIFIER_SUCCESS);
+    }
+
+    if (zkproof != nullptr) {
       free(zkproof);
     }
   }
@@ -139,9 +143,13 @@ TEST_F(MdocZKTest, one_claim) {
        {test::aamva_dhs_compliance},
        &mdoc_tests[10]},
       // Sparkasse Age Assurance test.
-      {"Sparkasse_Age-mdoc[11]",
-       {test::age_over_18},
-       &mdoc_tests[11]}};
+      {"Sparkasse_Age-mdoc[11]", {test::age_over_18}, &mdoc_tests[11]},
+      // MT Prod test
+      {"MT_Prod_Age_Over_18-mdoc[12]", {test::age_over_18}, &mdoc_tests[12]},
+      {"MT_Prod_Age_Over_18-mdoc[14]", {test::age_over_18}, &mdoc_tests[14]},
+      // AZ Prod test
+      {"AZ_Prod_Age_Over_18-mdoc[13]", {test::age_over_18}, &mdoc_tests[13]},
+  };
 
   for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); ++i) {
     run_test(tests[i].test_name, 1, tests[i].claims, tests[i].mdoc);
@@ -182,7 +190,7 @@ TEST_F(MdocZKTest, long_attribute) {
       circuit1_, circuit_len1_, test->pkx.as_pointer, test->pky.as_pointer,
       test->transcript, test->transcript_size, long_attr, 1,
       (const char*)test->now, zkproof, proof_len, test->doc_type, &kZkSpecs[0]);
-  EXPECT_EQ(ret, MDOC_VERIFIER_GENERAL_FAILURE);
+  EXPECT_EQ(ret, MDOC_VERIFIER_INVALID_CBOR);
   free(zkproof);
 }
 
@@ -426,6 +434,20 @@ TEST_F(MdocZKTest, bad_arguments) {
                               kDefaultDocType, &zk_spec_1),
             MDOC_VERIFIER_ARGUMENTS_TOO_SMALL);
 
+  RequestedAttribute attrs_prefix[1] = {RequestedAttribute(
+      {.namespace_id = {'o', 'r', 'g', '.', 'i', 's', 'o', '.', '1', '8', '0',
+                        '1', '3', '.', '5', '.', '1'},
+       .id = {'b', 'i', 'r', 't', 'h', '_', 'd', 'a', 't', 'e'},
+       .cbor_value = {0xD9, 0x03, 0xEC, 0x6A, '1', '9', '7', '1', '-', '0', '9',
+                      '-', '0'},
+       .namespace_len = 17,
+       .id_len = 10,
+       .cbor_value_len = 13})};
+  EXPECT_EQ(run_mdoc_verifier(circuit, sizeof(circuit), pk, pk, tr, sizeof(tr),
+                              attrs_prefix, 1, now, zkproof, sizeof(zkproof),
+                              kDefaultDocType, &zk_spec_1),
+            MDOC_VERIFIER_INVALID_CBOR);
+
   // Broken now.
   EXPECT_EQ(run_mdoc_verifier(circuit, sizeof(circuit), pk, pk, tr, sizeof(tr),
                               attrs, num_attrs, nullptr, zkproof,
@@ -527,6 +549,89 @@ TEST(CircuitGenerationTest, attempt_to_generate_old_circuit) {
   static size_t circuit_len;
   EXPECT_EQ(generate_circuit(old_zk_spec, &circuit, &circuit_len),
             CIRCUIT_GENERATION_INVALID_ZK_SPEC_VERSION);
+}
+
+TEST(CborValidate, ValidInputs) {
+  // Integer 0
+  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x00}, 1));
+  // Integer 1
+  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x01}, 1));
+  // Integer -1
+  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x20}, 1));
+  // Boolean True
+  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0xF5}, 1));
+  // Boolean False
+  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0xF4}, 1));
+  // Empty String
+  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x60}, 1));
+  // String "a"
+  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x61, 'a'}, 2));
+  // Empty Bytes
+  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x40}, 1));
+  // Bytes 0x01
+  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x41, 0x01}, 2));
+
+  // Fulldate: Tag 1004 (D9 03 EC) + String (6A) + 10 bytes -> 14 bytes
+  std::vector<uint8_t> fulldate = {0xD9, 0x03, 0xEC, 0x6A};
+  fulldate.insert(fulldate.end(), 10, '0');
+  EXPECT_EQ(fulldate.size(), 14);
+  EXPECT_TRUE(proofs::cbor_validate(fulldate.data(), fulldate.size()));
+
+  // Tdate: Tag 0 (C0) + String (74, len 20) + 20 bytes -> 22 bytes
+  std::vector<uint8_t> tdate = {0xC0, 0x74};
+  tdate.insert(tdate.end(), 20, '0');
+  EXPECT_EQ(tdate.size(), 22);
+  EXPECT_TRUE(proofs::cbor_validate(tdate.data(), tdate.size()));
+}
+
+TEST(CborValidate, InvalidInputs) {
+  // Null/Empty
+  EXPECT_FALSE(proofs::cbor_validate(nullptr, 0));
+
+  // Array (not allowed)
+  EXPECT_FALSE(proofs::cbor_validate((uint8_t[]){0x80}, 1));
+  // Map (not allowed)
+  EXPECT_FALSE(proofs::cbor_validate((uint8_t[]){0xA0}, 1));
+
+  // Malformed length (String len 1 but missing data)
+  EXPECT_FALSE(proofs::cbor_validate((uint8_t[]){0x61}, 1));
+
+  // Boolean, wrong length
+  EXPECT_FALSE(proofs::cbor_validate((uint8_t[]){0xF5, 0xF5}, 2));
+
+  // Wrong Tag (e.g. Tag 2)
+  EXPECT_FALSE(
+      proofs::cbor_validate((uint8_t[]){0xC2, 0x40}, 2));  // Tag 2 + Bytes
+
+  // Fulldate wrong length
+  // 14 bytes expected. Try 13.
+  std::vector<uint8_t> fulldate_wrong = {0xD9, 0x03, 0xEC,
+                                         0x69};  // String len 9
+  fulldate_wrong.insert(fulldate_wrong.end(), 9, '0');
+  EXPECT_EQ(fulldate_wrong.size(), 13);
+  EXPECT_FALSE(
+      proofs::cbor_validate(fulldate_wrong.data(), fulldate_wrong.size()));
+  // Try 15 bytes
+  fulldate_wrong.insert(fulldate_wrong.end(), 2, '0');
+  EXPECT_FALSE(
+      proofs::cbor_validate(fulldate_wrong.data(), fulldate_wrong.size()));
+  // Try 22 bytes
+  fulldate_wrong.insert(fulldate_wrong.end(), 7, '0');
+  EXPECT_FALSE(
+      proofs::cbor_validate(fulldate_wrong.data(), fulldate_wrong.size()));
+
+  // Fulldate inner type mismatch (Tag 1004 + Integer)
+  EXPECT_FALSE(proofs::cbor_validate((uint8_t[]){0xD9, 0x03, 0xEC, 0x00}, 4));
+
+  // Tdate wrong length
+  // 22 bytes expected. Try 21.
+  std::vector<uint8_t> tdate_short = {0xC0, 0x73};  // String len 19
+  tdate_short.insert(tdate_short.end(), 19, '0');
+  EXPECT_EQ(tdate_short.size(), 21);
+  EXPECT_FALSE(proofs::cbor_validate(tdate_short.data(), tdate_short.size()));
+
+  // Tdate inner type mismatch (Tag 0 + Integer)
+  EXPECT_FALSE(proofs::cbor_validate((uint8_t[]){0xC0, 0x00}, 2));
 }
 
 // ============================ Benchmarks ====================================

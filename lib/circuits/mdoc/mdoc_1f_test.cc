@@ -206,7 +206,7 @@ TEST(jwt, EvalJWT) {
 
   EXPECT_TRUE(rmw.compute_witness(pkX, pkY, t0.mdoc, t0.mdoc_size,
                                   t0.transcript, t0.transcript_size, t0.now,
-                                  oa.data(), oa.size()));
+                                  oa.data(), oa.size()) == MDOC_PROVER_SUCCESS);
   fill_eval_witness(mw, rmw, L);
   mdoc_1f.assert_credential(L.konst(pkX), L.konst(pkY), L.konst(rmw.e2_),
                             oa2.data(), now, mw);
@@ -266,7 +266,7 @@ void fill_input(Dense<Fp256Base>& W, const MdocTests& t0, const Fp256Base& f,
 
   EXPECT_TRUE(rmw.compute_witness(pkX, pkY, t0.mdoc, t0.mdoc_size,
                                   t0.transcript, t0.transcript_size, t0.now,
-                                  oa.data(), oa.size()));
+                                  oa.data(), oa.size()) == MDOC_PROVER_SUCCESS);
 
   // ========= Fill witness
   DenseFiller<Fp256Base> filler(W);

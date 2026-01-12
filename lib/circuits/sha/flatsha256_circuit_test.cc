@@ -47,7 +47,6 @@
 #include "sumcheck/circuit.h"
 #include "sumcheck/testing.h"
 #include "util/log.h"
-#include "util/panic.h"
 #include "zk/zk_proof.h"
 #include "zk/zk_prover.h"
 #include "benchmark/benchmark.h"

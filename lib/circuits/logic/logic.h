@@ -1024,6 +1024,14 @@ class Logic {
     }
   }
 
+  template <size_t N>
+  void vmux(const BitW& sel, bitvec<N>& dst, const bitvec<N>& v1,
+            const bitvec<N>& v0) const {
+    for (size_t i = 0; i < N; ++i) {
+      dst[i] = mux(&sel, &v1[i], v0[i]);
+    }
+  }
+
  private:
   // return one quad gate for the product eval(a)*eval(b),
   // optimizing some "obvious" cases.

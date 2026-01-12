@@ -35,7 +35,7 @@ template <class Logic, size_t IndexBits = CborConstants::kIndexBits>
 class Cbor {
  public:
   using CounterL = Counter<Logic>;
-  using CborBD = CborByteDecoder<Logic>;
+  using CborBD = CborByteDecoder2<Logic>;
   using Field = typename Logic::Field;
   using EltW = typename Logic::EltW;
   using CEltW = typename CounterL::CEltW;
