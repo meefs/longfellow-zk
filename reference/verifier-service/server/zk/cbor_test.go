@@ -162,7 +162,7 @@ func TestProcessDeviceResponseISO(t *testing.T) {
 	}
 
 	t.Run("single cert", func(t *testing.T) {
-		docData := &zkDocumentDataIso_1cert{
+		docData := &zkDocumentDataIso{
 			DocType:      "test_doctype",
 			ZkSystemId:   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			IssuerSigned: issuerSigned,
@@ -193,7 +193,7 @@ func TestProcessDeviceResponseISO(t *testing.T) {
 	})
 
 	t.Run("array of certs", func(t *testing.T) {
-		docData := &zkDocumentDataIso_certs{
+		docData := &zkDocumentDataIso{
 			DocType:      "test_doctype",
 			ZkSystemId:   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			IssuerSigned: issuerSigned,
