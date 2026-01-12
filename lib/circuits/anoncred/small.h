@@ -58,6 +58,7 @@ class Small {
   using Flatsha = FlatSHA256Circuit<LogicCircuit, BitPlucker<LogicCircuit, 3>>;
   using RoutingL = Routing<LogicCircuit>;
   using ShaBlockWitness = typename Flatsha::BlockWitness;
+  using sha_packed_v32 = typename Flatsha::packed_v32;
 
   const LogicCircuit& lc_;
   const EC& ec_;
@@ -109,19 +110,6 @@ class Small {
     }
   };
 
-  EltW repack(const v8 in[], size_t ind) const {
-    EltW h = lc_.konst(0);
-    EltW base = lc_.konst(0x2);
-    for (size_t i = 0; i < 32; ++i) {
-      for (size_t j = 0; j < 8; ++j) {
-        auto t = lc_.mul(&h, base);
-        auto tin = lc_.eval(in[ind + i][7 - j]);
-        h = lc_.add(&tin, t);
-      }
-    }
-    return h;
-  }
-
   explicit Small(const LogicCircuit& lc, const EC& ec, const Nat& order)
       : lc_(lc), ec_(ec), order_(order), sha_(lc), r_(lc) {}
 
@@ -134,6 +122,7 @@ class Small {
     ecc.verify_signature3(vw.dpkx_, vw.dpky_, hash_tr, vw.dpk_sig_);
 
     sha_.assert_message(kMaxSHABlocks, vw.nb_, vw.in_, vw.sig_sha_);
+    assert_hash(vw.e_, vw);
 
     const Memcmp<LogicCircuit> CMP(lc_);
     // // validFrom <= now
@@ -167,6 +156,58 @@ class Small {
       auto cmp = lc_.veq(&got[j], want[j]);
       lc_.assert_implies(&ll, cmp);
     }
+  }
+
+  // Assert that the hash of the mdoc is equal to e.
+  // The hash is encoded in the SHA witness, and thus the correct block
+  // must be muxed for the comparison. Thus method first muxes the "packed"
+  // encoding of the SHA witness, then unpacks it and compares it to e to
+  // save a lot of work in the bit plucker.
+  void assert_hash(const EltW& e, const Witness& vw) const {
+    sha_packed_v32 x[8];
+    for (size_t b = 0; b < kMaxSHABlocks; ++b) {
+      auto bt = lc_.veq(vw.nb_, b + 1); /* b is zero-indexed */
+      auto ebt = lc_.eval(bt);
+      for (size_t i = 0; i < 8; ++i) {
+        for (size_t k = 0; k < sha_.bp_.kNv32Elts; ++k) {
+          if (b == 0) {
+            x[i][k] = lc_.mul(&ebt, vw.sig_sha_[b].h1[i][k]);
+          } else {
+            auto maybe_sha = lc_.mul(&ebt, vw.sig_sha_[b].h1[i][k]);
+            x[i][k] = lc_.add(&x[i][k], maybe_sha);
+          }
+        }
+      }
+    }
+
+    EltW h = repack32(x);
+    lc_.assert_eq(&h, e);
+  }
+
+  EltW repack(const v8 in[], size_t ind) const {
+    EltW h = lc_.konst(0);
+    EltW base = lc_.konst(0x2);
+    for (size_t i = 0; i < 32; ++i) {
+      for (size_t j = 0; j < 8; ++j) {
+        auto t = lc_.mul(&h, base);
+        auto tin = lc_.eval(in[ind + i][7 - j]);
+        h = lc_.add(&tin, t);
+      }
+    }
+    return h;
+  }
+
+  EltW repack32(const sha_packed_v32 H[]) const {
+    EltW h = lc_.konst(0);
+    Elt twok = lc_.one();
+    for (size_t j = 8; j-- > 0;) {
+      auto hj = sha_.bp_.unpack_v32(H[j]);
+      for (size_t k = 0; k < 32; ++k) {
+        h = lc_.axpy(&h, twok, lc_.eval(hj[k]));
+        lc_.f_.add(twok, twok);
+      }
+    }
+    return h;
   }
 
   Flatsha sha_;

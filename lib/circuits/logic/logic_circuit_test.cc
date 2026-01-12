@@ -17,7 +17,6 @@
 #include <memory>
 #include <vector>
 
-#include "algebra/bogorng.h"
 #include "arrays/dense.h"
 #include "circuits/compiler/circuit_dump.h"
 #include "circuits/compiler/compiler.h"

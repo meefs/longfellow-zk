@@ -27,6 +27,7 @@
 #include "algebra/fp2.h"
 #include "algebra/reed_solomon.h"
 #include "arrays/dense.h"
+#include "cbor/host_decoder.h"
 #include "circuits/mac/mac_reference.h"
 #include "circuits/mac/mac_witness.h"
 #include "circuits/mdoc/mdoc_decompress.h"
@@ -58,7 +59,7 @@
 // ex: numAttrs = 1, this function returns (1*768 + 8) + 161
 size_t getHashMacIndex(size_t numAttrs, size_t version) {
   // The length of the attribute field that is added in version 4.
-  return numAttrs * 8 * (96 + 1) + 160 + 1;
+  return numAttrs * 8 * (96 + (version < 7 ? 1 : 2)) + 160 + 1;
 }
 
 namespace proofs {
@@ -145,17 +146,20 @@ struct ProverState {
 };
 
 // Fills the hash witness with the attributes and the time input.
-bool fill_attributes(DenseFiller<f_128> &hash_filler,
-                     const RequestedAttribute *attrs, size_t attrs_len,
-                     const uint8_t *now, const f_128 &Fs, size_t version) {
+MdocProverErrorCode fill_attributes(DenseFiller<f_128>& hash_filler,
+                                    const RequestedAttribute* attrs,
+                                    size_t attrs_len, const uint8_t* now,
+                                    const f_128& Fs, size_t version) {
   hash_filler.push_back(Fs.one());
   for (size_t ai = 0; ai < attrs_len; ++ai) {
-    if (!fill_attribute(hash_filler, attrs[ai], Fs, version)) {
-      return false;
+    MdocProverErrorCode err =
+        fill_attribute(hash_filler, attrs[ai], Fs, version);
+    if (err != MDOC_PROVER_SUCCESS) {
+      return err;
     }
   }
   fill_bit_string(hash_filler, now, 20, 20, Fs);
-  return true;
+  return MDOC_PROVER_SUCCESS;
 }
 
 // Fills the signature witness with the public inputs pkX, pkY, and e.
@@ -176,7 +180,8 @@ bool fill_public_inputs(DenseFiller<Fp256Base> &sig_filler,
                         const uint8_t *now, const uint8_t *docType,
                         size_t dt_len, const gf2k macs[], gf2k av,
                         const f_128 &Fs, size_t version) {
-  if (!fill_attributes(hash_filler, attrs, attrs_len, now, Fs, version)) {
+  if (fill_attributes(hash_filler, attrs, attrs_len, now, Fs, version) !=
+      MDOC_PROVER_SUCCESS) {
     return false;
   }
 
@@ -203,12 +208,12 @@ bool fill_public_inputs(DenseFiller<Fp256Base> &sig_filler,
 }
 
 // Fills the hash and signature public inputs and private witnesses.
-bool fill_witness(DenseFiller<Fp256Base> &fill_b, DenseFiller<f_128> &fill_s,
-                  const uint8_t *mdoc, size_t mdoc_len, const Elt &pkX,
-                  const Elt &pkY, const uint8_t *tr, size_t tr_len,
-                  const RequestedAttribute *attrs, size_t attrs_len,
-                  const uint8_t *now, ProverState &state,
-                  SecureRandomEngine &rng, const f_128 &Fs, size_t version) {
+MdocProverErrorCode fill_witness(
+    DenseFiller<Fp256Base>& fill_b, DenseFiller<f_128>& fill_s,
+    const uint8_t* mdoc, size_t mdoc_len, const Elt& pkX, const Elt& pkY,
+    const uint8_t* tr, size_t tr_len, const RequestedAttribute* attrs,
+    size_t attrs_len, const uint8_t* now, ProverState& state,
+    SecureRandomEngine& rng, const f_128& Fs, size_t version) {
   using MdocHW = MdocHashWitness<P256, f_128>;
   using MdocSW = MdocSignatureWitness<P256, Fp256Scalar>;
 
@@ -217,8 +222,10 @@ bool fill_witness(DenseFiller<Fp256Base> &fill_b, DenseFiller<f_128> &fill_s,
   auto sw = std::make_unique<MdocSW>(p256, p256_scalar, Fs);
 
   // hash public inputs
-  if (!fill_attributes(fill_s, attrs, attrs_len, now, Fs, version)) {
-    return false;
+  MdocProverErrorCode err =
+      fill_attributes(fill_s, attrs, attrs_len, now, Fs, version);
+  if (err != MDOC_PROVER_SUCCESS) {
+    return err;
   }
 
   // init mac+av to 0
@@ -226,10 +233,13 @@ bool fill_witness(DenseFiller<Fp256Base> &fill_b, DenseFiller<f_128> &fill_s,
     fill_gf2k<f_128, f_128>(Fs.zero(), fill_s, Fs);
   }
 
-  bool ok_h = hw->compute_witness(mdoc, mdoc_len, tr, tr_len, attrs, attrs_len,
-                                  now, version);
-  bool ok_s = sw->compute_witness(pkX, pkY, mdoc, mdoc_len, tr, tr_len);
-  if (!ok_h || !ok_s) return false;
+  MdocProverErrorCode ok_h = hw->compute_witness(mdoc, mdoc_len, tr, tr_len,
+                                                 attrs, attrs_len, version);
+  if (ok_h != MDOC_PROVER_SUCCESS) return ok_h;
+
+  MdocProverErrorCode ok_s =
+      sw->compute_witness(pkX, pkY, mdoc, mdoc_len, tr, tr_len);
+  if (ok_s != MDOC_PROVER_SUCCESS) return ok_s;
 
   // signature public inputs
   fill_signature_inputs(fill_b, pkX, pkY, sw->e2_);
@@ -253,14 +263,14 @@ bool fill_witness(DenseFiller<Fp256Base> &fill_b, DenseFiller<f_128> &fill_s,
   }
 
   // private witnesses
-  hw->fill_witness(fill_s);
+  hw->fill_witness(fill_s, version);
   for (auto &mac : state.macs) {
     mac.fill_witness(fill_s);
   }
 
   sw->fill_witness(fill_b);
 
-  return true;
+  return MDOC_PROVER_SUCCESS;
 }
 
 gf2k generate_mac_key(Transcript &t) {
@@ -311,6 +321,62 @@ bool sameNamespace(const RequestedAttribute attrs[/*n*/], size_t n) {
     }
   }
   return true;
+}
+
+// Validates that the input is a valid CBOR encoding of one of the following:
+// - String (TEXT)
+// - Boolean (PRIMITIVE TRUE/FALSE)
+// - Integer (UNSIGNED/NEGATIVE)
+// - Binary String (BYTES)
+// - Fulldate (TAG 1004) -> must be 14 bytes total
+// - Tdate (TAG 0) -> must be 22 bytes total
+bool cbor_validate(const uint8_t* in, size_t len) {
+  uint8_t dummy[1];  // For 0-length checks if needed, though len > 0 usually
+  const uint8_t* buf = in ? in : dummy;
+  size_t pos = 0;
+  CborDoc doc;
+
+  if (!doc.decode(buf, len, pos, 0)) {
+    return false;
+  }
+
+  // Ensure we consumed the entire buffer
+  if (pos != len) {
+    return false;
+  }
+
+  switch (doc.t_) {
+    case TEXT:
+    case BYTES:
+    case UNSIGNED:
+    case NEGATIVE:
+      return true;
+
+    case PRIMITIVE:
+      return (doc.u_.p == CTRUE || doc.u_.p == CFALSE);
+
+    case TAG: {
+      // items.n is the tag value
+      size_t tag = doc.u_.items.n;
+      if (tag == 1004) {  // Fulldate
+        if (len != 14) return false;
+        // Check inner type is TEXT? CborDoc handles valid children decode.
+        // host_decoder.h: case 6 (TAG) ... decode_items ...
+        // We know it has 1 child.
+        if (doc.children_.empty() || doc.children_[0].t_ != TEXT) return false;
+        return true;
+      }
+      if (tag == 0) {  // Tdate
+        if (len != 22) return false;
+        if (doc.children_.empty() || doc.children_[0].t_ != TEXT) return false;
+        return true;
+      }
+      return false;
+    }
+
+    default:
+      return false;
+  }
 }
 
 // =========== End of helper functions =====================
@@ -388,12 +454,12 @@ MdocProverErrorCode run_mdoc_prover(
 
   SecureRandomEngine rng;
   ProverState state;
-  bool ok = fill_witness(
+  MdocProverErrorCode ok = fill_witness(
       sig_filler, hash_filler, mdoc, mdoc_len, pkX, pkY, transcript, tr_len,
-      attrs, attrs_len, (const uint8_t *)now, state, rng, Fs, zk_spec->version);
-  if (!ok) {
+      attrs, attrs_len, (const uint8_t*)now, state, rng, Fs, zk_spec->version);
+  if (ok != MDOC_PROVER_SUCCESS) {
     log(ERROR, "fill_witness failed");
-    return MDOC_PROVER_WITNESS_CREATION_FAILURE;
+    return ok;
   }
 
   // ========= Run prover ==============
@@ -405,10 +471,10 @@ MdocProverErrorCode run_mdoc_prover(
   const RSFactory_b rsf_b(fft_b, p256_base);
   const RSFactory the_reed_solomon_factory(Fs);
 
-  ZkProof<f_128> h_zk(*c_hash, kLigeroRate, kLigeroNreq,
-                      zk_spec->block_enc_hash);
-  ZkProof<Fp256Base> sig_zk(*c_sig, kLigeroRate, kLigeroNreq,
-                            zk_spec->block_enc_sig);
+  size_t r = zk_spec->version < 7 ? kLigeroRate : kLigeroRatev7;
+  size_t req = zk_spec->version < 7 ? kLigeroNreq : kLigeroNreqv7;
+  ZkProof<f_128> h_zk(*c_hash, r, req, zk_spec->block_enc_hash);
+  ZkProof<Fp256Base> sig_zk(*c_sig, r, req, zk_spec->block_enc_sig);
 
   ZkProver<f_128, RSFactory> hash_p(*c_hash, Fs, the_reed_solomon_factory);
   ZkProver<Fp256Base, RSFactory_b> sig_p(*c_sig, p256_base, rsf_b);
@@ -489,6 +555,14 @@ MdocVerifierErrorCode run_mdoc_verifier(
     return MDOC_VERIFIER_INVALID_INPUT;
   }
 
+  // Verify that the values in the RequestedAttribute structure are valid cbor.
+  for (size_t i = 0; i < attrs_len; ++i) {
+    if (!cbor_validate(attrs[i].cbor_value, attrs[i].cbor_value_len)) {
+      log(ERROR, "invalid cbor value");
+      return MDOC_VERIFIER_INVALID_CBOR;
+    }
+  }
+
   const f_128 Fs;
 
   // Sanity check input sizes.
@@ -527,10 +601,10 @@ MdocVerifierErrorCode run_mdoc_verifier(
       c_sig->ninputs);
 
   // Parse proofs
-  ZkProof<f_128> pr_hash(*c_hash, kLigeroRate, kLigeroNreq,
-                         zk_spec->block_enc_hash);
-  ZkProof<Fp256Base> pr_sig(*c_sig, kLigeroRate, kLigeroNreq,
-                            zk_spec->block_enc_sig);
+  size_t r = zk_spec->version < 7 ? kLigeroRate : kLigeroRatev7;
+  size_t req = zk_spec->version < 7 ? kLigeroNreq : kLigeroNreqv7;
+  ZkProof<f_128> pr_hash(*c_hash, r, req, zk_spec->block_enc_hash);
+  ZkProof<Fp256Base> pr_sig(*c_sig, r, req, zk_spec->block_enc_sig);
 
   log(INFO,
       "proof params: h[nl:%zu, ni:%zu], s[nl:%zu, ni:%zu] hc[b:%zu r:%zu] "
@@ -573,12 +647,10 @@ MdocVerifierErrorCode run_mdoc_verifier(
   const RSFactory_b rsf_b(fft_b, p256_base);
   const RSFactory the_reed_solomon_factory(Fs);
 
-  ZkVerifier<f_128, RSFactory> hash_v(*c_hash, the_reed_solomon_factory,
-                                      kLigeroRate, kLigeroNreq,
+  ZkVerifier<f_128, RSFactory> hash_v(*c_hash, the_reed_solomon_factory, r, req,
                                       zk_spec->block_enc_hash, Fs);
-  ZkVerifier<Fp256Base, RSFactory_b> sig_v(*c_sig, rsf_b, kLigeroRate,
-                                           kLigeroNreq, zk_spec->block_enc_sig,
-                                           p256_base);
+  ZkVerifier<Fp256Base, RSFactory_b> sig_v(*c_sig, rsf_b, r, req,
+                                           zk_spec->block_enc_sig, p256_base);
 
   // Use the transcript from the session to select the random oracle.
   class Transcript tv(transcript, tr_len, zk_spec->version);

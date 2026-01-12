@@ -29,7 +29,6 @@
 #include "circuits/mdoc/mdoc_witness.h"
 #include "circuits/mdoc/mdoc_zk.h"
 #include "circuits/sha/flatsha256_witness.h"
-#include "util/log.h"
 namespace proofs {
 
 template <typename EC, typename Field, class ScalarField>
@@ -167,16 +166,20 @@ class mdoc_1f_witness {
     }
   }
 
-  bool compute_witness(Elt pkX, Elt pkY, const uint8_t mdoc[/* len */],
-                       size_t len, const uint8_t transcript[/* tlen */],
-                       size_t tlen, const uint8_t tnow[/*kMdoc1DateLen*/],
-                       const RequestedAttribute attrs[], size_t attrs_len) {
-    if (!pm_.parse_device_response(len, mdoc)) {
-      return false;
+  MdocProverErrorCode compute_witness(Elt pkX, Elt pkY,
+                                      const uint8_t mdoc[/* len */], size_t len,
+                                      const uint8_t transcript[/* tlen */],
+                                      size_t tlen,
+                                      const uint8_t tnow[/*kMdoc1DateLen*/],
+                                      const RequestedAttribute attrs[],
+                                      size_t attrs_len) {
+    MdocProverErrorCode err = pm_.parse_device_response(len, mdoc);
+    if (err != MDOC_PROVER_SUCCESS) {
+      return err;
     }
+
     if (pm_.t_mso_.len >= kMdoc1MaxSHABlocks * 64 - 9 - kCose1PrefixLen) {
-      log(ERROR, "tagged mso is too big: %zu", pm_.t_mso_.len);
-      return false;
+      return MDOC_PROVER_TAGGED_MSO_TOO_BIG;
     }
 
     Nat ne = nat_from_hash<Nat>(pm_.tagged_mso_bytes_.data(),
@@ -187,7 +190,9 @@ class mdoc_1f_witness {
     const size_t l = pm_.sig_.len;
     Nat nr = nat_from_be<Nat>(&mdoc[pm_.sig_.pos]);
     Nat ns = nat_from_be<Nat>(&mdoc[pm_.sig_.pos + l / 2]);
-    ew_.compute_witness(pkX, pkY, ne, nr, ns);
+    if (!ew_.compute_witness(pkX, pkY, ne, nr, ns)) {
+      return MDOC_PROVER_SIGNATURE_FAILURE;
+    }
 
     Nat ne2 = compute_transcript_hash<Nat>(transcript, tlen, &pm_.doc_type_);
     const size_t l2 = pm_.dksig_.len;
@@ -199,7 +204,9 @@ class mdoc_1f_witness {
     dpky_ = ec_.f_.to_montgomery(
         nat_from_be<Nat>(&mdoc[pmso + pm_.dev_key_pky_.pos]));
     e2_ = ec_.f_.to_montgomery(ne2);
-    dkw_.compute_witness(dpkx_, dpky_, ne2, nr2, ns2);
+    if (!dkw_.compute_witness(dpkx_, dpky_, ne2, nr2, ns2)) {
+      return MDOC_PROVER_DEVICE_SIGNATURE_FAILURE;
+    }
 
     memcpy(now_, tnow, kMdoc1DateLen);
     std::vector<uint8_t> buf;
@@ -259,12 +266,10 @@ class mdoc_1f_witness {
         }
       }
       if (!found) {
-        log(ERROR, "Could not find attribute %.*s", attrs[i].id_len,
-            attrs[i].id);
-        return false;
+        return MDOC_PROVER_ATTRIBUTE_NOT_FOUND;
       }
     }
-    return true;
+    return MDOC_PROVER_SUCCESS;
   }
 };
 

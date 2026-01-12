@@ -26,6 +26,7 @@
 #include "circuits/logic/evaluation_backend.h"
 #include "circuits/logic/logic.h"
 #include "circuits/mdoc/mdoc_witness.h"
+#include "circuits/mdoc/mdoc_zk.h"
 #include "gf2k/gf2_128.h"
 #include "gtest/gtest.h"
 
@@ -55,8 +56,9 @@ void test_examples(const Field& F) {
 
   for (const MdocTests& test : mdoc_tests) {
     ParsedMdoc pm;
-    bool ok = pm.parse_device_response(test.mdoc_size, test.mdoc);
-    EXPECT_TRUE(ok);
+    MdocProverErrorCode ok =
+        pm.parse_device_response(test.mdoc_size, test.mdoc);
+    EXPECT_TRUE(ok == MDOC_PROVER_SUCCESS);
 
     size_t n = pm.t_mso_.len - 5;
     const uint8_t* mso = test.mdoc + pm.t_mso_.pos + 5;

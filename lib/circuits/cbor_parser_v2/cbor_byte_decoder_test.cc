@@ -36,7 +36,7 @@ void test_decode_one_v8(const Field& F) {
   const Logic L(&ebk, F);
   const CounterL CTR(L);
 
-  using CborBD = CborByteDecoder<Logic>;
+  using CborBD = CborByteDecoder2<Logic>;
   const CborBD CBORBD(L);
   for (size_t type = 0; type < 8; ++type) {
     for (size_t count = 0; count < 32; ++count) {

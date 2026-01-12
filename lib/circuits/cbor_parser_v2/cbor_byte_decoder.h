@@ -22,7 +22,7 @@
 
 namespace proofs {
 template <class Logic>
-class CborByteDecoder {
+class CborByteDecoder2 {
  public:
   using CounterL = Counter<Logic>;
   using Field = typename Logic::Field;
@@ -31,7 +31,7 @@ class CborByteDecoder {
   using BitW = typename Logic::BitW;
   using v8 = typename Logic::v8;
 
-  explicit CborByteDecoder(const Logic& l) : l_(l), ctr_(l) {}
+  explicit CborByteDecoder2(const Logic& l) : l_(l), ctr_(l) {}
 
   //------------------------------------------------------------
   // Decoder (lexer)
