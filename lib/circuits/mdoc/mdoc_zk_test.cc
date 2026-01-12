@@ -553,23 +553,23 @@ TEST(CircuitGenerationTest, attempt_to_generate_old_circuit) {
 
 TEST(CborValidate, ValidInputs) {
   // Integer 0
-  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x00}, 1));
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x00}, 1));
   // Integer 1
-  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x01}, 1));
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x01}, 1));
   // Integer -1
-  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x20}, 1));
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x20}, 1));
   // Boolean True
-  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0xF5}, 1));
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0xF5}, 1));
   // Boolean False
-  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0xF4}, 1));
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0xF4}, 1));
   // Empty String
-  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x60}, 1));
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x60}, 1));
   // String "a"
-  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x61, 'a'}, 2));
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x61, 'a'}, 2));
   // Empty Bytes
-  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x40}, 1));
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x40}, 1));
   // Bytes 0x01
-  EXPECT_TRUE(proofs::cbor_validate((uint8_t[]){0x41, 0x01}, 2));
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x41, 0x01}, 2));
 
   // Fulldate: Tag 1004 (D9 03 EC) + String (6A) + 10 bytes -> 14 bytes
   std::vector<uint8_t> fulldate = {0xD9, 0x03, 0xEC, 0x6A};
@@ -589,19 +589,19 @@ TEST(CborValidate, InvalidInputs) {
   EXPECT_FALSE(proofs::cbor_validate(nullptr, 0));
 
   // Array (not allowed)
-  EXPECT_FALSE(proofs::cbor_validate((uint8_t[]){0x80}, 1));
+  EXPECT_FALSE(proofs::cbor_validate((const uint8_t[]){0x80}, 1));
   // Map (not allowed)
-  EXPECT_FALSE(proofs::cbor_validate((uint8_t[]){0xA0}, 1));
+  EXPECT_FALSE(proofs::cbor_validate((const uint8_t[]){0xA0}, 1));
 
   // Malformed length (String len 1 but missing data)
-  EXPECT_FALSE(proofs::cbor_validate((uint8_t[]){0x61}, 1));
+  EXPECT_FALSE(proofs::cbor_validate((const uint8_t[]){0x61}, 1));
 
   // Boolean, wrong length
-  EXPECT_FALSE(proofs::cbor_validate((uint8_t[]){0xF5, 0xF5}, 2));
+  EXPECT_FALSE(proofs::cbor_validate((const uint8_t[]){0xF5, 0xF5}, 2));
 
   // Wrong Tag (e.g. Tag 2)
-  EXPECT_FALSE(
-      proofs::cbor_validate((uint8_t[]){0xC2, 0x40}, 2));  // Tag 2 + Bytes
+  EXPECT_FALSE(proofs::cbor_validate((const uint8_t[]){0xC2, 0x40},
+                                     2));  // Tag 2 + Bytes
 
   // Fulldate wrong length
   // 14 bytes expected. Try 13.
@@ -621,7 +621,8 @@ TEST(CborValidate, InvalidInputs) {
       proofs::cbor_validate(fulldate_wrong.data(), fulldate_wrong.size()));
 
   // Fulldate inner type mismatch (Tag 1004 + Integer)
-  EXPECT_FALSE(proofs::cbor_validate((uint8_t[]){0xD9, 0x03, 0xEC, 0x00}, 4));
+  EXPECT_FALSE(
+      proofs::cbor_validate((const uint8_t[]){0xD9, 0x03, 0xEC, 0x00}, 4));
 
   // Tdate wrong length
   // 22 bytes expected. Try 21.
@@ -631,7 +632,7 @@ TEST(CborValidate, InvalidInputs) {
   EXPECT_FALSE(proofs::cbor_validate(tdate_short.data(), tdate_short.size()));
 
   // Tdate inner type mismatch (Tag 0 + Integer)
-  EXPECT_FALSE(proofs::cbor_validate((uint8_t[]){0xC0, 0x00}, 2));
+  EXPECT_FALSE(proofs::cbor_validate((const uint8_t[]){0xC0, 0x00}, 2));
 }
 
 // ============================ Benchmarks ====================================
