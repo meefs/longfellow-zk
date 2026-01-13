@@ -149,6 +149,17 @@ TEST_F(MdocZKTest, one_claim) {
       {"MT_Prod_Age_Over_18-mdoc[14]", {test::age_over_18}, &mdoc_tests[14]},
       // AZ Prod test
       {"AZ_Prod_Age_Over_18-mdoc[13]", {test::age_over_18}, &mdoc_tests[13]},
+      // EUAV order tests
+      {"EUAV_Age_Over_18-mdoc[15]", {test::age_over_18}, &mdoc_tests[15]},
+      {"EUAV_Age_Over_18-mdoc[16]", {test::age_over_18}, &mdoc_tests[16]},
+      {"EUAV_Age_Over_18-mdoc[17]", {test::age_over_18}, &mdoc_tests[17]},
+      {"EUAV_Age_Over_18-mdoc[18]", {test::age_over_18}, &mdoc_tests[18]},
+      {"EUAV_Age_Over_18-mdoc[19]", {test::age_over_18}, &mdoc_tests[19]},
+      {"EUAV_Age_Over_18-mdoc[20]", {test::age_over_18}, &mdoc_tests[20]},
+      {"EUAV_Age_Over_18-mdoc[21]", {test::age_over_18}, &mdoc_tests[21]},
+      {"EUAV_Age_Over_18-mdoc[22]", {test::age_over_18}, &mdoc_tests[22]},
+      {"EUAV_Age_Over_18-mdoc[23]", {test::age_over_18}, &mdoc_tests[23]},
+      {"EUAV_Age_Over_18-mdoc[24]", {test::age_over_18}, &mdoc_tests[24]},
   };
 
   for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); ++i) {
