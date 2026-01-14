@@ -66,11 +66,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 )
 
-var (
-	// IssuerRoots is a pool of trusted root certificate authorities.
-	IssuerRoots = x509.NewCertPool()
-)
-
 // X5ChainIndex is the index of the x509 chain in the COSE_Sign1 unprotected header.
 const X5ChainIndex = 33
 

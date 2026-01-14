@@ -39,6 +39,7 @@ import (
 var (
 	port       = flag.String("port", ":8888", "Listening port")
 	certs      = flag.String("cacerts", "certs.pem", "File containing issuer CA certs")
+	vicalUrl   = flag.String("vical_url", "https://vical.dts.aamva.org/vical/vc", "URL to fetch AAMVA VICAL from")
 	circuitDir = flag.String("circuit_dir", "circuits", "Directory from which to load circuits")
 )
 
@@ -74,6 +75,11 @@ func main() {
 	if err := zk.LoadIssuerRootCA(pem); err != nil {
 		logger.Error("could not load issuer root CA", "err", err)
 		os.Exit(1)
+	}
+
+	if err := zk.LoadVICAL(*vicalUrl); err != nil {
+		logger.Error("could not load VICAL", "url", *vicalUrl, "err", err)
+		// We decide not to exit here, as the server might still be useful with just local certs
 	}
 
 	server := NewServer(*port, logger)
