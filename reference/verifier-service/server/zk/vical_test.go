@@ -20,8 +20,17 @@ func TestLoadVICAL(t *testing.T) {
 	}))
 	defer ts.Close()
 
+	// Check initial count
+	initialCount := len(IssuerRoots.Subjects())
+
 	err = LoadVICAL(ts.URL)
 	if err != nil {
 		t.Fatalf("LoadVICAL failed: %v", err)
+	}
+
+	// Check final count
+	finalCount := len(IssuerRoots.Subjects())
+	if finalCount <= initialCount {
+		t.Errorf("Expected to load certificates, but count did not increase. Initial: %d, Final: %d", initialCount, finalCount)
 	}
 }

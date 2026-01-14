@@ -81,6 +81,9 @@ There are a few command line flags:
     	Listening port (default ":8888")
 ```
 
+> [!NOTE]
+> We included a setup that is useful for US-based RPs with AAMVA VICAL which includes IACA certs from several US issuers. If you'd like to integrate with other VICALs, a similar setup can be followed.
+
 ## Running
 
 There must be a `circuits` directory that contains all of the circuits used by the system. This directory is part of the main Longfellow ZK repository, so the server should run out of the box.
