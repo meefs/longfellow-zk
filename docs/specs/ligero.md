@@ -310,7 +310,7 @@ The quadratic constraints are given as input in an array `lqc[]` that contains t
 In this sense, the quadratic constraints are reduced to linear constraints, and the additional requirement for the verifier to check that each index of the `Qz` row is the product of its counterpart in the `Qx` and `Qy` row.
 
 ### Selection of challenge indicies
-The last step of the prove method is for the verifier to select a subset of unique indicies (i.e., they are sampled without replacement) from the range `DBLOCK...NCOL` and request that the prover open these columns of tableau `T`. These opened columns are then used to verify consistency with the previous messages sent by the prover.
+The last step of the prove method is for the verifier to select a subset of unique indices (i.e., they are sampled without replacement) from the range `DBLOCK...NCOL` and request that the prover open these columns of tableau `T`. These opened columns are then used to verify consistency with the previous messages sent by the prover.
 
 ### Ligero Prover procedure
 The `context` argument is application-dependent and includes information about the theorem statement that is proven.
