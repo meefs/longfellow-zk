@@ -77,23 +77,21 @@ constraints but not binding.
 This document only uses bindings of `EQ` and never `EQ` itself,
 and therefore the whole array never needs to be stored explicitly.
 For `n = 2^l` and `X` of size `l`, `bindv(EQ_{n}, X)` can be computed
-recursively in linear time as `bindv(EQ_{n}, X) = bindeq(l, X)` where
+recursively in linear time as follows.
 
+``` python
+def bindeq(field, log_n, challenges):
+    if log_n == 0:
+        return [field.one()]
+    n = 2 ** log_n
+    b = [None] * n
+    a = bindeq(field, log_n - 1, challenges[1:])
+    for i in range(n // 2):
+        b[2 * i] = (field.one() - challenges[0]) * a[i]
+        b[2 * i + 1] = challenges[0] * a[i]
+    return b
 ```
-   bindeq(l, X) =
-      LET n = 2^l
-      allocate B[n]
-      IF l = 0 THEN
-         B[0] = 1
-      ELSE
-         LET A = bindeq(l - 1, X[1..])
-         FOR 0 <= 2 * i < n DO
-            B[2 * i]     = (1 - X[0]) * A[i]
-            B[2 * i + 1] = X[0] * A[i]
-         ENDFOR
-      ENDIF
-      return B
-```
+
 For `m <= n`, `bindv(EQ_{n}, X)[i]` and `bindv(EQ_{m}, X)[i]`
 agree for `0 <= i < m`, and thus 
 `bindv(EQ_{m}, X)[i]` can be computed by padding `m` to the next power of 2
