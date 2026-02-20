@@ -398,7 +398,7 @@ constraints_layer(QUAD, wires, lv, sym_layer_pad, transcript,
       - (Q * layer_proof.vl) * sym_layer_pad.vr
       - Q * sym_layer_pad.vl_vr
      =
-      Q * layer_proof.vl * layer_proof.vl - known
+      Q * layer_proof.vl * layer_proof.vr - known
 
    Output the quadratic constraint
 
