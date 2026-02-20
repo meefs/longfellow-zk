@@ -211,7 +211,9 @@ consistency.
 
 ```
 sumcheck_circuit(circuit, wires, pad, transcript) {
-  G[0] = G[1] = transcript.gen_challenge(circuit.lv)
+  challenges = transcript.gen_challenge(circuit.lv)
+  G[0] = challenges
+  G[1] = challenges
   FOR 0 <= j < circuit.nl DO
      // Let V[j] be the output wires of layer j.
      // The body of the loop reduces the verification of the
@@ -241,7 +243,8 @@ sumcheck_circuit(circuit, wires, pad, transcript) {
 
 ```
 sumcheck_layer(QUAD, wires, lv, layer_pad, transcript) {
-   (VL, VR) = wires
+   VL = wires
+   VR = wires
    FOR 0 <= round < lv DO
       FOR 0 <= hand < 2 DO
         Let p(x) =
@@ -294,7 +297,9 @@ suffices to keep track of affine symbolic expressions of the form
 ```
 constraints_circuit(circuit, public_inputs, sym_private_inputs, 
                     sym_pad, transcript, proof) {
-  G[0] = G[1] = transcript.gen_challenge(circuit.lv)
+  challenges = transcript.gen_challenge(circuit.lv)
+  G[0] = challenges
+  G[1] = challenges
   claims = [0, 0]
   FOR 0 <= j < circuit.nl DO
      alpha = transcript.gen_challenge(1)
