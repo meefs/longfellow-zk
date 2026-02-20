@@ -331,7 +331,7 @@ constraints_circuit(circuit, public_inputs, sym_private_inputs,
 ```
 
 ```
-constraints_layer(QUAD, wires, lv, sym_layer_pad, transcript,
+constraints_layer(QUAD, lv, sym_layer_pad, transcript,
                   layer_proof, claims, alpha) {
    // Initial symbolic claim, which happens to be
    // a known constant but which will be updated to contain
