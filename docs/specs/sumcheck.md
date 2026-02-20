@@ -253,7 +253,8 @@ sumcheck_layer(QUAD, wires, lv, layer_pad, transcript) {
         // p(P1) is implied and not needed
         evals.p2 = p(P2) - layer_pad.evals[round][hand].p2
         layer_proof.evals[round][hand] = evals
-        transcript.write(evals);
+        transcript.write(evals.p0);
+        transcript.write(evals.p2);
         challenge = transcript.gen_challenge(1)
         G[round][hand] = challenge
 
@@ -268,8 +269,7 @@ sumcheck_layer(QUAD, wires, lv, layer_pad, transcript) {
    ENDFOR
    layer_proof.vl = VL[0] - layer_pad.vl
    layer_proof.vr = VR[0] - layer_pad.vr
-   transcript.write(layer_proof.vl)
-   transcript.write(layer_proof.vr)
+   transcript.write([layer_proof.vl, layer_proof.vr])
    return (layer_proof, G)
 }
 ```
@@ -343,7 +343,8 @@ constraints_layer(QUAD, wires, lv, sym_layer_pad, transcript,
         LET hp = layer_proof.evals[round][hand]
         LET sym_hpad = sym_layer_pad.evals[round][hand]
 
-        transcript.write(hp);
+        transcript.write(hp.p0);
+        transcript.write(hp.p2);
         challenge = transcript.gen_challenge(1)
         G[round][hand] = challenge
 
@@ -403,8 +404,7 @@ constraints_layer(QUAD, wires, lv, sym_layer_pad, transcript,
 
       sym_layer_pad.vl * sym_layer_pad.vr = sym_layer_pad.vl_vr
 
-   transcript.write(layer_proof.vl)
-   transcript.write(layer_proof.vr)
+   transcript.write([layer_proof.vl, layer_proof.vr])
 
    return (G, [layer_proof.vl, layer_proof.vr])
 }
