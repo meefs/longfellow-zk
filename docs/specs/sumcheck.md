@@ -14,6 +14,11 @@ Arrays can be multi-dimensional, as in the three-dimensional array
 `Q[g, l, r]`.  It is understood that the array is padded with
 infinitely many zeroes in each dimension.
 
+Depending on the context, some arrays may consist of almost all non-zero
+values, while other arrays may be sparse, containing very few non-zero
+values (ignoring the zero-padding convention above). Implementations
+should use dense or sparse representations of arrays as appropriate.
+
 Given array `A[]` and field element `x`, the function
 `bind(A, x)` returns the array `B` such that
 ```
