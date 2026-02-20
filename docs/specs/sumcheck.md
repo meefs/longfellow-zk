@@ -199,11 +199,9 @@ evaluations at three points `P0 = 0`, `P1 = 1`, and `P2`, where `0`
 and `1` are the additive and multiplicative identities in the field.
 The choice of `P2` depends upon the field.  For fields of characteristic
 greater than 2, set `P2 = 2` (= `1 + 1` in the field).  For `GF(2^128)`
-expressed as `GF(2)[X] / (X^128 + X^7 + X^2 + X + 1)`, and set `P2
-= X`.  This document does not prescribe a choice of P2 for binary
-fields other than `GF(2^128)`, but other binary fields
-represented as `GF(2)[X] / (Q(X))` SHOULD choose `P2 = X` for
-consistency.
+expressed as `GF(2)[X] / (X^128 + X^7 + X^2 + X + 1)`, set `P2 = inj(2)`
+as defined in (#gf2k).  This document does not prescribe a choice of
+P2 for binary fields other than `GF(2^128)`.
 
 ## Transform circuit and wires into a padded proof
 
