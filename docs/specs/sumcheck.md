@@ -256,7 +256,7 @@ sumcheck_layer(QUAD, wires, lv, layer_pad, transcript) {
         transcript.write(evals.p0);
         transcript.write(evals.p2);
         challenge = transcript.gen_challenge(1)
-        G[round][hand] = challenge
+        G[hand][round] = challenge
 
         // bind the L variable to CHALLENGE
         VL = bind(VL, challenge)
@@ -346,7 +346,7 @@ constraints_layer(QUAD, wires, lv, sym_layer_pad, transcript,
         transcript.write(hp.p0);
         transcript.write(hp.p2);
         challenge = transcript.gen_challenge(1)
-        G[round][hand] = challenge
+        G[hand][round] = challenge
 
         // Now the unpadded polynomial evaluations are expected
         // to be
