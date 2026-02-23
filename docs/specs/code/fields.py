@@ -1,3 +1,5 @@
+import secrets
+
 import sage.all
 from sage.rings.finite_rings.finite_field_constructor import GF
 from sage.rings.polynomial.polynomial_ring import polygen
@@ -11,6 +13,10 @@ def _make_gf2_128():
 def _make_quadratic_extension(base):
     x = polygen(base)
     return base.extension(x ** 2 + 1, name="x")
+
+
+def random_element(field):
+    return field.from_integer(secrets.randbelow(field.order()))
 
 
 # Construct prime-order fields.

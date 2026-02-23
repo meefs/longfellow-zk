@@ -203,6 +203,115 @@ expressed as `GF(2)[X] / (X^128 + X^7 + X^2 + X + 1)`, set `P2 = inj(2)`
 as defined in (#gf2k).  This document does not prescribe a choice of
 P2 for binary fields other than `GF(2^128)`.
 
+## Transcript encryption and deferred verification
+
+The sumcheck protocol produces a series of polynomials and claim values,
+computed from the circuit input values, to prove that the circuit
+computation was performed correctly.
+As described in (#overview), these polynomials and claims are not
+directly revealed to the verifier.
+Rather, the field elements that make up these values are encrypted with
+a one-time pad by subtracting a randomly chosen pad value from each
+field element, and the difference is sent to the verifier.
+
+When the verifier executes the sumcheck protocol, it does not have
+direct access to all the circuit inputs, and it is only given the
+one-time pad encrypted forms of the sumcheck polynomials and per-layer
+claims, not the corresponding plaintext values.
+Therefore, the prover and verifier defer part of the verification by
+producing a series of linear and quadratic constraints, relating the
+private input values and the one-time pad values, so that those
+constraints can be checked with the Ligero zero-knowledge system (see
+(#ligero-zk-proof)).
+
+The variables used in these constraints are assigned sequentially, first
+to the private circuit inputs, then to elements of the one-time pad.
+Variables for one-time pad values are assigned to values for circuit
+layers in order, starting with the output layer. Within each layer,
+variables are first assigned to one-time pad values for sumcheck
+polynomials, then to the per-layer claim values. The number of sumcheck
+polynomials for each layer is equal to double the value of `logw` for
+that layer of the circuit. The polynomials are represented by two field
+elements each, one for the evaluation at `P0 = 0`, and one for the
+evaluation at `P2`. At the end of the variables for each layer, three
+variables are assigned for claim-related values. Two variables are used
+for the one-time pad values for the claims `vl` and `vr`. Then, a
+variable is used for the product of those two one-time pad values.
+
+``` python
+def construct_symbolic_variables(field, circuit):
+    num_private_inputs = circuit.ninputs - circuit.pub_in
+    witness_length = (
+        num_private_inputs
+        + sum(l.logw for l in circuit.layers) * 4
+        + len(circuit.layers) * 3
+    )
+    ring = PolynomialRing(field, witness_length, "w")
+    variables = ring.gens()
+    witness_variables = variables[:num_private_inputs]
+    pad_variables = variables[num_private_inputs:]
+    return (
+        witness_variables,
+        construct_symbolic_pad(field, circuit, pad_variables)
+    )
+
+
+def construct_symbolic_pad(field, circuit, variables):
+    it = iter(variables)
+    layers = []
+    for layer in circuit.layers:
+        evals = []
+        for _ in range(layer.logw):
+            for _ in range(2):
+                evals.append([
+                    SumcheckPolynomial(
+                        next(it),
+                        next(it),
+                    ),
+                ])
+        vl = next(it)
+        vr = next(it)
+        vl_vr = next(it)
+        layers.append(LayerProof(
+            evals,
+            vl,
+            vr,
+            vl_vr,
+        ))
+    return layers
+
+
+def construct_concrete_pad(field, circuit):
+    """
+    Chooses one-time pad values, and returns them in strucuted and
+    flattened forms.
+    """
+    layers = []
+    flattened = []
+    for layer in circuit.layers:
+        evals = []
+        for _ in range(layer.nw):
+            for _ in range(2):
+                p0 = random_element(field)
+                p2 = random_element(field)
+                evals.append(SumcheckPolynomial(p0, p2))
+                flattened.append(p0)
+                flattened.append(p2)
+        vl = random_element(field)
+        vr = random_element(field)
+        vl_vr = vl * vr
+        layers.append(LayerProof(
+            evals,
+            vl,
+            vr,
+            vl_vr,
+        ))
+        flattened.append(vl)
+        flattened.append(vr)
+        flattened.append(vl_vr)
+    return (layers, flattened)
+```
+
 ## Transform circuit and wires into a padded proof
 
 ```
