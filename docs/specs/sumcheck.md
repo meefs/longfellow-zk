@@ -203,6 +203,16 @@ expressed as `GF(2)[X] / (X^128 + X^7 + X^2 + X + 1)`, set `P2 = inj(2)`
 as defined in (#gf2k).  This document does not prescribe a choice of
 P2 for binary fields other than `GF(2^128)`.
 
+During the sumcheck protocol, the claim value represents the sum of the
+evaluation of some function at all inputs `{0,1}^*`, while the
+polynomials represent the sum of the evaluations of the multilinear
+extension of that same function, with one argument set to `P0`, `P1`, or
+`P2`. Therefore, the sum of `p(P0) + p(P1)` is equal to the claim
+produced in the last round, and the prover only needs to send two field
+elements in order for the parties to agree on the polynomial. Here,
+`p(P0)` and `p(P2)` are sent to the verifier, and `p(P1)` is
+reconstructed.
+
 ## Transcript encryption and deferred verification
 
 The sumcheck protocol produces a series of polynomials and claim values,
