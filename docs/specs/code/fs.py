@@ -9,9 +9,11 @@ import hashlib
 import struct
 import math
 
+
 def hash(data):
     assert isinstance(data, bytes), "data not bytes"
     return hashlib.sha256(data).digest()
+
 
 class FSPRF:
     """
@@ -19,6 +21,7 @@ class FSPRF:
     Produces an infinite stream of bytes organized in 16-byte blocks.
     Block i = AES256(SEED, ID(i))
     """
+
     def __init__(self, seed: bytes):
         assert len(seed) == 32, "Seed must be 32 bytes (AES-256 key size)."
         self.counter = 0
@@ -31,10 +34,10 @@ class FSPRF:
         while len(self.buffer) < n:
             # block_id is the 16-byte little-endian representation of integer i
             block_id = self.counter.to_bytes(16, 'little')
-            
+
             # Block i = AES256(SEED, ID(i))
             block_output = self.cipher.encrypt(block_id)
-            
+
             self.buffer.extend(block_output)
             self.counter += 1
 
@@ -84,7 +87,6 @@ class Transcript:
         
         for elem in elems:
             self.tr.extend( int(elem).to_bytes(sz, byteorder="little"))
-
 
     def _get_fs(self) -> FSPRF:
         """

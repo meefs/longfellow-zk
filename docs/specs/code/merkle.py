@@ -2,9 +2,11 @@
 
 import hashlib
 
+
 def hash(data):
     assert isinstance(data, bytes), "data not bytes"
     return hashlib.sha256(data).digest()
+
 
 class MerkleTree:
     def __init__(self, n):
@@ -71,7 +73,7 @@ class MerkleTree:
         """
         Verifies that the provided leaves (s) at specific positions (indices)
         are part of the Merkle tree defined by 'root'.
-        
+
         :param root: The expected Root Hash
         :param n: Total number of leaves in the tree
         :param k: Number of leaves being verified
