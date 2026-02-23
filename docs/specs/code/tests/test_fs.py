@@ -1,5 +1,6 @@
 import unittest
 
+from fields import Fp256
 from fs import Transcript
 
 
@@ -7,7 +8,7 @@ class TestFiatShamir(unittest.TestCase):
     def test_example(self):
         t = Transcript()
 
-        p = 115792089210356248762697446949407573530086143415290314195533631308867097853951
+        field = Fp256
         session_id = b"test"
         t.init(session_id)
 
@@ -16,20 +17,20 @@ class TestFiatShamir(unittest.TestCase):
             arr.append(bi)
         t.write_bytes(arr)
 
-        tv1 = [t.generate_field(p) for i in range(0,16)]
+        tv1 = [t.generate_field(field) for i in range(0,16)]
         for ti in tv1:
             print(hex(ti))
         
-        t.write_field(7)
+        t.write_field(field(7))
 
-        tv2 = [t.generate_field(p) for i in range(0,16)]
+        tv2 = [t.generate_field(field) for i in range(0,16)]
         for ti in tv2:
             print(hex(ti))
 
-        fe_array = [(8), (9)]
+        fe_array = [field(8), field(9)]
         t.write_field_element_array(fe_array)
 
-        tv3 = [t.generate_field(p) for i in range(0,16)]
+        tv3 = [t.generate_field(field) for i in range(0,16)]
         for ti in tv3:
             print(hex(ti))
 

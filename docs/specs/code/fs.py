@@ -63,10 +63,10 @@ class Transcript:
         self._is_initialized = True
         self.write_bytes(session_id)
 
-    def write_field(self, elt, sz = 32):
+    def write_field(self, elt):
         assert self._is_initialized, "init not called"       
         self.tr.append(0x01)
-        self.tr.extend( int(elt).to_bytes(sz, byteorder="little"))
+        self.tr.extend(elt.to_bytes(byteorder="little"))
 
     def write_bytes(self, b):
         assert self._is_initialized, "init not called"       
@@ -76,7 +76,7 @@ class Transcript:
         self.tr.extend(length_prefix)
         self.tr.extend(b)
 
-    def write_field_element_array(self, elems, sz=32):
+    def write_field_element_array(self, elems):
         """
         Spec: Append byte designator 0x3, 8-byte LE count, then serialized elements.
         """
@@ -86,7 +86,7 @@ class Transcript:
         self.tr.extend(count_prefix)
         
         for elem in elems:
-            self.tr.extend( int(elem).to_bytes(sz, byteorder="little"))
+            self.tr.extend(elem.to_bytes(byteorder="little"))
 
     def _get_fs(self) -> FSPRF:
         """
@@ -121,14 +121,15 @@ class Transcript:
             if r < m:
                 return r
 
-    def generate_field(self, p):
+    def generate_field(self, field):
         fs = self._get_fs()
-        sz = math.ceil(p.bit_length() / 8)
+        order = field.order()
+        sz = math.ceil(order.bit_length() / 8)
         while True:
             b = fs.bytes(sz)
             x = int.from_bytes(b, byteorder='little', signed=False)
-            if x < p:
-                return x
+            if x < order:
+                return field.from_integer(x)
 
     def generate_nats_wo_replacement(self, m, n):
         assert m > n, "invalid parameter"
