@@ -11,6 +11,8 @@ from fields import random_element
 from fs import Transcript
 from sparse import SparseArray
 
+MAX_BINDINGS = 40
+
 
 def bindeq(field, log_n, challenges):
     if log_n == 0:
@@ -138,11 +140,18 @@ def sumcheck_circuit(
         wires: list[list],
         pad: list[LayerPad],
         transcript: Transcript) -> list[LayerProof]:
+    for _ in range(MAX_BINDINGS):
+        # Discard initial challenges. These are reserved for possible
+        # future use.
+        _ = transcript.generate_field(field)
     challenges = [
         transcript.generate_field(field)
-        for _ in range(circuit.lv)
+        for _ in range(MAX_BINDINGS)
     ]
-    G = (challenges, copy.copy(challenges))
+    G = (
+        challenges[:circuit.lv],
+        challenges[:circuit.lv],
+    )
     proof: list[LayerProof] = []
     for j, layer in enumerate(circuit.layers):
         alpha = transcript.generate_field(field)
@@ -281,11 +290,18 @@ def constraints_circuit(
     returned as objects holding three variables, representing
     `w_x * w_y = w_z`.
     """
+    for _ in range(MAX_BINDINGS):
+        # Discard initial challenges. These are reserved for possible
+        # future use.
+        _ = transcript.generate_field(field)
     challenges = [
         transcript.generate_field(field)
-        for _ in range(circuit.lv)
+        for _ in range(MAX_BINDINGS)
     ]
-    G = (challenges, copy.copy(challenges))
+    G = (
+        challenges[:circuit.lv],
+        challenges[:circuit.lv],
+    )
     claims = (field.zero(), field.zero())
     linear_constraints = []
     quadratic_constraints = []

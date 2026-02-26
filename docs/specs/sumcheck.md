@@ -389,6 +389,15 @@ each round of the sumcheck protocol.
 These two claim values are encrypted with a one-time pad and sent to the
 verifier.
 
+Before the first round, a fixed number of verifier challenges are
+generated and discarded. These are reserved for possible future
+extensions to the protocol. Additionally, a fixed number of challenges
+are generated for binding the output wires before the first round, with
+the remainder of the challenges being discarded. In both of these cases,
+`MAX_BINDINGS = 40` challenges are generated. For all subsequent layers,
+challenges used for binding output wires are generated one at a time,
+with no extra unused challenges.
+
 ``` python
 def sumcheck_circuit(
         field,
@@ -396,11 +405,18 @@ def sumcheck_circuit(
         wires: list[list],
         pad: list[LayerPad],
         transcript: Transcript) -> list[LayerProof]:
+    for _ in range(MAX_BINDINGS):
+        # Discard initial challenges. These are reserved for possible
+        # future use.
+        _ = transcript.generate_field(field)
     challenges = [
         transcript.generate_field(field)
-        for _ in range(circuit.lv)
+        for _ in range(MAX_BINDINGS)
     ]
-    G = (challenges, copy.copy(challenges))
+    G = (
+        challenges[:circuit.lv],
+        challenges[:circuit.lv],
+    )
     proof: list[LayerProof] = []
     for j, layer in enumerate(circuit.layers):
         alpha = transcript.generate_field(field)
@@ -542,11 +558,18 @@ def constraints_circuit(
     returned as objects holding three variables, representing
     `w_x * w_y = w_z`.
     """
+    for _ in range(MAX_BINDINGS):
+        # Discard initial challenges. These are reserved for possible
+        # future use.
+        _ = transcript.generate_field(field)
     challenges = [
         transcript.generate_field(field)
-        for _ in range(circuit.lv)
+        for _ in range(MAX_BINDINGS)
     ]
-    G = (challenges, copy.copy(challenges))
+    G = (
+        challenges[:circuit.lv],
+        challenges[:circuit.lv],
+    )
     claims = (field.zero(), field.zero())
     linear_constraints = []
     quadratic_constraints = []
