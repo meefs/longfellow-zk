@@ -253,7 +253,9 @@ for the one-time pad values for the claims `vl` and `vr`. Then, a
 variable is used for the product of those two one-time pad values.
 
 ``` python
-def construct_symbolic_variables(field, circuit):
+def construct_symbolic_variables(
+        field,
+        circuit: Circuit) -> tuple[list, list[LayerPad]]:
     num_private_inputs = circuit.ninputs - circuit.pub_in
     witness_length = (
         num_private_inputs
@@ -270,19 +272,22 @@ def construct_symbolic_variables(field, circuit):
     )
 
 
-def construct_symbolic_pad(field, circuit, variables):
+def construct_symbolic_pad(
+        field,
+        circuit: Circuit, variables) -> list[LayerPad]:
     it = iter(variables)
     layers = []
     for layer in circuit.layers:
-        evals = []
-        for _ in range(layer.logw):
+        evals: list[list[SumcheckPolynomial]] = []
+        for round in range(layer.logw):
+            evals.append([])
             for _ in range(2):
-                evals.append([
+                evals[round].append(
                     SumcheckPolynomial(
                         next(it),
                         next(it),
                     ),
-                ])
+                )
         vl = next(it)
         vr = next(it)
         vl_vr = next(it)
@@ -384,7 +389,7 @@ each round of the sumcheck protocol.
 These two claim values are encrypted with a one-time pad and sent to the
 verifier.
 
-```
+``` python
 def sumcheck_circuit(
         field,
         circuit: Circuit,
@@ -395,7 +400,7 @@ def sumcheck_circuit(
         transcript.generate_field(field)
         for _ in range(circuit.lv)
     ]
-    G = [challenges, copy.copy(challenges)]
+    G = (challenges, copy.copy(challenges))
     proof: list[LayerProof] = []
     for j, layer in enumerate(circuit.layers):
         alpha = transcript.generate_field(field)
@@ -423,19 +428,19 @@ def sumcheck_circuit(
     return proof
 ```
 
-```
+``` python
 def sumcheck_layer(
         field,
         QUAD: SparseArray,
         wires: list,
         logw: int,
         layer_pad: LayerPad,
-        transcript: Transcript) -> tuple[LayerProof, list[list]]:
+        transcript: Transcript) -> tuple[LayerProof, tuple[list, list]]:
     VL = DenseArray(field, wires)
     VR = DenseArray(field, wires)
     P2 = sumcheck_p2(field)
-    evals = []
-    G = ([], [])
+    evals: list[list[SumcheckPolynomial]] = []
+    G: tuple[list, list] = ([], [])
     for round in range(logw):
         evals.append([])
         for hand in range(2):
@@ -471,7 +476,7 @@ def sumcheck_layer(
                     )
                 else:
                     eval_p2 += P2 * v * VL[k[hand]] * VR[k[1 - hand]]
-            evals[round].append([eval_p0, eval_p2])
+            evals[round].append(SumcheckPolynomial(eval_p0, eval_p2))
             transcript.write_field(eval_p0)
             transcript.write_field(eval_p2)
             challenge = transcript.generate_field(field)
@@ -498,9 +503,11 @@ def sumcheck_layer(
 
 ## Generate constraints from the public inputs and the padded proof
 
-This section defines a procedure `constraints_circuit` for transforming the proof
-returned by `sumcheck_circuit` into constraints for the commitment
-scheme.  Specifically, each layer produces one linear constraint and one quadratic constraint.
+This section defines a procedure `constraints_circuit` for transforming
+the proof returned by `sumcheck_circuit` into constraints to be checked
+by the commitment scheme.  Specifically, each layer produces one linear
+constraint and one quadratic constraint. One additional linear
+constraint is added after processing the input layer.
 
 The main difficulty in describing the algorithm is that it operates
 not on concrete witnesses, but on expressions in which the witnesses
@@ -516,118 +523,189 @@ suffices to keep track of affine symbolic expressions of the form
 `k + SUM_{i} a[i] sym_w[i]` for some (concrete, nonsymbolic) field elements
 `k` and `a[]`.
 
+``` python
+def constraints_circuit(
+        field,
+        circuit: Circuit,
+        public_inputs: list,
+        sym_private_inputs: list,
+        sym_pad: list[LayerPad],
+        transcript: Transcript,
+        proof: list[LayerProof]) -> tuple[list, list[QuadraticConstraint]]:
+    """
+    Processes a sumcheck proof, and produces lists of constraints for
+    verification.
+
+    Linear constrants are returned as expressions of the form
+    `k + SUM_{i} a[i] sym_w[i]`, representing
+    `k + SUM_{i} a[i] sym_w[i] = 0`, and quadratic constraints are
+    returned as objects holding three variables, representing
+    `w_x * w_y = w_z`.
+    """
+    challenges = [
+        transcript.generate_field(field)
+        for _ in range(circuit.lv)
+    ]
+    G = (challenges, copy.copy(challenges))
+    claims = (field.zero(), field.zero())
+    linear_constraints = []
+    quadratic_constraints = []
+    for j, layer in enumerate(circuit.layers):
+        alpha = transcript.generate_field(field)
+        beta = transcript.generate_field(field)
+        QZ = layer.quad + beta * layer.Z
+        QUAD = QZ.bindv(G[0]) + alpha * QZ.bindv(G[1])
+        QUAD = QUAD.drop_dimension()
+        (
+            G,
+            claims,
+            linear_constraint,
+            quadratic_constraint,
+        ) = constraints_layer(
+            field,
+            QUAD,
+            layer.logw,
+            sym_pad[j],
+            transcript,
+            proof[j],
+            claims,
+            alpha,
+        )
+        linear_constraints.append(linear_constraint)
+        quadratic_constraints.append(quadratic_constraint)
+
+    # Add a constraint checking that the two final claims equal the
+    # binding of sym_inputs with G[0] and G[1].
+    gamma = transcript.generate_field(field)
+    # eq2 = bindv(EQ, G[0]) + gamma * bindv(EQ, G[1])
+    eq2 = (
+        bindeq(field, circuit.ninputs.bit_length(), G[0])
+        + gamma * bindeq(field, circuit.ninputs.bit_length(), G[1])
+    )
+    sym_layer_pad = sym_pad[-1]
+    num_private_inputs = circuit.ninputs - circuit.pub_in
+    final_constraint = (
+        claims[0]
+        + sym_layer_pad.vl
+        + gamma * claims[1]
+        + gamma * sym_layer_pad.vr
+        - sum(
+            eq2[i] * public_inputs[i]
+            for i in range(circuit.pub_in)
+        )
+        - sum(
+            eq2[i + circuit.pub_in] * sym_private_inputs[i]
+            for i in range(num_private_inputs)
+        )
+    )
+    linear_constraints.append(final_constraint)
+    return linear_constraints, quadratic_constraints
 ```
-constraints_circuit(circuit, public_inputs, sym_private_inputs, 
-                    sym_pad, transcript, proof) {
-  challenges = transcript.gen_challenge(circuit.lv)
-  G[0] = challenges
-  G[1] = challenges
-  claims = [0, 0]
-  FOR 0 <= j < circuit.nl DO
-     alpha = transcript.gen_challenge(1)
-     beta = transcript.gen_challenge(1)
-     QZ = circuit.layer[j].quad + beta * circuit.layer[j].Z;
-     QUAD = bindv(QZ, G[0]) + alpha * bindv(QZ, G[1])
-     (G, claims) = constraints_layer(
-               QUAD, circuit.layer[j].lv, sym_pad[j], transcript,
-               proof[j], claims, alpha)
-  ENDFOR
 
-  // now add constraints that the two final claims
-  // equal the binding of sym_inputs at G[0], G[1]
+``` python
+def constraints_layer(
+        field,
+        QUAD: SparseArray,
+        logw: int,
+        sym_layer_pad: LayerPad,
+        transcript: Transcript,
+        layer_proof: LayerProof,
+        claims: tuple[Any, Any],
+        alpha):
+    # Initial claim. This is a known constant during the first round,
+    # but it will be a symbolic affine expression in subsequent rounds.
+    sym_claim = claims[0] + alpha * claims[1]
 
-  gamma = transcript.gen_challenge(1)
-  LET eq2 = bindv(EQ, G[0]) + gamma * bindv(EQ, G[1])
-  LET sym_layer_pad = sym_pad[circuit.nl - 1]
-  LET npub = number of elements in public_inputs
+    # Lagrange basis polynomials
+    R = field["x"]
+    lag_0 = R.lagrange_polynomial([
+        (field.zero(), field.one()),
+        (field.one(), field.zero()),
+        (sumcheck_p2(field), field.zero()),
+    ])
+    lag_1 = R.lagrange_polynomial([
+        (field.zero(), field.zero()),
+        (field.one(), field.one()),
+        (sumcheck_p2(field), field.zero()),
+    ])
+    lag_2 = R.lagrange_polynomial([
+        (field.zero(), field.zero()),
+        (field.one(), field.zero()),
+        (sumcheck_p2(field), field.one()),
+    ])
 
-  Output the linear constraint
-      SUM_{i} (eq2[i + npub] * sym_private_inputs[i])
-      - sym_layer_pad.vl 
-      - gamma * sym_layer_pad.vr
-    = 
-      - SUM_{i} (eq2[i] * public_inputs[i])
-      + claims[0]
-      + gamma * claims[1]
-}
-```
+    G: tuple[list, list] = ([], [])
+    for round in range(logw):
+        for hand in range(2):
+            hp = layer_proof.evals[round][hand]
+            sym_hpad = sym_layer_pad.evals[round][hand]
 
-```
-constraints_layer(QUAD, lv, sym_layer_pad, transcript,
-                  layer_proof, claims, alpha) {
-   // Initial symbolic claim, which happens to be
-   // a known constant but which will be updated to contain
-   // symbolic linear terms later.
-   LET sym_claim = claims[0] + alpha * claims[1]
+            transcript.write_field(hp.p0)
+            transcript.write_field(hp.p2)
+            challenge = transcript.generate_field(field)
+            G[hand].append(challenge)
 
-   FOR 0 <= round < lv DO
-      FOR 0 <= hand < 2 DO
-        LET hp = layer_proof.evals[round][hand]
-        LET sym_hpad = sym_layer_pad.evals[round][hand]
+            # After decrypting, the polynomial evaluations are expected
+            # to be:
+            #
+            #   p(P0) = hp.p0 + sym_hpad.p0
+            #   p(P2) = hp.p2 + sym_hpad.p2
+            sym_p0 = hp.p0 + sym_hpad.p0
+            sym_p2 = hp.p2 + sym_hpad.p2
 
-        transcript.write(hp.p0);
-        transcript.write(hp.p2);
-        challenge = transcript.gen_challenge(1)
-        G[hand][round] = challenge
+            # Compute the implied evaluation, p(P1) = claim - p(P0), in
+            # symbolic form.
+            sym_p1 = sym_claim - sym_p0
 
-        // Now the unpadded polynomial evaluations are expected
-        // to be
-        //   p(P0) = hp.p0 + sym_hpad.p0
-        //   p(P2) = hp.p2 + sym_hpad.p2
-        LET sym_p0 = hp.p0 + sym_hpad.p0
-        LET sym_p2 = hp.p2 + sym_hpad.p2
+            # Given p(P0), p(P1), and p(P2), interpolate the new claim
+            # symbolically.
+            sym_claim = (
+                lag_0(challenge) * sym_p0
+                + lag_1(challenge) * sym_p1
+                + lag_2(challenge) * sym_p2
+            )
 
-        // Compute the implied p(P1) = claim - p(P0) in symbolic form
-        LET sym_p1 = sym_claim - sym_p0
+            QUAD = QUAD.bind(challenge, axis=hand)
 
-        LET lag_i(x) =
-               the quadratic polynomial such that
-                      lag_i(P_k) = 1  if i = k
-                                   0  otherwise
-               for 0 <= k < 3
+    # Now the bound QUAD is a 1x1 array.
+    Q = QUAD[0, 0]
 
-        // given p(P0), p(P1), and p(P2), interpolate the
-        // new claim symbolically
-        sym_claim =   lag_0(challenge) * sym_p0
-                    + lag_1(challenge) * sym_p1
-                    + lag_2(challenge) * sym_p2
+    # We want to verify that
+    #
+    #   sym_claim = Q * VL * VR
+    #
+    # where VL = layer_proof.vl + sym_layer_pad.vl
+    #   and VR = layer_proof.vr + sym_layer_pad.vr
+    #
+    # To keep this constraint linear, we expand the multiplication, and
+    # replace sym_layer_pad.vl * sym_layer_pad.vr with
+    # sym_layer_pad.vl_vr, checking that these quantities are equal in a
+    # separate quadratic constraint.
 
-        // bind L
-        QUAD = bind(QUAD, challenge);
+    linear_constraint = (
+        Q * (
+            layer_proof.vl * layer_proof.vr
+            + layer_proof.vr * sym_layer_pad.vl
+            + layer_proof.vl * sym_layer_pad.vr
+            + sym_layer_pad.vl_vr
+        )
+        - sym_claim
+    )
+    quadratic_constraint = QuadraticConstraint(
+        sym_layer_pad.vl,
+        sym_layer_pad.vr,
+        sym_layer_pad.vl_vr,
+    )
 
-        // swap left and right
-        QUAD = transpose(QUAD)
-      ENDFOR
-   ENDFOR
+    transcript.write_field_element_array([
+        layer_proof.vl,
+        layer_proof.vr,
+    ])
 
-   // now the bound QUAD is a scalar (a 1x1 array)
-   LET Q = QUAD[0,0]
-
-   // now verify that
-   //
-   //   SYM_CLAIM = Q * VL * VR
-   //
-   // where VL = layer_proof.vl + layer_pad.vl
-   //       VR = layer_proof.vr + layer_pad.vr
-
-   // decompose SYM_CLAIM into the known constant
-   // and the symbolic part
-   LET known + symbolic = sym_claim
-
-   Output the linear constraint
-      symbolic
-      - (Q * layer_proof.vr) * sym_layer_pad.vl
-      - (Q * layer_proof.vl) * sym_layer_pad.vr
-      - Q * sym_layer_pad.vl_vr
-     =
-      Q * layer_proof.vl * layer_proof.vr - known
-
-   Output the quadratic constraint
-
-      sym_layer_pad.vl * sym_layer_pad.vr = sym_layer_pad.vl_vr
-
-   transcript.write([layer_proof.vl, layer_proof.vr])
-
-   return (G, [layer_proof.vl, layer_proof.vr])
-}
+    return (
+        G,
+        (layer_proof.vl, layer_proof.vr),
+        linear_constraint,
+        quadratic_constraint,
+    )
 ```

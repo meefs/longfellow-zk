@@ -1,3 +1,4 @@
+import copy
 import unittest
 
 import sage.all
@@ -6,8 +7,8 @@ from sage.rings.finite_rings.finite_field_constructor import GF
 from circuit import Circuit, CircuitLayer, Quad
 from fs import Transcript
 from sumcheck import (
-    bindeq, construct_concrete_pad, construct_symbolic_variables,
-    sumcheck_circuit,
+    bindeq, constraints_circuit, construct_concrete_pad,
+    construct_symbolic_variables, sumcheck_circuit,
 )
 
 
@@ -34,14 +35,29 @@ class TestSumcheck(unittest.TestCase):
         circuit = make_test_circuit(gf17)
         transcript = Transcript()
         transcript.init(b"unit test")
-        wires = circuit.evaluate([gf17.one(), gf17(2)])
+        constraints_transcript = copy.deepcopy(transcript)
+        inputs = [gf17.one(), gf17(2)]
+        wires = circuit.evaluate(inputs)
         (pad_layers, _pad_flattened) = construct_concrete_pad(gf17, circuit)
-        sumcheck_circuit(
+        proof = sumcheck_circuit(
             gf17,
             circuit,
             wires,
             pad_layers,
             transcript,
+        )
+        sym_private_inputs, sym_pad = construct_symbolic_variables(
+            gf17,
+            circuit,
+        )
+        (_, _) = constraints_circuit(
+            gf17,
+            circuit,
+            inputs[:1],
+            sym_private_inputs,
+            sym_pad,
+            constraints_transcript,
+            proof,
         )
 
 
@@ -102,6 +118,6 @@ def make_test_circuit(field):
     return Circuit(
         1,
         1,
-        1,
+        2,
         [layer_0, layer_1, layer_2],
     )
