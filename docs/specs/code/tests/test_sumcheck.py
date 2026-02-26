@@ -4,8 +4,10 @@ import sage.all
 from sage.rings.finite_rings.finite_field_constructor import GF
 
 from circuit import Circuit, CircuitLayer, Quad
+from fs import Transcript
 from sumcheck import (
     bindeq, construct_concrete_pad, construct_symbolic_variables,
+    sumcheck_circuit,
 )
 
 
@@ -21,11 +23,26 @@ class TestSumcheck(unittest.TestCase):
             gf17(2) * gf17(5),
         ]
 
-    def test_smoke_test(self):
+    def test_smoke_test_witness(self):
         gf17 = GF(17)
         circuit = make_test_circuit(gf17)
         construct_symbolic_variables(gf17, circuit)
         construct_concrete_pad(gf17, circuit)
+
+    def test_smoke_test_sumcheck_prover(self):
+        gf17 = GF(17)
+        circuit = make_test_circuit(gf17)
+        transcript = Transcript()
+        transcript.init(b"unit test")
+        wires = circuit.evaluate([gf17.one(), gf17(2)])
+        (pad_layers, _pad_flattened) = construct_concrete_pad(gf17, circuit)
+        sumcheck_circuit(
+            gf17,
+            circuit,
+            wires,
+            pad_layers,
+            transcript,
+        )
 
 
 def make_test_circuit(field):
@@ -43,6 +60,7 @@ def make_test_circuit(field):
             # V[0][0] = 1 * V[1][1] * V[1][0]
             Quad(0, 1, 0, field(1)),
         ],
+        field,
     )
     layer_1 = CircuitLayer(
         4,
@@ -58,6 +76,7 @@ def make_test_circuit(field):
             Quad(2, 2, 0, field(0)),
             Quad(2, 3, 0, field(0)),
         ],
+        field,
     )
     layer_2 = CircuitLayer(
         2,
@@ -78,6 +97,7 @@ def make_test_circuit(field):
             # V[2][3] = -2 * V[3][0] * V[3][0]
             Quad(3, 0, 0, -field(2)),
         ],
+        field,
     )
     return Circuit(
         1,
