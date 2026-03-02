@@ -430,7 +430,7 @@ def constraints_layer(
             QUAD = QUAD.bind(challenge, axis=hand)
 
     # Now the bound QUAD is a 1x1 array.
-    Q = QUAD[0, 0]
+    Q = QUAD.drop_dimension().drop_dimension()[()]
 
     # We want to verify that
     #
