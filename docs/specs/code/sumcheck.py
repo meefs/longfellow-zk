@@ -1,5 +1,3 @@
-import copy
-import math
 from typing import Any
 
 import sage.all
@@ -7,9 +5,8 @@ from sage.rings.finite_rings.element_base import FiniteRingElement
 from sage.rings.finite_rings.finite_field_base import FiniteField
 from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
 from sage.rings.polynomial.multi_polynomial import MPolynomial
-from sage.rings.polynomial.multi_polynomial_ring_base import MPolynomialRing_base
 
-from circuit import Circuit, CircuitLayer, Quad
+from circuit import Circuit
 from dense import DenseArray
 from fields import random_element
 from fs import Transcript
