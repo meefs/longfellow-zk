@@ -54,18 +54,18 @@ class Circuit:
 
 
 class CircuitLayer:
-    def __init__(self, num_wires: int, quads: list[Quad], field) -> None:
+    def __init__(self, num_input_wires: int, quads: list[Quad], field) -> None:
         """
         Constructs a layer of a circuit.
 
         Arguments:
-        * `num_wires`: Number of input wires for this layer.
+        * `num_input_wires`: Number of input wires for this layer.
         * `quads`: List of quad terms in this layer, following the
           circuit serialization conventions. A value of zero indicates
           the term is part of the Z quad instead.
         """
-        self.logw = num_wires.bit_length()
-        self.nw = num_wires
+        self.logw = num_input_wires.bit_length()
+        self.nw = num_input_wires
         self.quads = quads
         self.quad = SparseArray(field)
         self.Z = SparseArray(field)
