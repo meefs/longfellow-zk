@@ -206,9 +206,9 @@ expressed as `GF(2)[X] / (X^128 + X^7 + X^2 + X + 1)`, set `P2 = inj(2)`
 as defined in (#gf2k).  This document does not prescribe a choice of
 P2 for binary fields other than `GF(2^128)`.
 
-At the start of each round of the sumcheck protocol, both the prover and
-the (virtual) sumcheck verifier agree on a claim value, which represents
-the sum of the evaluation of some function at all inputs `{0,1}^*`.
+At the start of each round of communication in a sumcheck protocol, both the
+prover and the (virtual) sumcheck verifier agree on a claim value, which
+represents the sum of the evaluation of some function at all inputs `{0,1}^*`.
 The polynomials computed by the prover represent the sum of the
 evaluations of the multilinear extension of that same function, with one
 argument fixed to `P0`, `P1`, or `P2`, and all other arguments chosen
@@ -224,7 +224,7 @@ and `p(P1)` is reconstructed from `p(P0)` and the claim.
 
 The sumcheck protocol produces a series of polynomials and claim values,
 computed from the circuit input values, to prove that the circuit
-computation was performed correctly.
+was evaluated correctly.
 As described in (#overview), these polynomials and claims are not
 directly revealed to the verifier.
 Rather, the field elements that make up these values are encrypted with
