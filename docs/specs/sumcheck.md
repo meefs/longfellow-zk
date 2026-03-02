@@ -80,11 +80,14 @@ For `n = 2^l` and `X` of size `l`, `bindv(EQ_{n}, X)` can be computed
 recursively in linear time as follows.
 
 ``` python
-def bindeq(field, log_n, challenges):
+def bindeq(
+        field: FiniteField,
+        log_n: int,
+        challenges: list[FiniteRingElement]) -> list[FiniteRingElement]:
     if log_n == 0:
         return [field.one()]
     n = 2 ** log_n
-    b = [None for _ in range(n)]
+    b = [field.zero() for _ in range(n)]
     a = bindeq(field, log_n - 1, challenges[1:])
     for i in range(n // 2):
         b[2 * i] = (field.one() - challenges[0]) * a[i]

@@ -3,6 +3,8 @@ import math
 from typing import Any
 
 import sage.all
+from sage.rings.finite_rings.element_base import FiniteRingElement
+from sage.rings.finite_rings.finite_field_base import FiniteField
 from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
 from sage.rings.polynomial.multi_polynomial import MPolynomial
 from sage.rings.polynomial.multi_polynomial_ring_base import MPolynomialRing_base
@@ -16,11 +18,14 @@ from sparse import SparseArray
 MAX_BINDINGS = 40
 
 
-def bindeq(field, log_n, challenges):
+def bindeq(
+        field: FiniteField,
+        log_n: int,
+        challenges: list[FiniteRingElement]) -> list[FiniteRingElement]:
     if log_n == 0:
         return [field.one()]
     n = 2 ** log_n
-    b = [None for _ in range(n)]
+    b = [field.zero() for _ in range(n)]
     a = bindeq(field, log_n - 1, challenges[1:])
     for i in range(n // 2):
         b[2 * i] = (field.one() - challenges[0]) * a[i]
