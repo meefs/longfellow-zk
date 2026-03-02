@@ -247,8 +247,9 @@ Variables for one-time pad values are assigned to values for circuit
 layers in order, starting with the output layer. Within each layer,
 variables are first assigned to one-time pad values for sumcheck
 polynomials, then to the per-layer claim values. The number of sumcheck
-polynomials for each layer is equal to double the value of `logw` for
-that layer of the circuit. The polynomials are represented by two field
+polynomials for each layer is equal to double the value of
+`log_num_input_wires` for that layer of the circuit.
+The polynomials are represented by two field
 elements each, one for the evaluation at `P0 = 0`, and one for the
 evaluation at `P2`. At the end of the variables for each layer, three
 variables are assigned for claim-related values. Two variables are used
@@ -263,7 +264,7 @@ def construct_symbolic_variables(
     num_private_inputs = circuit.ninputs - circuit.pub_in
     witness_length = (
         num_private_inputs
-        + sum(l.logw for l in circuit.layers) * 4
+        + sum(l.log_num_input_wires for l in circuit.layers) * 4
         + len(circuit.layers) * 3
     )
     ring = PolynomialRing(field, witness_length, "w")
@@ -283,7 +284,7 @@ def construct_symbolic_pad(
     layers = []
     for layer in circuit.layers:
         evals: list[list[SumcheckPolynomial]] = []
-        for round in range(layer.logw):
+        for round in range(layer.log_num_input_wires):
             evals.append([])
             for _ in range(2):
                 evals[round].append(
@@ -313,7 +314,7 @@ def construct_concrete_pad(field, circuit):
     flattened = []
     for layer in circuit.layers:
         evals = []
-        for _ in range(layer.nw):
+        for _ in range(layer.num_input_wires):
             for _ in range(2):
                 p0 = random_element(field)
                 p2 = random_element(field)
@@ -359,8 +360,9 @@ claim = SUM_{l, r} QUAD[j][l, r] V[j + 1][l] V[j + 1][r]
 ```
 
 If we reinterpret the wire indices `l` and `r` as binary numbers,
-replacing them both with `logw` many variables having value 0 or 1, then
-this equation has the form needed to apply the sumcheck protocol.
+replacing them both with `log_num_input_wires` many variables having
+value 0 or 1, then this equation has the form needed to apply the
+sumcheck protocol.
 
 At each layer, both parties start with two claims that each represent a
 linear combination of the layer's output wire values.
@@ -440,7 +442,7 @@ def sumcheck_circuit(
             field,
             QUAD,
             wires[j],
-            layer.logw,
+            layer.log_num_input_wires,
             pad[j],
             transcript,
         )
@@ -453,7 +455,7 @@ def sumcheck_layer(
         field,
         QUAD: SparseArray,
         wires: list,
-        logw: int,
+        log_num_input_wires: int,
         layer_pad: LayerPad,
         transcript: Transcript) -> tuple[LayerProof, tuple[list, list]]:
     VL = DenseArray(field, wires)
@@ -461,7 +463,7 @@ def sumcheck_layer(
     P2 = sumcheck_p2(field)
     evals: list[list[SumcheckPolynomial]] = []
     G: tuple[list, list] = ([], [])
-    for round in range(logw):
+    for round in range(log_num_input_wires):
         evals.append([])
         for hand in range(2):
             # Consider the following polynomial.
@@ -594,7 +596,7 @@ def constraints_circuit(
         ) = constraints_layer(
             field,
             QUAD,
-            layer.logw,
+            layer.log_num_input_wires,
             sym_pad[j],
             transcript,
             proof[j],
@@ -633,7 +635,7 @@ def constraints_circuit(
 def constraints_layer(
         field,
         QUAD: SparseArray,
-        logw: int,
+        log_num_input_wires: int,
         sym_layer_pad: LayerPad,
         transcript: Transcript,
         layer_proof: LayerProof,
@@ -662,7 +664,7 @@ def constraints_layer(
     ])
 
     G: tuple[list, list] = ([], [])
-    for round in range(logw):
+    for round in range(log_num_input_wires):
         for hand in range(2):
             hp = layer_proof.evals[round][hand]
             sym_hpad = sym_layer_pad.evals[round][hand]

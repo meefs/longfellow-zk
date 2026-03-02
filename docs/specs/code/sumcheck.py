@@ -70,7 +70,7 @@ def construct_symbolic_variables(
     num_private_inputs = circuit.ninputs - circuit.pub_in
     witness_length = (
         num_private_inputs
-        + sum(l.logw for l in circuit.layers) * 4
+        + sum(l.log_num_input_wires for l in circuit.layers) * 4
         + len(circuit.layers) * 3
     )
     ring = PolynomialRing(field, witness_length, "w")
@@ -90,7 +90,7 @@ def construct_symbolic_pad(
     layers = []
     for layer in circuit.layers:
         evals: list[list[SumcheckPolynomial]] = []
-        for round in range(layer.logw):
+        for round in range(layer.log_num_input_wires):
             evals.append([])
             for _ in range(2):
                 evals[round].append(
@@ -120,7 +120,7 @@ def construct_concrete_pad(field, circuit):
     flattened = []
     for layer in circuit.layers:
         evals = []
-        for _ in range(layer.nw):
+        for _ in range(layer.num_input_wires):
             for _ in range(2):
                 p0 = random_element(field)
                 p2 = random_element(field)
@@ -179,7 +179,7 @@ def sumcheck_circuit(
             field,
             QUAD,
             wires[j],
-            layer.logw,
+            layer.log_num_input_wires,
             pad[j],
             transcript,
         )
@@ -191,7 +191,7 @@ def sumcheck_layer(
         field,
         QUAD: SparseArray,
         wires: list,
-        logw: int,
+        log_num_input_wires: int,
         layer_pad: LayerPad,
         transcript: Transcript) -> tuple[LayerProof, tuple[list, list]]:
     VL = DenseArray(field, wires)
@@ -199,7 +199,7 @@ def sumcheck_layer(
     P2 = sumcheck_p2(field)
     evals: list[list[SumcheckPolynomial]] = []
     G: tuple[list, list] = ([], [])
-    for round in range(logw):
+    for round in range(log_num_input_wires):
         evals.append([])
         for hand in range(2):
             # Consider the following polynomial.
@@ -330,7 +330,7 @@ def constraints_circuit(
         ) = constraints_layer(
             field,
             QUAD,
-            layer.logw,
+            layer.log_num_input_wires,
             sym_pad[j],
             transcript,
             proof[j],
@@ -368,7 +368,7 @@ def constraints_circuit(
 def constraints_layer(
         field,
         QUAD: SparseArray,
-        logw: int,
+        log_num_input_wires: int,
         sym_layer_pad: LayerPad,
         transcript: Transcript,
         layer_proof: LayerProof,
@@ -397,7 +397,7 @@ def constraints_layer(
     ])
 
     G: tuple[list, list] = ([], [])
-    for round in range(logw):
+    for round in range(log_num_input_wires):
         for hand in range(2):
             hp = layer_proof.evals[round][hand]
             sym_hpad = sym_layer_pad.evals[round][hand]

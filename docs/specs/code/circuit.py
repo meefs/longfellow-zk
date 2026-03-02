@@ -36,7 +36,7 @@ class Circuit:
             if j == 0:
                 num_outputs = self.num_outputs
             else:
-                num_outputs = self.layers[j - 1].nw
+                num_outputs = self.layers[j - 1].num_input_wires
             outputs += [field.zero() for _ in range(num_outputs)]
             z_gates = set()
             for quad in layer.quads:
@@ -64,8 +64,8 @@ class CircuitLayer:
           circuit serialization conventions. A value of zero indicates
           the term is part of the Z quad instead.
         """
-        self.logw = num_input_wires.bit_length()
-        self.nw = num_input_wires
+        self.log_num_input_wires = num_input_wires.bit_length()
+        self.num_input_wires = num_input_wires
         self.quads = quads
         self.quad = SparseArray(field)
         self.Z = SparseArray(field)

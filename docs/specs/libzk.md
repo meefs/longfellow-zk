@@ -526,9 +526,9 @@ The `const_table` structure contains an array of `Elt` constants that can be ref
 
 ```
 struct {
-  size logw;     // log of number of wires
-  size nw;       // number of wires
-  Quads quads[];  // array of nw Quads
+  size log_num_input_wires;  // log of number of wires
+  size num_input_wires;      // number of wires
+  Quads quads[];             // array of Quads
 } CircuitLayer;
 ```
 
