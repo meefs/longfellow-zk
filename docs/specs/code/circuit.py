@@ -40,15 +40,19 @@ class Circuit:
             outputs += [field.zero() for _ in range(num_outputs)]
             z_gates = set()
             for quad in layer.quads:
-                if quad.v.is_zero():
-                    z_gates.add(quad.g)
-                    outputs[quad.g] += inputs[quad.h0] * inputs[quad.h1]
-                else:
-                    outputs[quad.g] += (
-                        quad.v * inputs[quad.h0] * inputs[quad.h1]
+                if quad.coefficient.is_zero():
+                    z_gates.add(quad.gate)
+                    outputs[quad.gate] += (
+                        inputs[quad.input_0] * inputs[quad.input_1]
                     )
-            for g in z_gates:
-                if not outputs[g].is_zero():
+                else:
+                    outputs[quad.gate] += (
+                        quad.coefficient
+                        * inputs[quad.input_0]
+                        * inputs[quad.input_1]
+                    )
+            for gate in z_gates:
+                if not outputs[gate].is_zero():
                     raise ValueError("In-circuit assertion failed")
         return wires
 
@@ -70,15 +74,28 @@ class CircuitLayer:
         self.quad = SparseArray(field)
         self.Z = SparseArray(field)
         for quad in quads:
-            if quad.v.is_zero():
-                self.Z[quad.g, quad.h0, quad.h1] = quad.v.parent().one()
+            if quad.coefficient.is_zero():
+                self.Z[
+                    quad.gate,
+                    quad.input_0,
+                    quad.input_1,
+                ] = quad.coefficient.parent().one()
             else:
-                self.quad[quad.g, quad.h0, quad.h1] = quad.v
+                self.quad[
+                    quad.gate,
+                    quad.input_0,
+                    quad.input_1,
+                ] = quad.coefficient
 
 
 class Quad:
-    def __init__(self, g: int, h0: int, h1: int, v: FiniteRingElement) -> None:
-        self.g = g
-        self.h0 = h0
-        self.h1 = h1
-        self.v = v
+    def __init__(
+            self,
+            gate: int,
+            input_0: int,
+            input_1: int,
+            coefficient: FiniteRingElement) -> None:
+        self.gate = gate
+        self.input_0 = input_0
+        self.input_1 = input_1
+        self.coefficient = coefficient
