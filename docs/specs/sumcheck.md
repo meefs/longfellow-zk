@@ -306,7 +306,7 @@ def construct_symbolic_pad(
 
 def construct_concrete_pad(field, circuit):
     """
-    Chooses one-time pad values, and returns them in strucuted and
+    Chooses one-time pad values, and returns them in structured and
     flattened forms.
     """
     layers = []
