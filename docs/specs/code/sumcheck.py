@@ -20,13 +20,13 @@ MAX_BINDINGS = 40
 
 def bindeq(
         field: FiniteField,
-        log_n: int,
         challenges: list[FiniteRingElement]) -> list[FiniteRingElement]:
+    log_n = len(challenges)
     if log_n == 0:
         return [field.one()]
     n = 2 ** log_n
     b = [field.zero() for _ in range(n)]
-    a = bindeq(field, log_n - 1, challenges[1:])
+    a = bindeq(field, challenges[1:])
     for i in range(n // 2):
         b[2 * i] = (field.one() - challenges[0]) * a[i]
         b[2 * i + 1] = challenges[0] * a[i]
@@ -344,10 +344,7 @@ def constraints_circuit(
     # binding of sym_inputs with G[0] and G[1].
     gamma = transcript.generate_field(field)
     # eq2 = bindv(EQ, G[0]) + gamma * bindv(EQ, G[1])
-    eq2 = (
-        bindeq(field, circuit.ninputs.bit_length(), G[0])
-        + gamma * bindeq(field, circuit.ninputs.bit_length(), G[1])
-    )
+    eq2 = bindeq(field, G[0]) + gamma * bindeq(field, G[1])
     sym_layer_pad = sym_pad[-1]
     num_private_inputs = circuit.ninputs - circuit.pub_in
     final_constraint = (

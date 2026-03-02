@@ -15,9 +15,9 @@ from sumcheck import (
 class TestSumcheck(unittest.TestCase):
     def test_bindeq(self):
         gf17 = GF(17)
-        assert bindeq(gf17, 0, []) == [gf17.one()]
-        assert bindeq(gf17, 1, [2]) == [gf17(16), gf17(2)]
-        assert bindeq(gf17, 2, [2, 5]) == [
+        assert bindeq(gf17, []) == [gf17.one()]
+        assert bindeq(gf17, [2]) == [gf17(16), gf17(2)]
+        assert bindeq(gf17, [2, 5]) == [
             gf17(16) * gf17(13),
             gf17(2) * gf17(13),
             gf17(16) * gf17(5),
