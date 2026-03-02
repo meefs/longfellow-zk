@@ -513,12 +513,12 @@ struct {
   Version version;     // 1-byte identifier, 0x1.
   FieldID field;       // identifies the field
   FieldID subfield;    // identifies the subfield
-  size nv;             // number of outputs
-	size pub_in;         // number of public inputs
-	size ninputs;        // number of inputs, including witnesses
-	size nl;             // number of layers
-	Elt const_table[];   // array of constants used by the quads
-	CircuitLayer layers[]; 	// array of layers of size nl
+  size num_outputs;    // number of outputs
+  size pub_in;         // number of public inputs
+  size ninputs;        // number of inputs, including witnesses
+  size num_layers;     // number of layers
+  Elt const_table[];   // array of constants used by the quads
+  CircuitLayer layers[]; 	// array of layers of size num_layers
 } Circuit;
 ```
 

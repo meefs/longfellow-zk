@@ -13,8 +13,8 @@ class Circuit:
             num_public_inputs: int,
             num_inputs: int,
             layers: list[CircuitLayer]) -> None:
-        self.nv = num_outputs
-        self.lv = num_outputs.bit_length()
+        self.num_outputs = num_outputs
+        self.log_num_outputs = num_outputs.bit_length()
         self.pub_in = num_public_inputs
         self.ninputs = num_inputs
         self.layers = layers
@@ -34,7 +34,7 @@ class Circuit:
             inputs = wires[j + 1]
             outputs = wires[j]
             if j == 0:
-                num_outputs = self.nv
+                num_outputs = self.num_outputs
             else:
                 num_outputs = self.layers[j - 1].nw
             outputs += [field.zero() for _ in range(num_outputs)]

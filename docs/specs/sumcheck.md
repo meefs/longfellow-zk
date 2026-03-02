@@ -418,8 +418,8 @@ def sumcheck_circuit(
         for _ in range(MAX_BINDINGS)
     ]
     G = (
-        challenges[:circuit.lv],
-        challenges[:circuit.lv],
+        challenges[:circuit.log_num_outputs],
+        challenges[:circuit.log_num_outputs],
     )
     proof: list[LayerProof] = []
     for j, layer in enumerate(circuit.layers):
@@ -574,8 +574,8 @@ def constraints_circuit(
         for _ in range(MAX_BINDINGS)
     ]
     G = (
-        challenges[:circuit.lv],
-        challenges[:circuit.lv],
+        challenges[:circuit.log_num_outputs],
+        challenges[:circuit.log_num_outputs],
     )
     claims = (field.zero(), field.zero())
     linear_constraints = []
