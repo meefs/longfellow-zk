@@ -22,6 +22,9 @@ class Circuit:
     def evaluate(self, inputs: list[FiniteRingElement]) -> list[list[FiniteRingElement]]:
         """
         Evaluates the circuit and returns all wire values.
+
+        This takes in the circuit's inputs as a list of field elements. By
+        convention, the first field element in the input list should be one.
         """
         field = inputs[0].parent()
         wires: list[list[FiniteRingElement]] = [[] for layer in self.layers]
