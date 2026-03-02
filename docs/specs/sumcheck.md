@@ -255,7 +255,8 @@ variable is used for the product of those two one-time pad values.
 ``` python
 def construct_symbolic_variables(
         field,
-        circuit: Circuit) -> tuple[list, list[LayerPad]]:
+        circuit: Circuit,
+        ) -> tuple[tuple[MPolynomial, ...], list[LayerPad]]:
     num_private_inputs = circuit.ninputs - circuit.pub_in
     witness_length = (
         num_private_inputs
@@ -480,9 +481,12 @@ def sumcheck_layer(
             # binding only 1-D arrays with length equal to the number
             # of wires.
             eval_p0 = sum(
-                v * VL[k[hand]] * VR[k[1 - hand]]
-                for (k, v) in QUAD.entries.items()
-                if k[hand] & 1 == 0
+                (
+                    v * VL[k[hand]] * VR[k[1 - hand]]
+                    for (k, v) in QUAD.entries.items()
+                    if k[hand] & 1 == 0
+                ),
+                start=field.zero(),
             )
             eval_p2 = field.zero()
             for (k, v) in QUAD.entries.items():

@@ -1,37 +1,42 @@
+from __future__ import annotations
+
 import collections
 import copy
 from typing import DefaultDict, Self
 
+import sage.all
+from sage.rings.finite_rings.element_base import FiniteRingElement
 
-class SparseArray[V]:
-    entries: DefaultDict[tuple[int, ...], V]
+
+class SparseArray:
+    entries: DefaultDict[tuple[int, ...], FiniteRingElement]
 
     def __init__(self, field) -> None:
         self.field = field
         self.entries = collections.defaultdict(field.zero)
 
-    def __getitem__(self, key: tuple[int, ...]) -> V:
+    def __getitem__(self, key: tuple[int, ...]) -> FiniteRingElement:
         return self.entries[key]
 
-    def __setitem__(self, key: tuple[int, ...], value: V) -> None:
+    def __setitem__(self, key: tuple[int, ...], value: FiniteRingElement) -> None:
         self.entries[key] = value
 
-    def __mul__(self, other: V) -> Self:
-        result: SparseArray[tuple[int, ...], V] = SparseArray(self.field)
+    def __mul__(self, other: FiniteRingElement) -> SparseArray:
+        result = SparseArray(self.field)
         for key, value in self.entries.items():
             result.entries[key] = value * other
         return result
 
-    def __rmul__(self, other: V) -> Self:
+    def __rmul__(self, other: FiniteRingElement) -> SparseArray:
         return self * other
 
-    def __add__(self, other: Self) -> Self:
+    def __add__(self, other: Self) -> SparseArray:
         result = copy.copy(self)
         for key, value in other.entries.items():
             result.entries[key] += value
         return result
 
-    def bind(self, x: V, axis=0) -> Self:
+    def bind(self, x: FiniteRingElement, axis=0) -> SparseArray:
         result = SparseArray(x.parent())
         for key, value in self.entries.items():
             new_key = key[:axis] + (key[axis] // 2,) + key[axis + 1:]
@@ -41,13 +46,13 @@ class SparseArray[V]:
                 result[new_key] += value - x * value
         return result
 
-    def bindv(self, xs: list[V], axis=0) -> Self:
+    def bindv(self, xs: list[FiniteRingElement], axis=0) -> SparseArray:
         result = self
         for x in xs:
             result = result.bind(x, axis)
         return result
 
-    def drop_dimension(self) -> Self:
+    def drop_dimension(self) -> SparseArray:
         """
         Removes the first dimension from a sparse array.
 

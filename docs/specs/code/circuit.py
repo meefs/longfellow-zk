@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import sage.all
+from sage.rings.finite_rings.element_base import FiniteRingElement
+
 from sparse import SparseArray
 
 
@@ -16,12 +19,12 @@ class Circuit:
         self.ninputs = num_inputs
         self.layers = layers
 
-    def evaluate[T](self, inputs: list[T]) -> list[list[T]]:
+    def evaluate(self, inputs: list[FiniteRingElement]) -> list[list[FiniteRingElement]]:
         """
         Evaluates the circuit and returns all wire values.
         """
         field = inputs[0].parent()
-        wires: list[list[T]] = [[] for layer in self.layers]
+        wires: list[list[FiniteRingElement]] = [[] for layer in self.layers]
         wires.append(inputs)
         for j in range(len(self.layers) - 1, -1, -1):
             layer = self.layers[j]
@@ -71,7 +74,7 @@ class CircuitLayer:
 
 
 class Quad:
-    def __init__(self, g: int, h0: int, h1: int, v) -> None:
+    def __init__(self, g: int, h0: int, h1: int, v: FiniteRingElement) -> None:
         self.g = g
         self.h0 = h0
         self.h1 = h1
