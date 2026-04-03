@@ -341,7 +341,13 @@ def constraints_circuit(
     # binding of sym_inputs with G[0] and G[1].
     gamma = transcript.generate_field(field)
     # eq2 = bindv(EQ, G[0]) + gamma * bindv(EQ, G[1])
-    eq2 = bindeq(field, G[0]) + gamma * bindeq(field, G[1])
+    eq2 = [
+        a + gamma * b
+        for a, b in zip(
+            bindeq(field, G[0]),
+            bindeq(field, G[1]),
+        )
+    ]
     sym_layer_pad = sym_pad[-1]
     num_private_inputs = circuit.ninputs - circuit.pub_in
     final_constraint = (
