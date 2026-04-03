@@ -39,6 +39,7 @@ class ml_dsa_44_witness {
   std::array<uint8_t, ml_dsa::C_TILDE_BYTES> c_prime_tilde_;
   std::vector<Sha3Witness::BlockWitness> c_prime_tilde_bws_;
   std::array<std::array<uint64_t, ml_dsa::N>, ml_dsa::L> z_bits_;
+  uint64_t h_sum_bits_;
 
   Sha3Witness::BlockWitness shake_bws_;
 
@@ -214,6 +215,7 @@ class ml_dsa_44_witness {
     for (size_t i = 0; i < 7; ++i) {
       Sha3Witness::fill_witness(filler, c_prime_tilde_bws_[i], f);
     }
+    filler.push_back(h_sum_bits_, 7, f);
   }
 
   bool compute_witness(const std::vector<uint8_t>& pk,
@@ -239,6 +241,13 @@ class ml_dsa_44_witness {
     msg_ = msg;
 
     // Z and H handling
+    uint64_t h_sum = 0;
+    for (size_t i = 0; i < ml_dsa::K; ++i) {
+      for (size_t k = 0; k < ml_dsa::N; ++k) {
+        if (ref_sig.h[i][k]) h_sum++;
+      }
+    }
+    h_sum_bits_ = h_sum;
 
     for (size_t i = 0; i < ml_dsa::L; ++i) {
       ml_dsa::Rq z_poly = ref_sig.z[i];

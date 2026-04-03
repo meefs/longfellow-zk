@@ -17,6 +17,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
 #include <string>
 
 #include "gtest/gtest.h"
@@ -143,11 +144,20 @@ TEST(Nat, BadStrings) {
       "559743559744",
       "0x40000000000000000001230000000000000000000000000000000000000000000",
       "000000000000000000000000000000000000000000000000000000000000000000000000"
+      "000000000000",
+      "000000000000000000000000000000000000000000000000000000000000000000000000"
+      "000000000000000000000000000000000000000000000000000000000000000000000000"
+      "000000000000000000000000000000000000000000000000000000000000000000000000"
+      "000000000000000000000000000000000000000000000000000000000000000000000000"
       "000000000000"};
 
   for (auto s : bad_strings) {
     EXPECT_FALSE(Nat<4>::of_untrusted_string(s).has_value());
   }
+}
+TEST(Nat, OfUntrustedStringValid) {
+  EXPECT_TRUE(Nat<4>::of_untrusted_string("123").has_value());
+  EXPECT_TRUE(Nat<4>::of_untrusted_string("0x123").has_value());
 }
 
 TEST(Nat, BadDigits) {
@@ -157,6 +167,20 @@ TEST(Nat, BadDigits) {
       EXPECT_DEATH(digit((char)i), "bad char");
     }
   }
+}
+
+TEST(Nat, HexConstructor) {
+  Nat<4> a("0x123");
+  EXPECT_EQ(a, Nat<4>(0x123));
+}
+
+TEST(Nat, SafeDigit) {
+  EXPECT_EQ(Nat<4>::safe_digit('a', 16), 10);
+  EXPECT_EQ(Nat<4>::safe_digit('f', 16), 15);
+  EXPECT_EQ(Nat<4>::safe_digit('A', 16), 10);
+  EXPECT_EQ(Nat<4>::safe_digit('F', 16), 15);
+  EXPECT_EQ(Nat<4>::safe_digit('g', 16), std::nullopt);
+  EXPECT_EQ(Nat<4>::safe_digit('a', 10), std::nullopt);
 }
 
 TEST(Nat, Mac) {
