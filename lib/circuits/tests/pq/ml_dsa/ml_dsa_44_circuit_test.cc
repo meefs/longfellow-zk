@@ -157,7 +157,7 @@ std::unique_ptr<Circuit<Field6>> make_ml_dsa_44_use_hint_circuit(size_t nc) {
 
         verify.assert_use_hint(sig->h, w->w_prime_approx_, w->w1_,
                                w->hint_aux_bits_, w->w_prime_1_,
-                               w->w_prime_1_bits_);
+                               w->w_prime_1_bits_, w->h_sum_bits_);
       });
 }
 

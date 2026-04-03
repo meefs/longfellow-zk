@@ -19,6 +19,7 @@
 #include <cstdint>
 
 #include "algebra/fp24.h"
+#include "algebra/nat.h"
 #include "benchmark/benchmark.h"
 #include "gtest/gtest.h"
 
@@ -168,6 +169,19 @@ TEST(Fp24_6, OfScalar) {
       EXPECT_EQ(ext.of_scalar(k), ext.beta(i));
     }
   }
+}
+
+TEST(Fp24, OfStringHex) {
+  Fp24 F(16777213);
+  EXPECT_EQ(F.of_string("0X123"), F.of_scalar(0x123));
+}
+
+TEST(Fp24, Unimplemented) {
+  Fp24 F(16777213);
+  EXPECT_DEATH(F.prescale_for_dot(F.one()), "prescale_for_dot\\(\\)");
+  EXPECT_DEATH(F.dot(0, nullptr, nullptr), "dot\\(\\)");
+  Nat<2> n2(1);
+  EXPECT_DEATH(F.reduce(n2), "reduce\\(\\)");
 }
 
 void BM_Fp24_6_add(benchmark::State& state) {

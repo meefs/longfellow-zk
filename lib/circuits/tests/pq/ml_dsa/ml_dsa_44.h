@@ -81,6 +81,7 @@ namespace proofs {
 template <class LogicCircuit, class Field>
 class MLDSA44Verify {
   using v6 = typename LogicCircuit::template bitvec<6>;
+  using v7 = typename LogicCircuit::template bitvec<7>;
   using v8 = typename LogicCircuit::v8;
   using v10 = typename LogicCircuit::template bitvec<10>;
   using v16 = typename LogicCircuit::template bitvec<16>;
@@ -196,6 +197,7 @@ class MLDSA44Verify {
     RqW nttc_;
     std::array<v8, ml_dsa::K * 192> w1_tilde_;
     std::vector<BlockWitness> c_prime_tilde_bws_;
+    v7 h_sum_bits_;
 
     void input(const LogicCircuit& lc) {
       sample_in_ball_.input(lc);
@@ -221,6 +223,7 @@ class MLDSA44Verify {
       for (auto& bw : c_prime_tilde_bws_) {
         bw.input(lc);
       }
+      h_sum_bits_ = lc.template vinput<7>();
     }
   };
 
@@ -355,19 +358,12 @@ class MLDSA44Verify {
     auto two_gamma2 = lc_.konst(lc_.f_.of_scalar(2 * ml_dsa::GAMMA_2));
     auto shift_val = lc_.konst(lc_.f_.of_scalar(ml_dsa::GAMMA_2 - 1));
     EltW zero = lc_.konst(lc_.f_.zero());
-    EltW one = lc_.konst(lc_.f_.one());
 
     lc_.assert_is_bit(h_elt);
 
     // 1. Reconstruct R and extract sign bit s
-    EltW r0_shifted = lc_.konst(lc_.f_.zero());
-    Elt p = lc_.f_.one();
-    Elt two = lc_.f_.two();
-    for (size_t b = 0; b < 18; ++b) {
-      EltW bit_val = lc_.mux(hint_r0_bits_elt[b], one, zero);
-      r0_shifted = lc_.axpy(r0_shifted, p, bit_val);
-      p = lc_.f_.mulf(p, two);
-    }
+    EltW r0_shifted =
+        lc_.as_scalar(lc_.template slice<0, 18>(hint_r0_bits_elt));
 
     // Check R <= 2*GAMMA_2 - 1  (18 bits since 2*GAMMA_2 - 1 = 190463 < 2^18)
     auto max_bound = lc_.template vbit<18>(2 * ml_dsa::GAMMA_2 - 1);
@@ -391,13 +387,7 @@ class MLDSA44Verify {
     lc_.assert_eq(r_elt, val);
 
     // 3. Verify r1_recon range [0, 43]
-    EltW r1_recon = lc_.konst(lc_.f_.zero());
-    p = lc_.f_.one();
-    for (size_t b = 0; b < 6; ++b) {
-      EltW bit_val = lc_.mux(r1_bits_elt[b], one, zero);
-      r1_recon = lc_.axpy(r1_recon, p, bit_val);
-      p = lc_.f_.mulf(p, two);
-    }
+    EltW r1_recon = lc_.as_scalar(r1_bits_elt);
     lc_.assert_eq(hinted_r1, r1_recon);
     auto r1_bound = lc_.template vbit<6>(43);
     auto is_w1_valid = lc_.leq(6, r1_bits_elt.data(), r1_bound.data());
@@ -421,15 +411,23 @@ class MLDSA44Verify {
       const RqW (&w_prime_approx)[ml_dsa::K], const RqW (&w1)[ml_dsa::K],
       const std::array<std::array<v19, ml_dsa::N>, ml_dsa::K>& hint_aux_bits,
       const RqW (&w_prime_1)[ml_dsa::K],
-      const std::array<std::array<v6, ml_dsa::N>, ml_dsa::K>& w_prime_1_bits)
-      const {
+      const std::array<std::array<v6, ml_dsa::N>, ml_dsa::K>& w_prime_1_bits,
+      const v7& h_sum_bits) const {
+    EltW sum = lc_.konst(lc_.f_.zero());
     for (size_t i = 0; i < ml_dsa::K; ++i) {
       for (size_t k = 0; k < ml_dsa::N; ++k) {
         assert_use_hint_single(h[i].coeffs[k], w_prime_approx[i].coeffs[k],
                                w1[i].coeffs[k], hint_aux_bits[i][k],
                                w_prime_1[i].coeffs[k], w_prime_1_bits[i][k]);
+        sum = lc_.add(sum, h[i].coeffs[k]);
       }
     }
+
+    auto is_valid_weight = lc_.vleq(h_sum_bits, ml_dsa::OMEGA);
+    lc_.assert1(is_valid_weight);
+
+    EltW reconstructed_sum = lc_.as_scalar(h_sum_bits);
+    lc_.assert_eq(sum, reconstructed_sum);
   }
 
   // Verifies that the infinity norm of the polynomial vector `vec` is within
@@ -456,17 +454,10 @@ class MLDSA44Verify {
       uint64_t bound) const {
     const Memcmp<LogicCircuit> CMP(lc_);
 
-    Elt two = lc_.f_.two();
     for (size_t i = 0; i < SIZE; ++i) {
       for (size_t j = 0; j < ml_dsa::N; ++j) {
         // 1. Reconstruct the shifted value from bit witnesses
-        EltW r = lc_.konst(lc_.f_.zero());
-        Elt p = lc_.f_.one();
-        for (size_t b = 0; b < BIT_WIDTH; ++b) {
-          EltW bit_val = lc_.eval(vec_bits[i][j][b]);
-          r = lc_.axpy(r, p, bit_val);
-          p = lc_.f_.mulf(p, two);
-        }
+        EltW r = lc_.as_scalar(vec_bits[i][j]);
 
         // 2. Check that the reconstructed (shifted) value matches the
         // original value shifted by bound.
@@ -610,14 +601,17 @@ class MLDSA44Verify {
       const v8& j = witness.j_vals[s];
       const v16& k_idx = witness.j_k_indices[s];
 
+      // Enforce that the k_idx witness is within bounds.
+      auto is_in_bounds = lc_.vleq(k_idx, out.size() - 1);
+      lc_.assert1(is_in_bounds);
+
       // Enforce the out_idx is increasing
       auto is_increasing = lc_.vleq(prev_k_index, k_idx);
       lc_.assert1(is_increasing);
 
       // Verify j <= i
-      v16 j_ext;
+      v16 j_ext = lc_.template vbit<16>(0);
       for (size_t k = 0; k < 8; ++k) j_ext[k] = j[k];
-      for (size_t k = 8; k < 16; ++k) j_ext[k] = lc_.bit(0);
 
       v16 i_vec = lc_.template vbit<16>(i);
       auto j_valid = lc_.vleq(j_ext, i_vec);
@@ -637,9 +631,8 @@ class MLDSA44Verify {
         auto lt_target = lc_.vlt(curr_k, k_idx);
         auto in_range = lc_.land(gt_prev, lt_target);
 
-        v16 out_k_ext;
+        v16 out_k_ext = lc_.template vbit<16>(0);
         for (size_t b = 0; b < 8; ++b) out_k_ext[b] = out[k][b];
-        for (size_t b = 8; b < 16; ++b) out_k_ext[b] = lc_.bit(0);
 
         auto rejected_val = lc_.vlt(i_vec, out_k_ext);  // out[k] > i
         lc_.assert_implies(in_range, rejected_val);
@@ -882,7 +875,7 @@ class MLDSA44Verify {
     // 9.  w_prime_1 = UseHint(h, w_prime_approx)
     //     Use hint h to reconstruct the exact high bits w1 \in R_q^K.
     assert_use_hint(sig.h, w.w_prime_approx_, w.w1_, w.hint_aux_bits_,
-                    w.w_prime_1_, w.w_prime_1_bits_);
+                    w.w_prime_1_, w.w_prime_1_bits_, w.h_sum_bits_);
 
     assert_w1_encode(w.w_prime_1_bits_, w.w1_tilde_);
 

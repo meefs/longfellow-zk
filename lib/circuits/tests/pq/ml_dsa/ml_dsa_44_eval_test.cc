@@ -187,6 +187,8 @@ MLDSA44Verify::Witness convert_witness(const ml_dsa_44_witness& witness_gen,
     witness.c_prime_tilde_bws_.push_back(convert_block_witness(L, raw_bw));
   }
 
+  witness.h_sum_bits_ = L.template vbit<7>(witness_gen.h_sum_bits_);
+
   return witness;
 }
 
