@@ -65,59 +65,66 @@ def make_test_circuit(field):
     """
     Constructs a very small circuit for use in tests.
 
-    This circuit outputs (x - 1) * (x - 2), and has an in-circuit assrtion
-    checking x - 2 = 0. This circuit assumes that the field has large
+    This circuit outputs two values, (x - 1) * (x - 2) and
+    x * (x - 1) * (x - 2), and has an in-circuit assrtion checking
+    x - 2 = 0. This circuit assumes that the field has large
     characteristic.
     """
     layer_0 = CircuitLayer(
-        3,
-        [
+        num_input_wires=4,
+        quads=[
             # Propagate x^2 - 3x + 2 to output.
-            # V[0][0] = 1 * V[1][1] * V[1][0]
-            Quad(0, 1, 0, field(1)),
+            # V[0][0] = 1 * V[1][0] * V[1][1]
+            Quad(gate=0, input_0=0, input_1=1, coefficient=field(1)),
+            # Propagate x^3 - 3x^2 + 2x to output.
+            # V[0][1] = 1 * V[1][0] * V[1][3]
+            Quad(gate=1, input_0=0, input_1=3, coefficient=field(1)),
         ],
-        field,
+        field=field,
     )
     layer_1 = CircuitLayer(
-        4,
-        [
+        num_input_wires=4,
+        quads=[
             # Propagate 1 to next layer.
             # V[1][0] = 1 * V[2][0] * V[2][0]
-            Quad(0, 0, 0, field(1)),
+            Quad(gate=0, input_0=0, input_1=0, coefficient=field(1)),
             # Propagate x^2 - 3x + 2 to next layer.
-            # V[1][1] = 1 * V[2][1] * V[2][0]
-            Quad(1, 1, 0, field(1)),
+            # V[1][1] = 1 * V[2][0] * V[2][1]
+            Quad(gate=1, input_0=0, input_1=1, coefficient=field(1)),
             # Assert x - 2 = 0.
-            # 0 = V[2][2] * V[2][0] + V[2][3] * V[2][0]
-            Quad(2, 2, 0, field(0)),
-            Quad(2, 3, 0, field(0)),
+            # 0 = V[2][0] * V[2][2] + V[2][0] * V[2][3]
+            Quad(gate=2, input_0=0, input_1=2, coefficient=field(0)),
+            Quad(gate=2, input_0=0, input_1=3, coefficient=field(0)),
+            # Compute x^3 - 3x^2 + 2x.
+            # V[1][3] = 1 * V[2][1] * V[2][2]
+            Quad(gate=3, input_0=1, input_1=2, coefficient=field(1)),
         ],
-        field,
+        field=field,
     )
     layer_2 = CircuitLayer(
-        2,
-        [
+        num_input_wires=2,
+        quads=[
             # Propagate 1 to next layer.
             # V[2][0] = 1 * V[3][0] * V[3][0]
-            Quad(0, 0, 0, field(1)),
+            Quad(gate=0, input_0=0, input_1=0, coefficient=field(1)),
             # Calculate x^2 - 3x + 2x.
-            # V[2][1] = 1 * V[3][1] * V[3][1] + -3 * V[3][1] * V[3][0]
+            # V[2][1] = 1 * V[3][1] * V[3][1] + -3 * V[3][0] * V[3][1]
             #           + 2 * V[3][0] * V[3][0]
-            Quad(1, 1, 1, field(1)),
-            Quad(1, 1, 0, -field(3)),
-            Quad(1, 0, 0, field(2)),
+            Quad(gate=1, input_0=1, input_1=1, coefficient=field(1)),
+            Quad(gate=1, input_0=0, input_1=1, coefficient=-field(3)),
+            Quad(gate=1, input_0=0, input_1=0, coefficient=field(2)),
             # Propagate x to next layer (for assertion).
-            # V[2][2] = 1 * V[3][1] * V[3][0]
-            Quad(2, 1, 0, field(1)),
+            # V[2][2] = 1 * V[3][0] * V[3][1]
+            Quad(gate=2, input_0=0, input_1=1, coefficient=field(1)),
             # Calculate -2 (for assertion).
             # V[2][3] = -2 * V[3][0] * V[3][0]
-            Quad(3, 0, 0, -field(2)),
+            Quad(gate=3, input_0=0, input_1=0, coefficient=-field(2)),
         ],
-        field,
+        field=field,
     )
     return Circuit(
-        1,
-        1,
-        2,
-        [layer_0, layer_1, layer_2],
+        num_outputs=2,
+        num_public_inputs=1,
+        num_inputs=2,
+        layers=[layer_0, layer_1, layer_2],
     )
