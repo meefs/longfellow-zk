@@ -239,9 +239,11 @@ def sumcheck_layer(
                     )
                 else:
                     eval_p2 += P2 * v * VL[k[hand]] * VR[k[1 - hand]]
-            evals[round].append(SumcheckPolynomial(eval_p0, eval_p2))
-            transcript.write_field(eval_p0)
-            transcript.write_field(eval_p2)
+            blinded_p0 = eval_p0 - layer_pad.evals[round][hand].p0
+            blinded_p2 = eval_p2 - layer_pad.evals[round][hand].p2
+            evals[round].append(SumcheckPolynomial(blinded_p0, blinded_p2))
+            transcript.write_field(blinded_p0)
+            transcript.write_field(blinded_p2)
             challenge = transcript.generate_field(field)
             G[hand].append(challenge)
 
