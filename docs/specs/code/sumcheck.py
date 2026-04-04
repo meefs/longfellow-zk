@@ -108,7 +108,7 @@ def construct_symbolic_pad(
     return layers
 
 
-def construct_concrete_pad(field, circuit):
+def construct_concrete_pad(field, circuit, pad_prg=random_element):
     """
     Chooses one-time pad values, and returns them in structured and
     flattened forms.
@@ -119,13 +119,13 @@ def construct_concrete_pad(field, circuit):
         evals = []
         for _ in range(layer.num_input_wires):
             for _ in range(2):
-                p0 = random_element(field)
-                p2 = random_element(field)
+                p0 = pad_prg(field)
+                p2 = pad_prg(field)
                 evals.append(SumcheckPolynomial(p0, p2))
                 flattened.append(p0)
                 flattened.append(p2)
-        vl = random_element(field)
-        vr = random_element(field)
+        vl = pad_prg(field)
+        vr = pad_prg(field)
         vl_vr = vl * vr
         layers.append(LayerPad(
             evals,
