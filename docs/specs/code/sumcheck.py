@@ -355,18 +355,18 @@ def constraints_circuit(
     sym_layer_pad = sym_pad[-1]
     num_private_inputs = circuit.ninputs - circuit.pub_in
     final_constraint = (
-        claims[0]
-        + sym_layer_pad.vl
-        + gamma * claims[1]
-        + gamma * sym_layer_pad.vr
-        - sum(
+        sum(
             eq2[i] * public_inputs[i]
             for i in range(circuit.pub_in)
         )
-        - sum(
+        + sum(
             eq2[i + circuit.pub_in] * sym_private_inputs[i]
             for i in range(num_private_inputs)
         )
+        - claims[0]
+        - sym_layer_pad.vl
+        - gamma * claims[1]
+        - gamma * sym_layer_pad.vr
     )
     linear_constraints.append(final_constraint)
     return linear_constraints, quadratic_constraints
@@ -452,13 +452,12 @@ def constraints_layer(
     # separate quadratic constraint.
 
     linear_constraint = (
-        Q * (
+        sym_claim - Q * (
             layer_proof.vl * layer_proof.vr
             + layer_proof.vr * sym_layer_pad.vl
             + layer_proof.vl * sym_layer_pad.vr
             + sym_layer_pad.vl_vr
         )
-        - sym_claim
     )
     quadratic_constraint = QuadraticConstraint(
         sym_layer_pad.vl,
