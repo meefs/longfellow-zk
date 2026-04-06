@@ -180,7 +180,7 @@ def sumcheck_circuit(
         layer_proof, G = sumcheck_layer(
             field,
             QUAD,
-            wires[j],
+            wires[j + 1],
             layer.log_num_input_wires,
             pad[j],
             transcript,
