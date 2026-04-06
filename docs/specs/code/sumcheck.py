@@ -121,7 +121,7 @@ def construct_concrete_pad(
     flattened = []
     for layer in circuit.layers:
         evals: list[list[SumcheckPolynomial]] = []
-        for round in range(layer.num_input_wires):
+        for round in range(layer.log_num_input_wires):
             evals.append([])
             for _ in range(2):
                 p0 = pad_prg(field)
