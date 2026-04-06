@@ -14,7 +14,7 @@ class Circuit:
             num_inputs: int,
             layers: list[CircuitLayer]) -> None:
         self.num_outputs = num_outputs
-        self.log_num_outputs = num_outputs.bit_length()
+        self.log_num_outputs = (num_outputs - 1).bit_length()
         self.pub_in = num_public_inputs
         self.ninputs = num_inputs
         self.layers = layers
@@ -68,7 +68,7 @@ class CircuitLayer:
           circuit serialization conventions. A value of zero indicates
           the term is part of the Z quad instead.
         """
-        self.log_num_input_wires = num_input_wires.bit_length()
+        self.log_num_input_wires = (num_input_wires - 1).bit_length()
         self.num_input_wires = num_input_wires
         self.quads = quads
         self.quad = SparseArray(field)
