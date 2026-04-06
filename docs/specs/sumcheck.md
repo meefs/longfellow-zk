@@ -498,14 +498,11 @@ def sumcheck_layer(
                 ),
                 start=field.zero(),
             )
+            QUAD_bind_p2 = QUAD.bind(P2, axis=hand)
+            VL_bind_p2 = VL.bind(P2)
             eval_p2 = field.zero()
-            for (k, v) in QUAD.entries.items():
-                if k[hand] & 1 == 0:
-                    eval_p2 += (
-                        (1 - P2) * v * VL[k[hand]] * VR[k[1 - hand]]
-                    )
-                else:
-                    eval_p2 += P2 * v * VL[k[hand]] * VR[k[1 - hand]]
+            for (k, v) in QUAD_bind_p2.entries.items():
+                eval_p2 += v * VL_bind_p2[k[hand]] * VR[k[1 - hand]]
             blinded_p0 = eval_p0 - layer_pad.evals[round][hand].p0
             blinded_p2 = eval_p2 - layer_pad.evals[round][hand].p2
             evals[round].append(SumcheckPolynomial(blinded_p0, blinded_p2))
