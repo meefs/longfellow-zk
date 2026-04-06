@@ -24,7 +24,7 @@ class DenseArray:
         new = []
         for i in range(0, len(self.values), 2):
             new.append(
-                (self.field.one() - x) * self[i * 2]
-                + x * self[i * 2 + 1]
+                (self.field.one() - x) * self[i]
+                + x * self[i + 1]
             )
         return DenseArray(self.field, new)
