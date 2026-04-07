@@ -583,7 +583,6 @@ def constraints_circuit(
         challenges[:circuit.log_num_outputs],
         challenges[:circuit.log_num_outputs],
     )
-    claims = (field.zero(), field.zero())
     linear_constraints = []
     quadratic_constraints = []
     for j, layer in enumerate(circuit.layers):
@@ -592,6 +591,13 @@ def constraints_circuit(
         QZ = layer.quad + beta * layer.Z
         QUAD = QZ.bindv(G[0]) + alpha * QZ.bindv(G[1])
         QUAD = QUAD.drop_dimension()
+        if j == 0:
+            claims = (field.zero(), field.zero())
+        else:
+            claims = (
+                claims[0] + sym_pad[j - 1].vl,
+                claims[1] + sym_pad[j - 1].vr,
+            )
         (
             G,
             claims,
