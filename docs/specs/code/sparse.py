@@ -31,7 +31,8 @@ class SparseArray:
         return self * other
 
     def __add__(self, other: Self) -> SparseArray:
-        result = copy.copy(self)
+        result = SparseArray(self.field)
+        result.entries = copy.copy(self.entries)
         for key, value in other.entries.items():
             result.entries[key] += value
         return result
