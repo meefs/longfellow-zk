@@ -5,6 +5,7 @@ import sage.all
 from sage.rings.finite_rings.finite_field_constructor import GF
 
 from circuit import Circuit, CircuitLayer, Quad
+from fields import Fp256
 from fs import Transcript
 from sumcheck import (
     bindeq, constraints_circuit, construct_concrete_pad,
@@ -59,6 +60,71 @@ class TestSumcheck(unittest.TestCase):
             constraints_transcript,
             proof,
         )
+
+    def test_sumcheck_prover_dump_proof(self):
+        pad_transcript = Transcript()
+        pad_transcript.init(b"pad prng")
+        pad_prg = lambda field: pad_transcript.generate_field(field)
+
+        circuit = make_test_circuit(Fp256)
+        transcript = Transcript()
+        transcript.init(b"test")
+        constraints_transcript = copy.deepcopy(transcript)
+        inputs = [Fp256(1), Fp256(2)]
+        wires = circuit.evaluate(inputs)
+        (pad_layers, _pad_flattened) = construct_concrete_pad(
+            Fp256,
+            circuit,
+            pad_prg,
+        )
+        proof = sumcheck_circuit(
+            Fp256,
+            circuit,
+            wires,
+            pad_layers,
+            transcript,
+        )
+        sym_private_inputs, sym_pad = construct_symbolic_variables(
+            Fp256,
+            circuit,
+        )
+        (linear_constraints, quadratic_constraints) = constraints_circuit(
+            Fp256,
+            circuit,
+            inputs[:1],
+            sym_private_inputs,
+            sym_pad,
+            constraints_transcript,
+            proof,
+        )
+
+        for layer_idx, proof_layer in enumerate(proof):
+            print(f"Layer {layer_idx}:")
+            for polynomials in proof_layer.evals:
+                print("Left hand, P0", hex(polynomials[0].p0))
+                print("Left hand, P2", hex(polynomials[0].p2))
+                print("Right hand, P0", hex(polynomials[1].p0))
+                print("Right hand, P2", hex(polynomials[1].p2))
+            print("VL", hex(proof_layer.vl))
+            print("VR", hex(proof_layer.vr))
+        for i, linear_constraint in enumerate(linear_constraints):
+            print(f"Linear constraint {i}:")
+            rhs = Fp256.zero()
+            for (exponents, coeff) in linear_constraint.monomial_coefficients().items():
+                if exponents.is_constant():
+                    rhs = -coeff
+                elif exponents.unweighted_degree() == 1:
+                    variable, _ = next(exponents.sparse_iter())
+                    print(f"{hex(coeff)} * w{variable}")
+                else:
+                    raise Exception(f"degree of term is too high: {exponents}")
+            print(f"RHS: {hex(rhs)}")
+        print("Quadratic constraints:")
+        for quadratic_constraint in quadratic_constraints:
+            print(
+                f"{quadratic_constraint.x} * {quadratic_constraint.y} "
+                f"= {quadratic_constraint.z}"
+            )
 
 
 def make_test_circuit(field):
