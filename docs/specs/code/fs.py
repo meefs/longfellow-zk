@@ -9,9 +9,11 @@ import hashlib
 import struct
 import math
 
+
 def hash(data):
     assert isinstance(data, bytes), "data not bytes"
     return hashlib.sha256(data).digest()
+
 
 class FSPRF:
     """
@@ -19,6 +21,7 @@ class FSPRF:
     Produces an infinite stream of bytes organized in 16-byte blocks.
     Block i = AES256(SEED, ID(i))
     """
+
     def __init__(self, seed: bytes):
         assert len(seed) == 32, "Seed must be 32 bytes (AES-256 key size)."
         self.counter = 0
@@ -31,10 +34,10 @@ class FSPRF:
         while len(self.buffer) < n:
             # block_id is the 16-byte little-endian representation of integer i
             block_id = self.counter.to_bytes(16, 'little')
-            
+
             # Block i = AES256(SEED, ID(i))
             block_output = self.cipher.encrypt(block_id)
-            
+
             self.buffer.extend(block_output)
             self.counter += 1
 
@@ -60,10 +63,10 @@ class Transcript:
         self._is_initialized = True
         self.write_bytes(session_id)
 
-    def write_field(self, elt, sz = 32):
+    def write_field(self, elt):
         assert self._is_initialized, "init not called"       
         self.tr.append(0x01)
-        self.tr.extend( int(elt).to_bytes(sz, byteorder="little"))
+        self.tr.extend(elt.to_bytes(byteorder="little"))
 
     def write_bytes(self, b):
         assert self._is_initialized, "init not called"       
@@ -73,7 +76,7 @@ class Transcript:
         self.tr.extend(length_prefix)
         self.tr.extend(b)
 
-    def write_field_element_array(self, elems, sz=32):
+    def write_field_element_array(self, elems):
         """
         Spec: Append byte designator 0x3, 8-byte LE count, then serialized elements.
         """
@@ -83,8 +86,7 @@ class Transcript:
         self.tr.extend(count_prefix)
         
         for elem in elems:
-            self.tr.extend( int(elem).to_bytes(sz, byteorder="little"))
-
+            self.tr.extend(elem.to_bytes(byteorder="little"))
 
     def _get_fs(self) -> FSPRF:
         """
@@ -119,14 +121,15 @@ class Transcript:
             if r < m:
                 return r
 
-    def generate_field(self, p):
+    def generate_field(self, field):
         fs = self._get_fs()
-        sz = math.ceil(p.bit_length() / 8)
+        order = field.order()
+        sz = math.ceil(order.bit_length() / 8)
         while True:
             b = fs.bytes(sz)
             x = int.from_bytes(b, byteorder='little', signed=False)
-            if x < p:
-                return x
+            if x < order:
+                return field.from_integer(x)
 
     def generate_nats_wo_replacement(self, m, n):
         assert m > n, "invalid parameter"
@@ -135,49 +138,3 @@ class Transcript:
             j = i + self.generate_nat(m - i)
             A[i], A[j] = A[j], A[i]
         return A[:n]	
-
-
-# --- Test Example ---
-
-if __name__ == "__main__":
-    t = Transcript()
-
-    p = 115792089210356248762697446949407573530086143415290314195533631308867097853951
-    session_id = b"test"
-    t.init(session_id)
-
-    arr = bytearray()
-    for bi in range(0, 100):
-        arr.append(bi)
-    t.write_bytes(arr)
-
-    tv1 = [t.generate_field(p) for i in range(0,16)]
-    for ti in tv1:
-        print(hex(ti))
-    
-    t.write_field(7)
-
-    tv2 = [t.generate_field(p) for i in range(0,16)]
-    for ti in tv2:
-        print(hex(ti))
-
-    fe_array = [(8), (9)]
-    t.write_field_element_array(fe_array)
-
-    tv3 = [t.generate_field(p) for i in range(0,16)]
-    for ti in tv3:
-        print(hex(ti))
-
-    t.write_bytes(b'nats')
-
-    ns = [1, 1, 1, 2, 2, 2,  7,    7,    7,     7,     32,     32,     32,    32,
-      256, 256, 256, 256, 1000, 10000, 60000, 65535, 100000, 100000]
-    nats = [t.generate_nat(n) for n in ns]
-    print(nats)
-
-    t.write_bytes(b'choose')
-    choose_sizes = [31, 32, 63, 64, 1000, 65535]
-    for cs in choose_sizes:
-        gotc = t.generate_nats_wo_replacement(cs, 20)
-        print(gotc)
-

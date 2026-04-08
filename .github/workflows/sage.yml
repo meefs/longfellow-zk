@@ -16,7 +16,7 @@ jobs:
       options: --user root
     steps:
     - name: Install dependencies
-      run: sage --pip install pycryptodome
+      run: sage --pip install pycryptodome mypy
     - name: Checkout
       uses: actions/checkout@v4
       with:
@@ -24,5 +24,5 @@ jobs:
     - name: Run tests
       working-directory: docs/specs/code
       run: |
-        sage --python fs.py
-        sage --python merkle.py
+        sage --python -m mypy *.py tests/*.py
+        sage --python -m unittest --verbose

@@ -1,4 +1,4 @@
-# Ligero ZK Proof
+# Ligero ZK Proof {#ligero-zk-proof}
 This section specifies the construction and verification method for a Ligero commitment and zero-knowledge argument. The Ligero system as described by Ames, Hazay, Ishai, and Venkitasubramaniam [@ligero], consists of a commitment scheme, and a method for proving linear and quadratic constraints on the committed values in zero-knowledge. The later interface is sufficient to prove arbitrary circuits, but in the Longfellow scheme, it suffices to describe how to use such constraints to directly verify an IP transcript.
 
 <reference anchor='ligero' target='https://eprint.iacr.org/2022/1608'>
