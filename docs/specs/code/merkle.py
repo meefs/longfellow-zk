@@ -81,7 +81,7 @@ class MerkleTree:
         :param indices: List of positions for the leaves in 's'
         :param proof: List of proof hashes
         """
-        tmp = [None] * (2 * n)
+        tmp: list[None | bytes] = [None] * (2 * n)
         defined = [False] * (2 * n)
 
         proof_index = 0
@@ -113,6 +113,8 @@ class MerkleTree:
             if defined[2 * i] and defined[2 * i + 1]:
                 left = tmp[2 * i]
                 right = tmp[2 * i + 1]
+                assert left is not None
+                assert right is not None
                 tmp[i] = hash(left + right)
                 defined[i] = True
 

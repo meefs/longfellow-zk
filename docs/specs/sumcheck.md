@@ -557,7 +557,7 @@ def constraints_circuit(
         field,
         circuit: Circuit,
         public_inputs: list,
-        sym_private_inputs: list,
+        sym_private_inputs: Sequence[MPolynomial],
         sym_pad: list[LayerPad],
         transcript: Transcript,
         proof: list[LayerProof]) -> tuple[list, list[QuadraticConstraint]]:

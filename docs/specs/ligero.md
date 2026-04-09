@@ -86,7 +86,7 @@ This section describes how to verify a compressed Merkle proof. The claim to ver
 
 ```
     def verify_merkle(self, root, n, k, s, indices, proof):
-        tmp = [None] * (2 * n)
+        tmp: list[None | bytes] = [None] * (2 * n)
         defined = [False] * (2 * n)
 
         proof_index = 0
@@ -117,6 +117,8 @@ This section describes how to verify a compressed Merkle proof. The claim to ver
             if defined[2 * i] and defined[2 * i + 1]:
                 left = tmp[2 * i]
                 right = tmp[2 * i + 1]
+                assert left is not None
+                assert right is not None
                 tmp[i] = hash(left + right)
                 defined[i] = True
 

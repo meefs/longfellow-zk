@@ -17,8 +17,8 @@ class TestSumcheck(unittest.TestCase):
     def test_bindeq(self):
         gf17 = GF(17)
         assert bindeq(gf17, []) == [gf17.one()]
-        assert bindeq(gf17, [2]) == [gf17(16), gf17(2)]
-        assert bindeq(gf17, [2, 5]) == [
+        assert bindeq(gf17, [gf17(2)]) == [gf17(16), gf17(2)]
+        assert bindeq(gf17, [gf17(2), gf17(5)]) == [
             gf17(16) * gf17(13),
             gf17(2) * gf17(13),
             gf17(16) * gf17(5),
@@ -118,7 +118,7 @@ class TestSumcheck(unittest.TestCase):
                     print(f"{hex(coeff)} * w{variable}")
                 else:
                     raise Exception(f"degree of term is too high: {exponents}")
-            print(f"RHS: {hex(rhs)}")
+            print(f"RHS: {rhs.to_bytes().hex()}")
         print("Quadratic constraints:")
         for quadratic_constraint in quadratic_constraints:
             print(
