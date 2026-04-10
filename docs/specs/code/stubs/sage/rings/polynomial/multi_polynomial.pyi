@@ -1,6 +1,7 @@
 from typing import Self, overload
 
 from sage.rings.finite_rings.element_base import FiniteRingElement
+from sage.rings.polynomial.polydict import ETuple
 
 
 class MPolynomial:
@@ -18,3 +19,7 @@ class MPolynomial:
     def __sub__(self, other: Self) -> Self: ...
     @overload
     def __sub__(self, other: FiniteRingElement) -> Self: ...
+
+    def __call__(self, *x: FiniteRingElement) -> FiniteRingElement: ...
+
+    def monomial_coefficients(self) -> dict[ETuple, FiniteRingElement]: ...
