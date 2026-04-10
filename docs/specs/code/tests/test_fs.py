@@ -5,7 +5,7 @@ from fs import Transcript
 
 
 class TestFiatShamir(unittest.TestCase):
-    def test_example(self):
+    def test_example(self) -> None:
         t = Transcript()
 
         field = Fp256
@@ -47,7 +47,7 @@ class TestFiatShamir(unittest.TestCase):
             gotc = t.generate_nats_wo_replacement(cs, 20)
             print(gotc)
 
-    def test_gf2_128(self):
+    def test_gf2_128(self) -> None:
         field = GF2_128
         t = Transcript()
         t.init(b"transcript binary field test")

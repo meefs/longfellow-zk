@@ -2,6 +2,7 @@ import copy
 import unittest
 
 import sage.all
+from sage.rings.finite_rings.finite_field_base import FiniteField
 from sage.rings.finite_rings.finite_field_constructor import GF
 
 from circuit import Circuit, CircuitLayer, Quad
@@ -14,7 +15,7 @@ from sumcheck import (
 
 
 class TestSumcheck(unittest.TestCase):
-    def test_bindeq(self):
+    def test_bindeq(self) -> None:
         gf17 = GF(17)
         assert bindeq(gf17, []) == [gf17.one()]
         assert bindeq(gf17, [gf17(2)]) == [gf17(16), gf17(2)]
@@ -25,13 +26,13 @@ class TestSumcheck(unittest.TestCase):
             gf17(2) * gf17(5),
         ]
 
-    def test_smoke_test_witness(self):
+    def test_smoke_test_witness(self) -> None:
         gf17 = GF(17)
         circuit = make_test_circuit(gf17)
         construct_symbolic_variables(gf17, circuit)
         construct_concrete_pad(gf17, circuit)
 
-    def test_smoke_test_sumcheck_prover(self):
+    def test_smoke_test_sumcheck_prover(self) -> None:
         gf17 = GF(17)
         circuit = make_test_circuit(gf17)
         transcript = Transcript()
@@ -61,7 +62,7 @@ class TestSumcheck(unittest.TestCase):
             proof,
         )
 
-    def test_sumcheck_prover_dump_proof(self):
+    def test_sumcheck_prover_dump_proof(self) -> None:
         pad_transcript = Transcript()
         pad_transcript.init(b"pad prng")
         pad_prg = lambda field: pad_transcript.generate_field(field)
@@ -127,7 +128,7 @@ class TestSumcheck(unittest.TestCase):
             )
 
 
-def make_test_circuit(field):
+def make_test_circuit(field: FiniteField) -> Circuit:
     """
     Constructs a very small circuit for use in tests.
 
