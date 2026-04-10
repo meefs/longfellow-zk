@@ -6,12 +6,13 @@ from typing import DefaultDict, Self
 
 import sage.all
 from sage.rings.finite_rings.element_base import FiniteRingElement
+from sage.rings.finite_rings.finite_field_base import FiniteField
 
 
 class SparseArray:
     entries: DefaultDict[tuple[int, ...], FiniteRingElement]
 
-    def __init__(self, field) -> None:
+    def __init__(self, field: FiniteField) -> None:
         self.field = field
         self.entries = collections.defaultdict(field.zero)
 
@@ -37,7 +38,7 @@ class SparseArray:
             result.entries[key] += value
         return result
 
-    def bind(self, x: FiniteRingElement, axis=0) -> SparseArray:
+    def bind(self, x: FiniteRingElement, axis: int = 0) -> SparseArray:
         result = SparseArray(x.parent())
         for key, value in self.entries.items():
             new_key = key[:axis] + (key[axis] // 2,) + key[axis + 1:]
@@ -47,7 +48,7 @@ class SparseArray:
                 result[new_key] += value - x * value
         return result
 
-    def bindv(self, xs: list[FiniteRingElement], axis=0) -> SparseArray:
+    def bindv(self, xs: list[FiniteRingElement], axis: int = 0) -> SparseArray:
         result = self
         for x in xs:
             result = result.bind(x, axis)
