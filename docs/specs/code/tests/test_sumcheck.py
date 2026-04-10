@@ -101,12 +101,12 @@ class TestSumcheck(unittest.TestCase):
         for layer_idx, proof_layer in enumerate(proof):
             print(f"Layer {layer_idx}:")
             for polynomials in proof_layer.evals:
-                print("Left hand, P0", hex(polynomials[0].p0))
-                print("Left hand, P2", hex(polynomials[0].p2))
-                print("Right hand, P0", hex(polynomials[1].p0))
-                print("Right hand, P2", hex(polynomials[1].p2))
-            print("VL", hex(proof_layer.vl))
-            print("VR", hex(proof_layer.vr))
+                print("Left hand, P0", polynomials[0].p0.to_bytes().hex())
+                print("Left hand, P2", polynomials[0].p2.to_bytes().hex())
+                print("Right hand, P0", polynomials[1].p0.to_bytes().hex())
+                print("Right hand, P2", polynomials[1].p2.to_bytes().hex())
+            print("VL", proof_layer.vl.to_bytes().hex())
+            print("VR", proof_layer.vr.to_bytes().hex())
         for i, linear_constraint in enumerate(linear_constraints):
             print(f"Linear constraint {i}:")
             rhs = Fp256.zero()
@@ -115,7 +115,7 @@ class TestSumcheck(unittest.TestCase):
                     rhs = -coeff
                 elif exponents.unweighted_degree() == 1:
                     variable, _ = next(exponents.sparse_iter())
-                    print(f"{hex(coeff)} * w{variable}")
+                    print(f"{coeff.to_bytes().hex()} * w{variable}")
                 else:
                     raise Exception(f"degree of term is too high: {exponents}")
             print(f"RHS: {rhs.to_bytes().hex()}")

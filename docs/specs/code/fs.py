@@ -4,13 +4,16 @@
 # To run this test in sage, run `sage --python fs.py`
 #
 from Crypto.Cipher import AES
+from sage.rings.finite_rings.element_base import FiniteRingElement
+from sage.rings.finite_rings.finite_field_base import FiniteField
 
 import hashlib
 import struct
 import math
+from typing import Sequence
 
 
-def hash(data):
+def hash(data: bytes) -> bytes:
     assert isinstance(data, bytes), "data not bytes"
     return hashlib.sha256(data).digest()
 
@@ -22,7 +25,7 @@ class FSPRF:
     Block i = AES256(SEED, ID(i))
     """
 
-    def __init__(self, seed: bytes):
+    def __init__(self, seed: bytes) -> None:
         assert len(seed) == 32, "Seed must be 32 bytes (AES-256 key size)."
         self.counter = 0
         self.buffer = bytearray()
@@ -48,13 +51,15 @@ class FSPRF:
 
 
 class Transcript:
-    def __init__(self):
+    _fs: None | FSPRF
+
+    def __init__(self) -> None:
         self.tr = bytearray()
         self._is_initialized = False
         self._fs = None
         self._tr_snapshot_len = 0
 
-    def init(self, session_id: bytes):
+    def init(self, session_id: bytes) -> None:
         """
         Initializes the transcript with a session_id.
         Must be called exactly once before any other method.
@@ -63,12 +68,12 @@ class Transcript:
         self._is_initialized = True
         self.write_bytes(session_id)
 
-    def write_field(self, elt):
+    def write_field(self, elt: FiniteRingElement) -> None:
         assert self._is_initialized, "init not called"       
         self.tr.append(0x01)
         self.tr.extend(elt.to_bytes(byteorder="little"))
 
-    def write_bytes(self, b):
+    def write_bytes(self, b: bytes) -> None:
         assert self._is_initialized, "init not called"       
         self.tr.append(0x00)
         # packs an unsigned long long (8 bytes) in Little Endian (<)
@@ -76,7 +81,7 @@ class Transcript:
         self.tr.extend(length_prefix)
         self.tr.extend(b)
 
-    def write_field_element_array(self, elems):
+    def write_field_element_array(self, elems: Sequence[FiniteRingElement]) -> None:
         """
         Spec: Append byte designator 0x3, 8-byte LE count, then serialized elements.
         """
@@ -104,7 +109,7 @@ class Transcript:
             
         return self._fs
 
-    def generate_nat(self, m):
+    def generate_nat(self, m: int) -> int:
         """
         Generates a random natural number between 0 and m-1 inclusive via rejection sampling.
         """
@@ -121,7 +126,7 @@ class Transcript:
             if r < m:
                 return r
 
-    def generate_field(self, field):
+    def generate_field(self, field: FiniteField) -> FiniteRingElement:
         fs = self._get_fs()
         order = field.order()
         sz = math.ceil(order.bit_length() / 8)
@@ -131,7 +136,7 @@ class Transcript:
             if x < order:
                 return field.from_integer(x)
 
-    def generate_nats_wo_replacement(self, m, n):
+    def generate_nats_wo_replacement(self, m: int, n: int) -> list[int]:
         assert m > n, "invalid parameter"
         A = list(range(0, m))
         for i in range(0, n):

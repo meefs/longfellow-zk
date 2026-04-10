@@ -411,7 +411,7 @@ with no extra unused challenges.
 
 ``` python
 def sumcheck_circuit(
-        field,
+        field: FiniteField,
         circuit: Circuit,
         wires: list[list],
         pad: list[LayerPad],
@@ -457,7 +457,7 @@ def sumcheck_circuit(
 
 ``` python
 def sumcheck_layer(
-        field,
+        field: FiniteField,
         QUAD: SparseArray,
         wires: list,
         log_num_input_wires: int,
@@ -554,9 +554,9 @@ suffices to keep track of affine symbolic expressions of the form
 
 ``` python
 def constraints_circuit(
-        field,
+        field: FiniteField,
         circuit: Circuit,
-        public_inputs: list,
+        public_inputs: list[FiniteRingElement],
         sym_private_inputs: Sequence[MPolynomial],
         sym_pad: list[LayerPad],
         transcript: Transcript,
@@ -631,12 +631,18 @@ def constraints_circuit(
     num_private_inputs = circuit.ninputs - circuit.pub_in
     final_constraint = (
         sum(
-            eq2[i] * public_inputs[i]
-            for i in range(circuit.pub_in)
+            (
+                eq2[i] * public_inputs[i]
+                for i in range(circuit.pub_in)
+            ),
+            start=field.zero(),
         )
         + sum(
-            eq2[i + circuit.pub_in] * sym_private_inputs[i]
-            for i in range(num_private_inputs)
+            (
+                eq2[i + circuit.pub_in] * sym_private_inputs[i]
+                for i in range(num_private_inputs)
+            ),
+            start=field.zero(),
         )
         - claims[0]
         - sym_layer_pad.vl

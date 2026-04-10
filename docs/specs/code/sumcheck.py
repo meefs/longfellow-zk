@@ -31,7 +31,7 @@ def bindeq(
 
 
 class SumcheckPolynomial:
-    def __init__(self, p0, p2):
+    def __init__(self, p0: FiniteRingElement, p2: FiniteRingElement):
         self.p0 = p0
         self.p2 = p2
 
@@ -40,9 +40,9 @@ class LayerPad:
     def __init__(
             self,
             evals: list[list[SumcheckPolynomial]],
-            vl,
-            vr,
-            vl_vr):
+            vl: FiniteRingElement,
+            vr: FiniteRingElement,
+            vl_vr: FiniteRingElement):
         self.evals = evals
         self.vl = vl
         self.vr = vr
@@ -53,8 +53,8 @@ class LayerProof:
     def __init__(
             self,
             evals: list[list[SumcheckPolynomial]],
-            vl,
-            vr):
+            vl: FiniteRingElement,
+            vr: FiniteRingElement):
         self.evals = evals
         self.vl = vl
         self.vr = vr
@@ -145,7 +145,7 @@ def construct_concrete_pad(
 
 
 def sumcheck_circuit(
-        field,
+        field: FiniteField,
         circuit: Circuit,
         wires: list[list],
         pad: list[LayerPad],
@@ -190,7 +190,7 @@ def sumcheck_circuit(
 
 
 def sumcheck_layer(
-        field,
+        field: FiniteField,
         QUAD: SparseArray,
         wires: list,
         log_num_input_wires: int,
@@ -285,9 +285,9 @@ class QuadraticConstraint:
 
 
 def constraints_circuit(
-        field,
+        field: FiniteField,
         circuit: Circuit,
-        public_inputs: list,
+        public_inputs: list[FiniteRingElement],
         sym_private_inputs: Sequence[MPolynomial],
         sym_pad: list[LayerPad],
         transcript: Transcript,
@@ -362,12 +362,18 @@ def constraints_circuit(
     num_private_inputs = circuit.ninputs - circuit.pub_in
     final_constraint = (
         sum(
-            eq2[i] * public_inputs[i]
-            for i in range(circuit.pub_in)
+            (
+                eq2[i] * public_inputs[i]
+                for i in range(circuit.pub_in)
+            ),
+            start=field.zero(),
         )
         + sum(
-            eq2[i + circuit.pub_in] * sym_private_inputs[i]
-            for i in range(num_private_inputs)
+            (
+                eq2[i + circuit.pub_in] * sym_private_inputs[i]
+                for i in range(num_private_inputs)
+            ),
+            start=field.zero(),
         )
         - claims[0]
         - sym_layer_pad.vl

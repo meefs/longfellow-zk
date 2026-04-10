@@ -19,20 +19,20 @@ class TestFiatShamir(unittest.TestCase):
 
         tv1 = [t.generate_field(field) for i in range(0,16)]
         for ti in tv1:
-            print(hex(ti))
+            print(ti.to_bytes().hex())
         
         t.write_field(field(7))
 
         tv2 = [t.generate_field(field) for i in range(0,16)]
         for ti in tv2:
-            print(hex(ti))
+            print(ti.to_bytes().hex())
 
         fe_array = [field(8), field(9)]
         t.write_field_element_array(fe_array)
 
         tv3 = [t.generate_field(field) for i in range(0,16)]
         for ti in tv3:
-            print(hex(ti))
+            print(ti.to_bytes().hex())
 
         t.write_bytes(b'nats')
 
