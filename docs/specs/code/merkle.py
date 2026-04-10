@@ -94,7 +94,7 @@ class MerkleTree:
         proof_index = 0
 
         if n != self.n: return False
-        
+
         marked = self.mark_tree(indices)
 
         for i in range(n - 1, 0, -1):

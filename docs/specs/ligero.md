@@ -36,7 +36,8 @@ class MerkleTree:
     def build_tree(self) -> bytes:
         for i in range(self.n - 1, 0, -1):
             left = self.a[2 * i]
-            right = self.a[2 * i + 1]s
+            right = self.a[2 * i + 1]
+
             self.a[i] = hash(left + right)
 
         return self.a[1]
