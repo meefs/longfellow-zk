@@ -3,17 +3,17 @@
 import hashlib
 
 
-def hash(data):
+def hash(data: bytes) -> bytes:
     assert isinstance(data, bytes), "data not bytes"
     return hashlib.sha256(data).digest()
 
 
 class MerkleTree:
-    def __init__(self, n):
+    def __init__(self, n: int) -> None:
         self.n = n
         self.a = [b''] * (2 * n)
 
-    def set_leaf(self, pos, leaf):
+    def set_leaf(self, pos: int, leaf: bytes) -> None:
         """
         Sets a leaf at a specific position.
         pos: 0-based index relative to the leaves (0 to n-1)
@@ -21,7 +21,7 @@ class MerkleTree:
         assert 0 <= pos < self.n, f"{pos} is out of bounds"
         self.a[pos + self.n] = leaf
 
-    def build_tree(self):
+    def build_tree(self) -> bytes:
         """
         Computes the internal nodes from n-1 down to 1.
         Returns the root (M.a[1]).
@@ -34,7 +34,7 @@ class MerkleTree:
 
         return self.a[1]
     
-    def mark_tree(self, requested_leaves):
+    def mark_tree(self, requested_leaves: list[int]) -> list[bool]:
         marked = [False] * (2 * self.n)
 
         for i in requested_leaves:
@@ -46,7 +46,7 @@ class MerkleTree:
 
         return marked
 
-    def compressed_proof(self, requested_leaves):
+    def compressed_proof(self, requested_leaves: list[int]) -> list[bytes]:
         """
         Generates a compressed proof for the requested leaves.
         """
@@ -69,7 +69,14 @@ class MerkleTree:
 
         return proof
 
-    def verify_merkle(self, root, n, k, s, indices, proof):
+    def verify_merkle(
+            self,
+            root: bytes,
+            n: int,
+            k: int,
+            s: list[bytes],
+            indices: list[int],
+            proof: list[bytes]) -> bool:
         """
         Verifies that the provided leaves (s) at specific positions (indices)
         are part of the Merkle tree defined by 'root'.

@@ -25,15 +25,15 @@ A tree that contains `n` leaves is represented by an array of `2 * n` message di
 
 ```
 class MerkleTree:
-    def __init__(self, n):
+    def __init__(self, n: int) -> None:
         self.n = n
         self.a = [b''] * (2 * n)
 
-    def set_leaf(self, pos, leaf):
+    def set_leaf(self, pos: int, leaf: bytes) -> None:
         assert 0 <= pos < self.n, f"{pos} is out of bounds"
         self.a[pos + self.n] = leaf
 
-    def build_tree(self):
+    def build_tree(self) -> bytes:
         for i in range(self.n - 1, 0, -1):
             left = self.a[2 * i]
             right = self.a[2 * i + 1]s
@@ -50,7 +50,7 @@ To address these inefficiencies, this section explains how to produce a batch pr
 It is important in this formulation to treat the input digests as a sequence, i.e. with a given order. Both the prover and verifier of this batch proof must use the same order of the `requested_leaves` array.
 
 ```
-    def mark_tree(self, requested_leaves):
+    def mark_tree(self, requested_leaves: list[int]) -> list[bool]:
         marked = [False] * (2 * self.n)
 
         for i in requested_leaves:
@@ -62,7 +62,7 @@ It is important in this formulation to treat the input digests as a sequence, i.
 
         return marked
 
-    def compressed_proof(self, requested_leaves):
+    def compressed_proof(self, requested_leaves: list[int]) -> list[bytes]:
         proof = []
         marked = self.mark_tree(requested_leaves)
         for i in range(self.n - 1, 0, -1):
@@ -85,7 +85,14 @@ It is important in this formulation to treat the input digests as a sequence, i.
 This section describes how to verify a compressed Merkle proof. The claim to verify is that "the commitment `root` defines an `n`-leaf Merkle tree that contains `k` digests `s[0], ..., s[k-1]` at corresponding indices `i[0], ..., i[k-1]`."  The strategy of this verification procedure is to deduce which nodes are needed along the `k` verification paths from index to root, then read these values from the purported proof, and then recompute the Merkle tree and the consistency of the `root` digest. As an optimization, the `defined[]` array avoids recomputing internal portions of the Merkle tree that are not relevant to the verification. By convention, a proof for the degenerate case of `k=0` digests is defined to fail. It is assumed that the `indices[]` array does not contain duplicates.
 
 ```
-    def verify_merkle(self, root, n, k, s, indices, proof):
+    def verify_merkle(
+            self,
+            root: bytes,
+            n: int,
+            k: int,
+            s: list[bytes],
+            indices: list[int],
+            proof: list[bytes]) -> bool:
         tmp: list[None | bytes] = [None] * (2 * n)
         defined = [False] * (2 * n)
 
