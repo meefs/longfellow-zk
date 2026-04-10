@@ -18,7 +18,8 @@ MAX_BINDINGS = 40
 
 def bindeq(
         field: FiniteField,
-        challenges: list[FiniteRingElement]) -> list[FiniteRingElement]:
+        challenges: list[FiniteRingElement],
+        ) -> list[FiniteRingElement]:
     log_n = len(challenges)
     if log_n == 0:
         return [field.one()]
@@ -225,13 +226,13 @@ def sumcheck_layer(
             #                    * bind(VL, x)[l]
             #                    * VR[r]
             #
-            # We evaluate this polynomial at the points P0 and P2. The
-            # sum of p(P0) and p(P1) is implicitly known already, so
-            # p(P1) does not need to be calculated.
+            # We evaluate this polynomial at the points P0 and P2.
+            # The sum of p(P0) and p(P1) is implicitly known already,
+            # so p(P1) does not need to be calculated.
             #
-            # Implementation note: this can be computed more efficiently
-            # by first computing the intermediate array defined as
-            # follows:
+            # Implementation note: this can be computed more
+            # efficiently by first computing the intermediate array
+            # defined as follows:
             #
             # A[l] = \sum_{r} QUAD[l, r] * VR[r]
             #
@@ -253,7 +254,10 @@ def sumcheck_layer(
                 eval_p2 += v * VL_bind_p2[k[hand]] * VR[k[1 - hand]]
             blinded_p0 = eval_p0 - layer_pad.evals[round][hand].p0
             blinded_p2 = eval_p2 - layer_pad.evals[round][hand].p2
-            evals[round].append(SumcheckPolynomial(blinded_p0, blinded_p2))
+            evals[round].append(SumcheckPolynomial(
+                blinded_p0,
+                blinded_p2,
+            ))
             transcript.write_field(blinded_p0)
             transcript.write_field(blinded_p2)
             challenge = transcript.generate_field(field)
@@ -425,7 +429,8 @@ def constraints_layer(
             QuadraticConstraint,
         ]:
     # Initial claim. This is a known constant during the first round,
-    # but it will be a symbolic affine expression in subsequent rounds.
+    # but it will be a symbolic affine expression in subsequent
+    # rounds.
     sym_claim = claims[0] + alpha * claims[1]
 
     # Lagrange basis polynomials
@@ -460,20 +465,20 @@ def constraints_layer(
             challenge = transcript.generate_field(field)
             G[hand].append(challenge)
 
-            # After decrypting, the polynomial evaluations are expected
-            # to be:
+            # After decrypting, the polynomial evaluations are
+            # expected to be:
             #
             #   p(P0) = hp.p0 + sym_hpad.p0
             #   p(P2) = hp.p2 + sym_hpad.p2
             sym_p0 = hp.p0 + sym_hpad.p0
             sym_p2 = hp.p2 + sym_hpad.p2
 
-            # Compute the implied evaluation, p(P1) = claim - p(P0), in
-            # symbolic form.
+            # Compute the implied evaluation, p(P1) = claim - p(P0),
+            # in symbolic form.
             sym_p1 = sym_claim - sym_p0
 
-            # Given p(P0), p(P1), and p(P2), interpolate the new claim
-            # symbolically.
+            # Given p(P0), p(P1), and p(P2), interpolate the new
+            # claim symbolically.
             sym_claim = (
                 lag_0(challenge) * sym_p0
                 + lag_1(challenge) * sym_p1
@@ -492,10 +497,10 @@ def constraints_layer(
     # where VL = layer_proof.vl + sym_layer_pad.vl
     #   and VR = layer_proof.vr + sym_layer_pad.vr
     #
-    # To keep this constraint linear, we expand the multiplication, and
-    # replace sym_layer_pad.vl * sym_layer_pad.vr with
-    # sym_layer_pad.vl_vr, checking that these quantities are equal in a
-    # separate quadratic constraint.
+    # To keep this constraint linear, we expand the multiplication,
+    # and replace sym_layer_pad.vl * sym_layer_pad.vr with
+    # sym_layer_pad.vl_vr, checking that these quantities are equal
+    # in a separate quadratic constraint.
 
     linear_constraint = (
         sym_claim - Q * (

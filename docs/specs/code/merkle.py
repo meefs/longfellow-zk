@@ -34,7 +34,10 @@ class MerkleTree:
 
         return self.a[1]
     
-    def mark_tree(self, requested_leaves: list[int]) -> list[bool]:
+    def mark_tree(
+            self,
+            requested_leaves: list[int],
+            ) -> list[bool]:
         marked = [False] * (2 * self.n)
 
         for i in requested_leaves:
@@ -46,7 +49,10 @@ class MerkleTree:
 
         return marked
 
-    def compressed_proof(self, requested_leaves: list[int]) -> list[bytes]:
+    def compressed_proof(
+            self,
+            requested_leaves: list[int],
+            ) -> list[bytes]:
         """
         Generates a compressed proof for the requested leaves.
         """
@@ -58,12 +64,14 @@ class MerkleTree:
             if marked[i]:
                 child = 2 * i
 
-                # If the left child is marked, we need the right child (sibling).
+                # If the left child is marked, we need the right
+                # child (sibling).
                 if marked[child]:
                     child += 1
 
                 # If the identified child/sibling is NOT marked,
-                # we must provide its hash in the proof so the verifier can calculate the parent.
+                # we must provide its hash in the proof so the
+                # verifier can calculate the parent.
                 if not marked[child]:
                     proof.append(self.a[child])
 
