@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sage.all
 from sage.rings.finite_rings.element_base import FiniteRingElement
+from sage.rings.finite_rings.finite_field_base import FiniteField
 
 from sparse import SparseArray
 
@@ -58,7 +59,11 @@ class Circuit:
 
 
 class CircuitLayer:
-    def __init__(self, num_input_wires: int, quads: list[Quad], field) -> None:
+    def __init__(
+            self,
+            num_input_wires: int,
+            quads: list[Quad],
+            field: FiniteField) -> None:
         """
         Constructs a layer of a circuit.
 

@@ -1,22 +1,24 @@
 import secrets
 
 import sage.all
+from sage.rings.finite_rings.element_base import FiniteRingElement
+from sage.rings.finite_rings.finite_field_base import FiniteField
 from sage.rings.finite_rings.finite_field_constructor import GF
 from sage.rings.polynomial.polynomial_ring import polygen
 
 
-def _make_gf2_128():
+def _make_gf2_128() -> FiniteField:
     x = polygen(GF2)
     return GF2.extension(x ** 128 + x ** 7 + x ** 2 + x + 1, name="x")
 
 
-def _make_quadratic_extension(base):
+def _make_quadratic_extension(base: FiniteField) -> FiniteField:
     x = polygen(base)
     return base.extension(x ** 2 + 1, name="x")
 
 
-def random_element(field):
-    return field.from_integer(secrets.randbelow(field.order()))
+def random_element(field: FiniteField) -> FiniteRingElement:
+    return field.from_integer(secrets.randbelow(int(field.order())))
 
 
 # Construct prime-order fields.

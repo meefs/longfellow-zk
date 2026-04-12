@@ -263,7 +263,7 @@ pseudo-random integers via rejection sampling as follows:
   If `r < m` return `r`, otherwise start over.
 
 ```
-    def generate_nat(self, m):
+    def generate_nat(self, m: int) -> int:
         assert m > 0, "m must be > 0"
 
         l = m.bit_length()
@@ -281,13 +281,13 @@ pseudo-random integers via rejection sampling as follows:
 * `transcript.generate_nats_wo_replacement(m, n)` generates a list of `n` different, random natural numbers between `0` and `m - 1` inclusive.  There are many equivalent algorithms to perform this step.  The following approach requires only `n` calls to the `generate_nat` method.
 
 ```
-	def generate_nats_wo_replacement(m, n):
-	    # assert(m > n)
-	    A = list(range(0, m))
-	    for i in range(0, n):
-	        j = i + generate_nat(m - i)
-	        A[i], A[j] = A[j], A[i]
-	    return A[:n]	
+def generate_nats_wo_replacement(m: int, n: int) -> list[int]:
+    # assert(m > n)
+    A = list(range(0, m))
+    for i in range(0, n):
+        j = i + generate_nat(m - i)
+        A[i], A[j] = A[j], A[i]
+    return A[:n]
 ``` 
     
 * `transcript.generate_field_element(F)` generates a field element.
@@ -458,7 +458,8 @@ def write_runs(columns, N, F2, F) {
       size_t runlen = 0
       while (ci + runlen < N &&
              runlen < kMaxRunLen &&
-             columns[ci + runlen].is_in_subfield(F2) == subfield_run) {
+             columns[ci + runlen].is_in_subfield(F2) == subfield_run
+             ) {
         ++runlen;
       }
       write_size(runlen, buf);

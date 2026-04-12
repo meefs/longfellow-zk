@@ -1,17 +1,23 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import sage.all
 from sage.rings.finite_rings.element_base import FiniteRingElement
+from sage.rings.finite_rings.finite_field_base import FiniteField
 
 
 class DenseArray:
     entries: list[FiniteRingElement]
 
-    def __init__(self, field, values: list[FiniteRingElement]) -> None:
+    def __init__(
+            self,
+            field: FiniteField,
+            values: list[FiniteRingElement]) -> None:
         self.field = field
         self.values = values
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[FiniteRingElement]:
         return iter(self.values)
 
     def __getitem__(self, index: int) -> FiniteRingElement:

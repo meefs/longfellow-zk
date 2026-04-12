@@ -4,7 +4,7 @@ from merkle import MerkleTree
 
 
 class TestMerkleTree(unittest.TestCase):
-    def test_appendix_example(self):
+    def test_appendix_example(self) -> None:
         # Example from the test vector section in the Appendix.
         n = 5
         mt = MerkleTree(n)

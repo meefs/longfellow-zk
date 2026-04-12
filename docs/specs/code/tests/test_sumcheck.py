@@ -2,6 +2,7 @@ import copy
 import unittest
 
 import sage.all
+from sage.rings.finite_rings.finite_field_base import FiniteField
 from sage.rings.finite_rings.finite_field_constructor import GF
 
 from circuit import Circuit, CircuitLayer, Quad
@@ -14,24 +15,24 @@ from sumcheck import (
 
 
 class TestSumcheck(unittest.TestCase):
-    def test_bindeq(self):
+    def test_bindeq(self) -> None:
         gf17 = GF(17)
         assert bindeq(gf17, []) == [gf17.one()]
-        assert bindeq(gf17, [2]) == [gf17(16), gf17(2)]
-        assert bindeq(gf17, [2, 5]) == [
+        assert bindeq(gf17, [gf17(2)]) == [gf17(16), gf17(2)]
+        assert bindeq(gf17, [gf17(2), gf17(5)]) == [
             gf17(16) * gf17(13),
             gf17(2) * gf17(13),
             gf17(16) * gf17(5),
             gf17(2) * gf17(5),
         ]
 
-    def test_smoke_test_witness(self):
+    def test_smoke_test_witness(self) -> None:
         gf17 = GF(17)
         circuit = make_test_circuit(gf17)
         construct_symbolic_variables(gf17, circuit)
         construct_concrete_pad(gf17, circuit)
 
-    def test_smoke_test_sumcheck_prover(self):
+    def test_smoke_test_sumcheck_prover(self) -> None:
         gf17 = GF(17)
         circuit = make_test_circuit(gf17)
         transcript = Transcript()
@@ -61,7 +62,7 @@ class TestSumcheck(unittest.TestCase):
             proof,
         )
 
-    def test_sumcheck_prover_dump_proof(self):
+    def test_sumcheck_prover_dump_proof(self) -> None:
         pad_transcript = Transcript()
         pad_transcript.init(b"pad prng")
         pad_prg = lambda field: pad_transcript.generate_field(field)
@@ -101,12 +102,12 @@ class TestSumcheck(unittest.TestCase):
         for layer_idx, proof_layer in enumerate(proof):
             print(f"Layer {layer_idx}:")
             for polynomials in proof_layer.evals:
-                print("Left hand, P0", hex(polynomials[0].p0))
-                print("Left hand, P2", hex(polynomials[0].p2))
-                print("Right hand, P0", hex(polynomials[1].p0))
-                print("Right hand, P2", hex(polynomials[1].p2))
-            print("VL", hex(proof_layer.vl))
-            print("VR", hex(proof_layer.vr))
+                print("Left hand, P0", polynomials[0].p0.to_bytes().hex())
+                print("Left hand, P2", polynomials[0].p2.to_bytes().hex())
+                print("Right hand, P0", polynomials[1].p0.to_bytes().hex())
+                print("Right hand, P2", polynomials[1].p2.to_bytes().hex())
+            print("VL", proof_layer.vl.to_bytes().hex())
+            print("VR", proof_layer.vr.to_bytes().hex())
         for i, linear_constraint in enumerate(linear_constraints):
             print(f"Linear constraint {i}:")
             rhs = Fp256.zero()
@@ -115,10 +116,10 @@ class TestSumcheck(unittest.TestCase):
                     rhs = -coeff
                 elif exponents.unweighted_degree() == 1:
                     variable, _ = next(exponents.sparse_iter())
-                    print(f"{hex(coeff)} * w{variable}")
+                    print(f"{coeff.to_bytes().hex()} * w{variable}")
                 else:
                     raise Exception(f"degree of term is too high: {exponents}")
-            print(f"RHS: {hex(rhs)}")
+            print(f"RHS: {rhs.to_bytes().hex()}")
         print("Quadratic constraints:")
         for quadratic_constraint in quadratic_constraints:
             print(
@@ -127,7 +128,7 @@ class TestSumcheck(unittest.TestCase):
             )
 
 
-def make_test_circuit(field):
+def make_test_circuit(field: FiniteField) -> Circuit:
     """
     Constructs a very small circuit for use in tests.
 

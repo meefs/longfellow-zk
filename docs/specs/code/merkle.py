@@ -3,17 +3,17 @@
 import hashlib
 
 
-def hash(data):
+def hash(data: bytes) -> bytes:
     assert isinstance(data, bytes), "data not bytes"
     return hashlib.sha256(data).digest()
 
 
 class MerkleTree:
-    def __init__(self, n):
+    def __init__(self, n: int) -> None:
         self.n = n
         self.a = [b''] * (2 * n)
 
-    def set_leaf(self, pos, leaf):
+    def set_leaf(self, pos: int, leaf: bytes) -> None:
         """
         Sets a leaf at a specific position.
         pos: 0-based index relative to the leaves (0 to n-1)
@@ -21,7 +21,7 @@ class MerkleTree:
         assert 0 <= pos < self.n, f"{pos} is out of bounds"
         self.a[pos + self.n] = leaf
 
-    def build_tree(self):
+    def build_tree(self) -> bytes:
         """
         Computes the internal nodes from n-1 down to 1.
         Returns the root (M.a[1]).
@@ -34,7 +34,10 @@ class MerkleTree:
 
         return self.a[1]
     
-    def mark_tree(self, requested_leaves):
+    def mark_tree(
+            self,
+            requested_leaves: list[int],
+            ) -> list[bool]:
         marked = [False] * (2 * self.n)
 
         for i in requested_leaves:
@@ -46,7 +49,10 @@ class MerkleTree:
 
         return marked
 
-    def compressed_proof(self, requested_leaves):
+    def compressed_proof(
+            self,
+            requested_leaves: list[int],
+            ) -> list[bytes]:
         """
         Generates a compressed proof for the requested leaves.
         """
@@ -58,18 +64,27 @@ class MerkleTree:
             if marked[i]:
                 child = 2 * i
 
-                # If the left child is marked, we need the right child (sibling).
+                # If the left child is marked, we need the right
+                # child (sibling).
                 if marked[child]:
                     child += 1
 
                 # If the identified child/sibling is NOT marked,
-                # we must provide its hash in the proof so the verifier can calculate the parent.
+                # we must provide its hash in the proof so the
+                # verifier can calculate the parent.
                 if not marked[child]:
                     proof.append(self.a[child])
 
         return proof
 
-    def verify_merkle(self, root, n, k, s, indices, proof):
+    def verify_merkle(
+            self,
+            root: bytes,
+            n: int,
+            k: int,
+            s: list[bytes],
+            indices: list[int],
+            proof: list[bytes]) -> bool:
         """
         Verifies that the provided leaves (s) at specific positions (indices)
         are part of the Merkle tree defined by 'root'.
@@ -81,13 +96,13 @@ class MerkleTree:
         :param indices: List of positions for the leaves in 's'
         :param proof: List of proof hashes
         """
-        tmp = [None] * (2 * n)
+        tmp: list[None | bytes] = [None] * (2 * n)
         defined = [False] * (2 * n)
 
         proof_index = 0
 
         if n != self.n: return False
-        
+
         marked = self.mark_tree(indices)
 
         for i in range(n - 1, 0, -1):
@@ -113,6 +128,8 @@ class MerkleTree:
             if defined[2 * i] and defined[2 * i + 1]:
                 left = tmp[2 * i]
                 right = tmp[2 * i + 1]
+                assert left is not None
+                assert right is not None
                 tmp[i] = hash(left + right)
                 defined[i] = True
 
