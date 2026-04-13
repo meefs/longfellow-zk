@@ -250,6 +250,8 @@ class CborDoc {
   }
 
   // Returns the index of the item with respect to the document bytes.
+  // This function is only called once the input bytes are successfully
+  // parsed; the check condition asserts this invariant.
   size_t position() const {
     switch (t_) {
       case UNSIGNED:
@@ -270,7 +272,8 @@ class CborDoc {
   // Returns the length of the item's value in bytes.
   // According to ISO 18013-5 7.2.1, the mDL data elements shall be encoded
   // as tstr, uint, bstr, bool, or tdate, so this function only handles those
-  // cases.
+  // cases. This function is only called after the source bytes have been
+  // successfully parsed.
   size_t length() const {
     switch (t_) {
       case UNSIGNED:

@@ -322,6 +322,9 @@ TEST(Mdoc1fTest, RunsExamples) {
 
 // ============ Benchmarks =====================================================
 
+constexpr size_t kZKRate = 7;
+constexpr size_t kZKQueries = 132;
+
 void BM_Mdoc1fProver(benchmark::State& state) {
   std::unique_ptr<Circuit<Fp256Base>> CIRCUIT = make_mdoc1f_circuit(p256_base);
 
@@ -349,7 +352,7 @@ void BM_Mdoc1fProver(benchmark::State& state) {
 
   SecureRandomEngine rng;
 
-  ZkProof<Fp256Base> zkpr(*CIRCUIT, 4, 128);
+  ZkProof<Fp256Base> zkpr(*CIRCUIT, kZKRate, kZKQueries);
   ZkProver<Fp256Base, RSFactory> prover(*CIRCUIT, p256_base, rsf);
 
   for (auto s : state) {

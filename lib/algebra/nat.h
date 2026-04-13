@@ -168,6 +168,11 @@ class Nat : public Limb<W64> {
     return (bh != 0);
   }
 
+  T& cmovnz(limb_t nz, const T& y) {
+    proofs::cmovnz(kLimbs, limb_, nz, y.limb_);
+    return *this;
+  }
+
   T& add(const T& y) {
     (void)add_limb(kLimbs, limb_, y.limb_);
     return *this;

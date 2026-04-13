@@ -176,6 +176,7 @@ class ProverLayers {
     check(EQ->n() == W->n0_, "EQ->n() == W->n0_");
 
     check(logw <= Proof<Field>::kMaxBindings, "logw <= kMaxBindings");
+    check(logc <= Proof<Field>::kMaxBindings, "logc <= kMaxBindings");
     bnd.logv = logw;
 
     // Bind the C variables to Q.
@@ -309,7 +310,7 @@ class ProverLayers {
   Elt /*R*/ round_c(Proof<Field>* pr, const Proof<Field>* pad,
                     TranscriptSumcheck<Field>& ts, size_t layer, size_t round,
                     CPoly poly, const Field& F) {
-    check(round <= Proof<Field>::kMaxBindings, "round <= kMaxBindings");
+    check(round < Proof<Field>::kMaxBindings, "round < kMaxBindings");
 
     if (pad) {
       poly.sub(pad->l[layer].cp[round], F);
@@ -322,7 +323,7 @@ class ProverLayers {
   Elt /*R*/ round_h(Proof<Field>* pr, const Proof<Field>* pad,
                     TranscriptSumcheck<Field>& ts, size_t layer, size_t hand,
                     size_t round, WPoly poly, const Field& F) {
-    check(round <= Proof<Field>::kMaxBindings, "round <= kMaxBindings");
+    check(round < Proof<Field>::kMaxBindings, "round < kMaxBindings");
     if (pad) {
       poly.sub(pad->l[layer].hp[hand][round], F);
     }
