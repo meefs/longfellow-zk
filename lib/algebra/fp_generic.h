@@ -61,6 +61,14 @@ class FpGeneric {
     N n;
     bool operator==(const Elt& y) const { return n == y.n; }
     bool operator!=(const Elt& y) const { return !operator==(y); }
+
+    bool constant_time_eq(const Elt& y) const {
+      return n.constant_time_eq(y.n);
+    }
+    Elt& cmovnz(limb_t nz, const Elt& y) {
+      n.cmovnz(nz, y.n);
+      return *this;
+    }
   };
 
   explicit FpGeneric(const N& modulus)

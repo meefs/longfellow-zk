@@ -25,6 +25,7 @@
 #include "algebra/bogorng.h"
 #include "algebra/compare.h"
 #include "algebra/poly.h"
+#include "benchmark/benchmark.h"
 #include "gtest/gtest.h"
 
 namespace proofs {
@@ -411,6 +412,30 @@ TEST(GF2_128, Subfields) {
   test_subfield<6>();
   // not enough bits in uint64_t for a (1<<7)-bit subfield
 }
+
+// ================== Benchmarks ===============================================
+
+void BM_gf2_128(benchmark::State& state) {
+  Elt x = F.of_scalar(2);
+  Elt y[1000];
+  for (auto _ : state) {
+    benchmark::DoNotOptimize(&x);
+    for (size_t j = 0; j < 1000; ++j) {
+      y[j] = x;
+      x = F.mulf(x, x);
+    }
+    for (size_t i = 0; i < 1000 * 1000; ++i) {
+      for (size_t j = 0; j < 1000; ++j) {
+        y[j] = F.mulf(y[j], x);
+      }
+      x = F.mulf(x, x);
+    }
+    for (size_t j = 0; j < 1000; ++j) {
+      x = F.mulf(y[j], x);
+    }
+  }
+}
+BENCHMARK(BM_gf2_128);
 
 }  // namespace subfield
 }  // namespace proofs

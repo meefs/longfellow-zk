@@ -537,5 +537,63 @@ TEST(HostDecoderTest, Lookup) {
   EXPECT_EQ(ptr, nullptr);
 }
 
+TEST(HostDecoderTest, Coverage) {
+  // 1. Test position() for UNSIGNED
+  {
+    CborDoc root;
+    std::vector<uint8_t> bytes = {0};  // Unsigned 0
+    size_t pos = 0;
+    ASSERT_TRUE(root.decode(bytes.data(), bytes.size(), pos, 0));
+    EXPECT_EQ(root.position(), 0);
+  }
+
+  // 2. Test position() for TAG
+  {
+    CborDoc root;
+    // Date tag from existing tests
+    std::vector<uint8_t> bytes = {0xD9, 0x03, 0xEC, 0x6a, '1', '9', '7',
+                                  '1',  '-',  '0',  '9',  '-', '0', '1'};
+    size_t pos = 0;
+    ASSERT_TRUE(root.decode(bytes.data(), bytes.size(), pos, 0));
+    EXPECT_EQ(root.position(), 4);  // Children string position
+  }
+
+  // 3. Test position() for PRIMITIVE
+  {
+    CborDoc root;
+    std::vector<uint8_t> bytes = {X(7, 20)};  // False
+    size_t pos = 0;
+    ASSERT_TRUE(root.decode(bytes.data(), bytes.size(), pos, 0));
+    EXPECT_EQ(root.position(), 0);
+  }
+
+  // 4. Test position() death
+  {
+    CborDoc root;
+    std::vector<uint8_t> bytes = {X(4, 0)};  // Empty array
+    size_t pos = 0;
+    ASSERT_TRUE(root.decode(bytes.data(), bytes.size(), pos, 0));
+    EXPECT_DEATH(root.position(), "valueIndex called on non-value type");
+  }
+
+  // 5. Test length() for large UNSIGNED
+  {
+    CborDoc root;
+    std::vector<uint8_t> bytes = {X(0, 26), 0x00, 0x01, 0x00, 0x00};  // 65536
+    size_t pos = 0;
+    ASSERT_TRUE(root.decode(bytes.data(), bytes.size(), pos, 0));
+    EXPECT_EQ(root.length(), 5);
+  }
+
+  // 6. Test length() death
+  {
+    CborDoc root;
+    std::vector<uint8_t> bytes = {X(4, 0)};  // Empty array
+    size_t pos = 0;
+    ASSERT_TRUE(root.decode(bytes.data(), bytes.size(), pos, 0));
+    EXPECT_DEATH(root.length(), "valueLength called on non-value type");
+  }
+}
+
 }  // namespace
 }  // namespace proofs

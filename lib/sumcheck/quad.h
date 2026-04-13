@@ -26,6 +26,7 @@
 #include "arrays/eqs.h"
 #include "sumcheck/equad.h"
 #include "sumcheck/hquad.h"
+#include "util/panic.h"
 
 // ------------------------------------------------------------
 // Representation of the QUAD array used in sumcheck.
@@ -81,7 +82,9 @@ class Quad {
       : n_(n),
         vc_(n),
         delta_table_(std::move(delta_table)),
-        kvec_(std::move(kvec)) {}
+        kvec_(std::move(kvec)) {
+    check(n > 0, "Quad n > 0");
+  }
 
   // no copies
   Quad(const Quad& y) = delete;

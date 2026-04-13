@@ -35,7 +35,8 @@
 #include "ec/p256.h"
 #include "gf2k/gf2_128.h"
 #include "gf2k/lch14_reed_solomon.h"
-#include "proto/circuit.h"
+#include "proto/circuit_io.h"
+#include "proto/circuit_reader.h"
 #include "random/secure_random_engine.h"
 #include "random/transcript.h"
 #include "sumcheck/circuit.h"
@@ -433,13 +434,13 @@ MdocProverErrorCode run_mdoc_prover(
     log(INFO, "bytes len: %zu", full_size);
     ReadBuffer rb_circuit(bytes.data(), full_size);
 
-    CircuitRep<Fp256Base> cr_s(p256_base, P256_ID);
+    CircuitReader<Fp256Base> cr_s(p256_base, P256_ID);
     c_sig = cr_s.from_bytes(rb_circuit, enforce_circuit_id_in_prover);
     if (c_sig == nullptr) {
       log(ERROR, "signature circuit could not be parsed");
       return MDOC_PROVER_CIRCUIT_PARSING_FAILURE;
     }
-    CircuitRep<f_128> cr_h(Fs, GF2_128_ID);
+    CircuitReader<f_128> cr_h(Fs, GF2_128_ID);
     c_hash = cr_h.from_bytes(rb_circuit, enforce_circuit_id_in_prover);
 
     if (c_hash == nullptr) {
@@ -587,14 +588,14 @@ MdocVerifierErrorCode run_mdoc_verifier(
   log(INFO, "bytes len: %zu", full_size);
 
   ReadBuffer rb_circuit(bytes.data(), full_size);
-  CircuitRep<Fp256Base> cr_s(p256_base, P256_ID);
+  CircuitReader<Fp256Base> cr_s(p256_base, P256_ID);
   auto c_sig = cr_s.from_bytes(rb_circuit, enforce_circuit_id_in_verifier);
   if (c_sig == nullptr) {
     log(ERROR, "signature circuit could not be parsed");
     return MDOC_VERIFIER_CIRCUIT_PARSING_FAILURE;
   }
 
-  CircuitRep<f_128> cr_h(Fs, GF2_128_ID);
+  CircuitReader<f_128> cr_h(Fs, GF2_128_ID);
   auto c_hash = cr_h.from_bytes(rb_circuit, enforce_circuit_id_in_verifier);
 
   if (c_hash == nullptr) {
