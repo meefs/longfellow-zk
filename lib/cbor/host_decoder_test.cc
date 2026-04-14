@@ -573,7 +573,9 @@ TEST(HostDecoderTest, Coverage) {
     std::vector<uint8_t> bytes = {X(4, 0)};  // Empty array
     size_t pos = 0;
     ASSERT_TRUE(root.decode(bytes.data(), bytes.size(), pos, 0));
+#if GTEST_HAS_DEATH_TEST
     EXPECT_DEATH(root.position(), "valueIndex called on non-value type");
+#endif
   }
 
   // 5. Test length() for large UNSIGNED
@@ -591,7 +593,9 @@ TEST(HostDecoderTest, Coverage) {
     std::vector<uint8_t> bytes = {X(4, 0)};  // Empty array
     size_t pos = 0;
     ASSERT_TRUE(root.decode(bytes.data(), bytes.size(), pos, 0));
+#if GTEST_HAS_DEATH_TEST
     EXPECT_DEATH(root.length(), "valueLength called on non-value type");
+#endif
   }
 }
 
