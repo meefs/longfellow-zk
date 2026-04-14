@@ -129,6 +129,7 @@ TEST(MerkleTree, ZeroLengthProof) {
 }
 
 TEST(MerkleTree, UniqueLeaves) {
+#if GTEST_HAS_DEATH_TEST
   Digest leaves[4] = {Digest{100}, Digest{101}, Digest{102}, Digest{103}};
   MerkleTree mt(4);
   for (size_t i = 0; i < 4; i++) {
@@ -139,10 +140,10 @@ TEST(MerkleTree, UniqueLeaves) {
   std::vector<Digest> ll = {leaves[1], leaves[1]};
   MerkleTreeVerifier verifier(4, root);
   std::vector<Digest> proof = {Digest::hash2(leaves[1], leaves[1])};
-
   EXPECT_DEATH(
       verifier.verify_compressed_proof(proof.data(), 1, leaves, ids, 2),
       "duplicate position in merkle tree requested");
+#endif
 }
 
 TEST(MerkleTree, BatchVerifyProofTooShort) {

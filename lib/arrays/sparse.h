@@ -163,9 +163,10 @@ class Sparse {
   }
 
   void canonicalize(const Field& F) {
-    std::sort(c_.begin(), c_.end(), [&F](const corner& x, const corner& y) {
-      return corner::compare(x, y, F);
-    });
+    std::sort(c_.begin(), c_.begin() + n_,
+              [&F](const corner& x, const corner& y) {
+                return corner::compare(x, y, F);
+              });
     return coalesce(F);
   }
 
