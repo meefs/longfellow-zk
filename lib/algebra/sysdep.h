@@ -249,20 +249,23 @@ static inline void cmovnz(size_t W, uint64_t a[/*W*/], uint64_t nz,
     asm("testq %[nz], %[nz]\n\t"
         "cmovneq %[b0], %[a0]\n\t"
         : [a0] "+r"(a[0])
-        : [nz] "r"(nz), [b0] "r"(b[0]));
+        : [nz] "r"(nz), [b0] "r"(b[0])
+        : "cc");
   } else if (W == 2) {
     asm("testq %[nz], %[nz]\n\t"
         "cmovneq %[b0], %[a0]\n\t"
         "cmovneq %[b1], %[a1]\n\t"
         : [a0] "+r"(a[0]), [a1] "+r"(a[1])
-        : [nz] "r"(nz), [b0] "r"(b[0]), [b1] "r"(b[1]));
+        : [nz] "r"(nz), [b0] "r"(b[0]), [b1] "r"(b[1])
+        : "cc");
   } else if (W == 3) {
     asm("testq %[nz], %[nz]\n\t"
         "cmovneq %[b0], %[a0]\n\t"
         "cmovneq %[b1], %[a1]\n\t"
         "cmovneq %[b2], %[a2]\n\t"
         : [a0] "+r"(a[0]), [a1] "+r"(a[1]), [a2] "+r"(a[2])
-        : [nz] "r"(nz), [b0] "r"(b[0]), [b1] "r"(b[1]), [b2] "r"(b[2]));
+        : [nz] "r"(nz), [b0] "r"(b[0]), [b1] "r"(b[1]), [b2] "r"(b[2])
+        : "cc");
   } else if (W == 4) {
     asm("testq %[nz], %[nz]\n\t"
         "cmovneq %[b0], %[a0]\n\t"
@@ -271,7 +274,8 @@ static inline void cmovnz(size_t W, uint64_t a[/*W*/], uint64_t nz,
         "cmovneq %[b3], %[a3]\n\t"
         : [a0] "+r"(a[0]), [a1] "+r"(a[1]), [a2] "+r"(a[2]), [a3] "+r"(a[3])
         : [nz] "r"(nz), [b0] "r"(b[0]), [b1] "r"(b[1]), [b2] "r"(b[2]),
-          [b3] "r"(b[3]));
+          [b3] "r"(b[3])
+        : "cc");
   } else {
     for (size_t i = 0; i < W; ++i) {
       a[i] = (nz != 0) ? b[i] : a[i];

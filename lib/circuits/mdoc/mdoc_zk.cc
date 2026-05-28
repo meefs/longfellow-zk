@@ -346,33 +346,37 @@ bool cbor_validate(const uint8_t* in, size_t len) {
     return false;
   }
 
-  switch (doc.t_) {
+  switch (doc.variant()) {
     case TEXT:
     case BYTES:
     case UNSIGNED:
     case NEGATIVE:
       return true;
 
-    case PRIMITIVE:
-      return (doc.u_.p == CTRUE || doc.u_.p == CFALSE);
+    case PRIMITIVE: {
+      CborPrimitive p = doc.as_primitive();
+      return (p == CTRUE || p == CFALSE);
+    }
 
     case TAG: {
       // items.n is the tag value
-      size_t tag = doc.u_.items.n;
-      if (tag == 1004) {  // Fulldate
-        if (len != 14) return false;
-        // Check inner type is TEXT? CborDoc handles valid children decode.
-        // host_decoder.h: case 6 (TAG) ... decode_items ...
-        // We know it has 1 child.
-        if (doc.children_.empty() || doc.children_[0].t_ != TEXT) return false;
-        return true;
+      size_t tag = doc.as_tag();
+      CborTag inner_tag = doc.tagged_value().variant();
+      switch (tag) {
+        case 1004:  // Fulldate
+          if (len != 14) return false;
+          // Check inner type is TEXT? CborDoc handles valid children decode.
+          // host_decoder.h: case 6 (TAG) ... decode_items ...
+          // We know it has 1 child.
+          if (inner_tag != TEXT) return false;
+          return true;
+        case 0:  // Tdate
+          if (len != 22) return false;
+          if (inner_tag != TEXT) return false;
+          return true;
+        default:
+          return false;
       }
-      if (tag == 0) {  // Tdate
-        if (len != 22) return false;
-        if (doc.children_.empty() || doc.children_[0].t_ != TEXT) return false;
-        return true;
-      }
-      return false;
     }
 
     default:

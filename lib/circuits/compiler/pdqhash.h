@@ -109,6 +109,7 @@ class PdqHash {
     ++bits_;
     std::vector<kv> table1(capacity());
     table_.swap(table1);
+    sz_ = 0;
     for (const auto &p : table1) {
       if (p.v != kNil) {
         insert0(p.k, p.v);

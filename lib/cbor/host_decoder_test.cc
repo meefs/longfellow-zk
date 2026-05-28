@@ -497,28 +497,28 @@ TEST(HostDecoderTest, Lookup) {
        'm'},
   };
   for (const auto &key : keys) {
-    const CborDoc *got = croot.lookup(mso.data(), key.size(), &key[0], ndx);
-    EXPECT_NE(got, nullptr);
+    auto got = croot.lookup(mso.data(), key.size(), &key[0], ndx);
+    EXPECT_NE(got.key, nullptr);
   }
 
   // Perform a cascading series of lookups
   const uint8_t dki[13] = {'d', 'e', 'v', 'i', 'c', 'e', 'K',
                            'e', 'y', 'I', 'n', 'f', 'o'};
-  const CborDoc *c_dki = croot.lookup(mso.data(), sizeof(dki), dki, ndx);
-  EXPECT_NE(c_dki, nullptr);
+  auto c_dki = croot.lookup(mso.data(), sizeof(dki), dki, ndx);
+  EXPECT_NE(c_dki.key, nullptr);
   EXPECT_EQ(4u, ndx);
 
   const uint8_t dk[9] = {'d', 'e', 'v', 'i', 'c', 'e', 'K', 'e', 'y'};
-  const CborDoc *c_dk = c_dki[1].lookup(mso.data(), sizeof(dk), dk, ndx);
-  EXPECT_NE(c_dk, nullptr);
+  auto c_dk = c_dki.val->lookup(mso.data(), sizeof(dk), dk, ndx);
+  EXPECT_NE(c_dk.key, nullptr);
   EXPECT_EQ(0u, ndx);
 
-  const CborDoc *c_pkx = c_dk[1].lookup_negative(-1, ndx);
-  EXPECT_NE(c_pkx, nullptr);
+  auto c_pkx = c_dk.val->lookup_negative(-1, ndx);
+  EXPECT_NE(c_pkx.key, nullptr);
   EXPECT_EQ(2u, ndx);
 
-  const CborDoc *c_00 = c_dk[1].lookup_unsigned(1, ndx);
-  EXPECT_NE(c_00, nullptr);
+  auto c_00 = c_dk.val->lookup_unsigned(1, ndx);
+  EXPECT_NE(c_00.key, nullptr);
   EXPECT_EQ(0u, ndx);
 
   // Perform lookups that should fail
@@ -528,13 +528,13 @@ TEST(HostDecoderTest, Lookup) {
        'm'},
   };
   for (const auto &key : not_keys) {
-    const CborDoc *got = croot.lookup(mso.data(), key.size(), &key[0], ndx);
-    EXPECT_EQ(got, nullptr);
+    auto got = croot.lookup(mso.data(), key.size(), &key[0], ndx);
+    EXPECT_EQ(got.key, nullptr);
   }
-  const CborDoc *ptr = c_dk[1].lookup_negative(-4, ndx);
-  EXPECT_EQ(ptr, nullptr);
-  ptr = c_dk[1].lookup_unsigned(6, ndx);
-  EXPECT_EQ(ptr, nullptr);
+  auto ptr = c_dk.val->lookup_negative(-4, ndx);
+  EXPECT_EQ(ptr.key, nullptr);
+  ptr = c_dk.val->lookup_unsigned(6, ndx);
+  EXPECT_EQ(ptr.key, nullptr);
 }
 
 TEST(HostDecoderTest, Coverage) {
@@ -574,7 +574,7 @@ TEST(HostDecoderTest, Coverage) {
     size_t pos = 0;
     ASSERT_TRUE(root.decode(bytes.data(), bytes.size(), pos, 0));
 #if GTEST_HAS_DEATH_TEST
-    EXPECT_DEATH(root.position(), "valueIndex called on non-value type");
+    EXPECT_DEATH(root.position(), "position\\(\\) called on unknown type");
 #endif
   }
 
@@ -594,7 +594,7 @@ TEST(HostDecoderTest, Coverage) {
     size_t pos = 0;
     ASSERT_TRUE(root.decode(bytes.data(), bytes.size(), pos, 0));
 #if GTEST_HAS_DEATH_TEST
-    EXPECT_DEATH(root.length(), "valueLength called on non-value type");
+    EXPECT_DEATH(root.length(), "length\\(\\) called on non-value type");
 #endif
   }
 }

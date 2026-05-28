@@ -209,7 +209,7 @@ TEST(Nat, BadDigits) {
   std::string ok = "0123456789abcdefABCDEF";
   for (int i = 0; i < 256; ++i) {
     if (ok.find((char)i) == std::string::npos) {  // bad char
-      EXPECT_DEATH(digit((char)i), "malformed numeral in digit()");
+      EXPECT_DEATH(digit((char)i, 16), "malformed numeral in digit()");
     }
   }
 #endif
