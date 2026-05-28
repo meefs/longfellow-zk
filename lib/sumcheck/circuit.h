@@ -67,10 +67,8 @@ struct LayerProof {
   // For efficiency, we distinguish polynomials needed to bind copy
   // variables (CPoly, degree 3) from polynomials needed to bind
   // wire variables (WPoly, degree 2).
-  using CPoly = SumcheckPoly<4, Field>;
-  using WPoly = SumcheckPoly<3, Field>;
-  using FWPoly = Poly<3, Field>;
-  using FCPoly = Poly<4, Field>;
+  using CPoly = Poly<4, Field>;
+  using WPoly = Poly<3, Field>;
 
   // Maximum 2^40 gates/wires/copies per layer.
   static constexpr size_t kMaxBindings = 40;

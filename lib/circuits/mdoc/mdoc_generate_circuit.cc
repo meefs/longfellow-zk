@@ -189,6 +189,11 @@ CircuitGenerationErrorCode generate_circuit(const ZkSpecStruct* zk_spec,
   uint8_t* buf = (uint8_t*)malloc(buf_size);
 
   size_t zl = ZSTD_compress(buf, buf_size, src, sz, 16);
+  if (ZSTD_isError(zl)) {
+    log(ERROR, "ZSTD_compress failed: %s", ZSTD_getErrorName(zl));
+    free(buf);
+    return CIRCUIT_GENERATION_ZLIB_FAILURE;
+  }
   log(INFO, "zstd from %zu --> %zu", sz, zl);
   *clen = zl;
   *cb = buf;

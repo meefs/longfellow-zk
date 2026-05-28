@@ -52,6 +52,12 @@ class FpGeneric {
   static constexpr bool kCharacteristicTwo = false;
   static constexpr bool kSupportsDot = true;
   static constexpr size_t kNPolyEvaluationPoints = 6;
+
+  // Number of extra 64-bit limbs for the accumulator.  The
+  // accumulator is designed to store dot products of length less than
+  // 2^64, so (2*W64 + 1) 64-bit words is enough.  We name the
+  // constant to document all places where this choice matters.
+  static constexpr size_t kAccumulatorExtraW64 = 1;
   N m_;
   size_t exact_bits_;
 
@@ -113,6 +119,7 @@ class FpGeneric {
         inv_small_scalars_[i] = invertf(poly_evaluation_points_[i]);
       }
     }
+    accum_scale_ = reduce_scale<kAccumulatorExtraW64>().e;
   }
 
   explicit FpGeneric(const StaticString s) : FpGeneric(N(s)) {}
@@ -412,6 +419,25 @@ class FpGeneric {
   // zero (as a counter) iff the field element is zero.
   Elt znz_indicator(const CElt& celt) const { return celt.e; }
 
+  // accumulators
+  struct Accum {
+    Nat<2 * W64 + kAccumulatorExtraW64> acc;
+  };
+
+  Elt reduce(const Accum& a) const {
+    Elt r;
+    r.n = reduce_nat(a.acc);
+    mul(r, accum_scale_);
+    return r;
+  }
+
+  void mac(Accum& a, const Elt& x, const Elt& y) const {
+    if (optimized_mul && (x == zero() || y == zero())) {
+      return;
+    }
+    a.acc.mac(x.n, y.n);
+  }
+
   // dot product
   struct NatScaledForDot {
     N n;
@@ -496,14 +522,16 @@ class FpGeneric {
   // private to prevent misuse.
   Elt of_charp(const char* s) const {
     Elt a(k_[0]);
+    size_t zbase = 10;
     Elt base = of_scalar(10);
     if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
       s += 2;
+      zbase = 16;
       base = of_scalar(16);
     }
 
     for (; *s; s++) {
-      Elt d = of_scalar(digit(*s));
+      Elt d = of_scalar(digit(*s, zbase));
       mul(a, base);
       add(a, d);
     }
@@ -535,6 +563,7 @@ class FpGeneric {
   Elt mone_;  // minus one
   Elt poly_evaluation_points_[kNPolyEvaluationPoints];
   Elt inv_small_scalars_[kNPolyEvaluationPoints];
+  Elt accum_scale_;
 };
 }  // namespace proofs
 

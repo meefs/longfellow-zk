@@ -194,9 +194,9 @@ class QuadCircuit {
       typename term::assert0_type_hack hack;
       std::vector<term> terms;
       terms.push_back(term(op, hack));
-      size_t n1 = push_node(node(terms));
-      nodes_[n1].info.is_assert0 = true;
-      return n1;
+      node nn(terms);
+      nn.info.is_assert0 = true;
+      return push_node(nn);
     }
   }
 

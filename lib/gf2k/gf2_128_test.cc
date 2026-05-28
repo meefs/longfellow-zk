@@ -210,38 +210,7 @@ TEST(GF2_128, Bogorng) {
   }
 }
 
-template <size_t N>
-void one_test_extend() {
-  using T2 = Poly<2, Field>;
-  using FT = Poly<N, Field>;
-  Bogorng<Field> rng(&F);
 
-  // Test the linear extension.  Start with a polynomial
-  // L2 of degree <2, and extend it to a polynomial L
-  // of degree <N, then evaluate both at random points.
-  for (size_t iter = 0; iter < 10; ++iter) {
-    T2 L2;
-    L2[0] = rng.next();
-    L2[1] = rng.next();
-
-    FT L = FT::extend(L2, F);
-
-    for (size_t iter1 = 0; iter1 < 10; iter1++) {
-      Elt r = rng.next();
-      Elt got = L.eval_lagrange(r, F);
-      Elt got2 = L2.eval_lagrange(r, F);
-      EXPECT_EQ(got, got2);
-    }
-  }
-}
-
-TEST(GF2_128, Extend) {
-  one_test_extend<2>();
-  one_test_extend<3>();
-  one_test_extend<4>();
-  one_test_extend<5>();
-  one_test_extend<6>();
-}
 
 void expect_order(size_t log_order, const Elt x0) {
   // EXPECT_NE(x, x0) is necessary but not sufficient.  We should

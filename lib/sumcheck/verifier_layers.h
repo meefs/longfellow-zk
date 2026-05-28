@@ -94,14 +94,13 @@ class VerifierLayers {
                       TranscriptSumcheck<Field>& ts, const Field& F) {
     proofs::check(logc <= Proof<Field>::kMaxBindings, "logc <= kMaxBindings");
     for (size_t round = 0; round < logc; ++round) {
-      // Change verification equation from
-      //    claim =? (p(0) + p(1))
-      // to p(1) = claim - p(0).
       auto tp = plr->cp[round];
-      auto t1 = F.subf(*claim, tp.t_[0]);
-      ch->cb[round] = ts.round(plr->cp[round]);
-      auto p = tp.to_poly(t1);
-      *claim = p.eval_lagrange(ch->cb[round], F);
+      if (F.addf(tp[0], tp[1]) != *claim) {
+        *why = "claim != p(0) + p(1)";
+        return false;
+      }
+      ch->cb[round] = ts.round(tp);
+      *claim = tp.eval_lagrange(ch->cb[round], F);
     }
 
     return true;
@@ -113,14 +112,13 @@ class VerifierLayers {
     proofs::check(logw <= Proof<Field>::kMaxBindings, "logw <= kMaxBindings");
     for (size_t round = 0; round < logw; ++round) {
       for (size_t hand = 0; hand < 2; ++hand) {
-        // Change verification equation from
-        //    claim =? (p(0) + p(1))
-        // to p(1) = claim - p(0).
         auto tp = plr->hp[hand][round];
-        auto t1 = F.subf(*claim, tp.t_[0]);
+        if (F.addf(tp[0], tp[1]) != *claim) {
+          *why = "claim != p(0) + p(1)";
+          return false;
+        }
         ch->hb[hand][round] = ts.round(tp);
-        auto p = tp.to_poly(t1);
-        *claim = p.eval_lagrange(ch->hb[hand][round], F);
+        *claim = tp.eval_lagrange(ch->hb[hand][round], F);
       }
     }
     return true;
