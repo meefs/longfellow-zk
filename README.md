@@ -43,6 +43,11 @@ $ sudo apt install -y clang cmake libssl-dev libzstd-dev libgtest-dev libbenchma
 $ yum install -y clang libzstd-devel openssl-devel git cmake google-benchmark-devel gtest-devel
 ```
 
+Newer versions of fedora seem to require `libpfm-devel`:
+```
+$ yum install -y clang libzstd-devel openssl-devel git cmake google-benchmark-devel gtest-devel libpfm-devel
+```
+
 
 ### MacOS
 Ensure that Xcode command line tools such as `clang` and `cmake` are installed.
