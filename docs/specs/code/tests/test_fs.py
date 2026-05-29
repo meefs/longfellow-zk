@@ -15,7 +15,7 @@ class TestFiatShamir(unittest.TestCase):
         arr = bytearray()
         for bi in range(0, 100):
             arr.append(bi)
-        t.write_bytes(arr[:])
+        t.write_bytes(bytes(arr))
 
         tv1 = [t.generate_field(field) for i in range(0,16)]
         for ti in tv1:
