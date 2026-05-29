@@ -49,7 +49,7 @@ jobs:
             os: ubuntu-24.04-16core
             container_image: "fedora:42"
             cpp_compiler: clang++
-            install_command: "yum install -y clang libzstd-devel openssl-devel git cmake google-benchmark-devel gtest-devel"
+            install_command: "yum install -y clang libzstd-devel openssl-devel git cmake google-benchmark-devel gtest-devel libpfm-devel"
           - os_name: "Fedora 41"
             os: ubuntu-24.04-16core
             container_image: "fedora:41"
