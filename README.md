@@ -34,7 +34,7 @@ googlebenchmark.
 ### Ubuntu, debian
 
 ```
-$ sudo apt install -y clang cmake libssl-dev libzstd-dev libgtest-dev libbenchmark-dev zlib1g-dev
+$ sudo apt install -y build-essential clang cmake libssl-dev libzstd-dev libgtest-dev libbenchmark-dev zlib1g-dev
 ```
 
 ### Fedora, redhat
