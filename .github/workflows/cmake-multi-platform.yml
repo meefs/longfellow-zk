@@ -83,27 +83,6 @@ jobs:
             cpp_compiler: clang++
             install_command: "yum install -y clang libzstd-devel openssl-devel git cmake google-benchmark-devel gtest-devel"
 
-          - os_name: "Amazon Linux 2023"
-            os: ubuntu-24.04-16core
-            container_image: "amazonlinux:2023"
-            cpp_compiler: clang++
-            install_command: "yum install -y clang libzstd-devel openssl-devel git cmake google-benchmark-devel gtest-devel"
-          - os_name: "Alma Linux 10"
-            os: ubuntu-24.04-16core
-            container_image: "almalinux:10"
-            cpp_compiler: clang++
-            install_command: "yum install -y clang libzstd-devel openssl-devel git cmake google-benchmark-devel gtest-devel"
-          - os_name: "Alma Linux 9"
-            os: ubuntu-24.04-16core
-            container_image: "almalinux:9"
-            cpp_compiler: clang++
-            install_command: "yum install -y clang libzstd-devel openssl-devel git cmake google-benchmark-devel gtest-devel"
-          - os_name: "Alma Linux 8"
-            os: ubuntu-24.04-16core
-            container_image: "almalinux:8"
-            cpp_compiler: clang++
-            install_command: "yum install -y clang libzstd-devel openssl-devel git cmake google-benchmark-devel gtest-devel"
-
     steps:
     - name: Install dependencies
       run: ${{ matrix.install_command }}
