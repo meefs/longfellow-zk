@@ -18,7 +18,7 @@ jobs:
     - name: Install dependencies
       run: sage --pip install pycryptodome mypy
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         persist-credentials: false
     - name: Run tests
