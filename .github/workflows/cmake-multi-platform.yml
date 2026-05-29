@@ -51,11 +51,6 @@ jobs:
             cpp_compiler: clang++
             install_command: "apt-get update -y && apt-get install -y clang cmake git libssl-dev libzstd-dev libgtest-dev libbenchmark-dev zlib1g-dev"
 
-          - os_name: "Debian 14"
-            os: ubuntu-24.04-16core
-            container_image: "debian:14"
-            cpp_compiler: clang++
-            install_command: "apt-get update -y && apt-get install -y clang cmake git libssl-dev libzstd-dev libgtest-dev libbenchmark-dev zlib1g-dev"
           - os_name: "Debian 13"
             os: ubuntu-24.04-16core
             container_image: "debian:13"
