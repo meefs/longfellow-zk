@@ -43,6 +43,22 @@ jobs:
             container_image: "ubuntu:resolute"
             cpp_compiler: clang++
             install_command: "apt-get update -y && apt-get install -y clang cmake git libssl-dev libzstd-dev libgtest-dev libbenchmark-dev zlib1g-dev"
+          - os_name: "Ubuntu Noble"
+            os: ubuntu-24.04-16core
+            container_image: "ubuntu:noble"
+            cpp_compiler: clang++
+            install_command: "apt-get update -y && apt-get install -y clang cmake git libssl-dev libzstd-dev libgtest-dev libbenchmark-dev zlib1g-dev"
+          - os_name: "Ubuntu Questing"
+            os: ubuntu-24.04-16core
+            container_image: "ubuntu:questing"
+            cpp_compiler: clang++
+            install_command: "apt-get update -y && apt-get install -y clang cmake git libssl-dev libzstd-dev libgtest-dev libbenchmark-dev zlib1g-dev"
+          - os_name: "Ubuntu Jammy"
+            os: ubuntu-24.04-16core
+            container_image: "ubuntu:jammy"
+            cpp_compiler: clang++
+            install_command: "apt-get update -y && apt-get install -y clang cmake git libssl-dev libzstd-dev libgtest-dev libbenchmark-dev zlib1g-dev"
+            
           - os_name: "Debian 13"
             os: ubuntu-24.04-16core
             container_image: "debian:13"
