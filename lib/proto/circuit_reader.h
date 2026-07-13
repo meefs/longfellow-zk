@@ -63,6 +63,10 @@ class CircuitReader {
       return nullptr;
     }
 
+    // Wire labels and indices must fit in uint32_t.
+    constexpr size_t kMaxValidWireId = 0xFFFFFFFEull;
+    constexpr size_t kMaxValidIndex = 0xFFFFFFFFull;
+
     size_t fid_as_size_t = read_field_id(buf);
     size_t nv = read_size(buf);
     size_t nc = read_size(buf);
@@ -73,8 +77,11 @@ class CircuitReader {
     size_t numconst = read_size(buf);
 
     // Basic sanity checks.
-    if (fid_as_size_t != static_cast<size_t>(field_id_) || npub_in > ninputs ||
-        subfield_boundary > ninputs || nl > CircuitIO::kMaxLayers) {
+    if (nv == 0 || nv > kMaxValidWireId || nc == 0 || nl == 0 ||
+        nl > CircuitIO::kMaxLayers ||
+        fid_as_size_t != static_cast<size_t>(field_id_) ||
+        ninputs > kMaxValidWireId || npub_in > ninputs ||
+        subfield_boundary > ninputs || numconst > kMaxValidIndex) {
       return nullptr;
     }
 
@@ -120,12 +127,13 @@ class CircuitReader {
       }
 
       size_t lw = read_size(buf);
-      if (lw > LayerProof<Field>::kMaxBindings) return nullptr;
+      if (lw > LayerProof<Field>::kMaxBindings || !(lw > 0)) return nullptr;
 
       size_t nw = read_size(buf);
-      if (!(nw > 0)) return nullptr;
+      if (!(nw > 0) || nw < lw || nw > kMaxValidWireId || nw > (1ull << lw))
+        return nullptr;
       size_t nq = read_size(buf);
-      if (!(nq > 0)) return nullptr;
+      if (!(nq > 0) || nq > kMaxValidIndex) return nullptr;
 
       // Each quad takes 4 values, check for overflow.
       need = CircuitIO::checked_mul(4 * CircuitIO::kBytesPerSizeT, nq);

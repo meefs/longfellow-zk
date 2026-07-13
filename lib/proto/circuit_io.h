@@ -51,11 +51,12 @@ struct CircuitIO {
   static constexpr uint64_t kMaxValue = (1ULL << (kBytesPerSizeT * 8)) - 1;
 
   // Multiplies arguments and checks for overflow.
-  template <typename T>
-  static std::optional<T> checked_mul(T a, T b) {
-    T ab = a * b;
-    if (a == 0 || ab / a == b) return ab;
-    return std::nullopt;
+  static std::optional<size_t> checked_mul(size_t a, size_t b) {
+    size_t ab;
+    if (__builtin_mul_overflow(a, b, &ab)) {
+      return std::nullopt;
+    }
+    return ab;
   }
 };
 

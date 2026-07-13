@@ -70,11 +70,6 @@ class CborDoc {
     return u_.u64;
   }
 
-  int64_t as_negative() const {
-    check(t_ == NEGATIVE, "as_negative called on non-NEGATIVE type");
-    return u_.i64;
-  }
-
   CborPrimitive as_primitive() const {
     check(t_ == PRIMITIVE, "as_primitive called on non-PRIMITIVE type");
     return u_.p;
@@ -170,7 +165,7 @@ class CborDoc {
         break;
       case 1:
         t_ = NEGATIVE;
-        u_.i64 = -(int64_t)count;
+        u_.n64 = count;
         break;
 
       case 2: /* BYTES */
@@ -228,9 +223,11 @@ class CborDoc {
 
   // Lookup a child node in an array. Expects index to be within bounds.
   const CborDoc* aref(size_t index) const {
-    CborItems arr = as_array();
-    check(index < arr.nchildren, "aref index out of bounds");
-    return &children_[index];
+    if (t_ != ARRAY) return nullptr;
+    if (index < u_.items.n) {
+      return &children_[index];
+    }
+    return nullptr;
   }
 
   // Lookup a key in a map of type {bytes->elements}.
@@ -255,11 +252,11 @@ class CborDoc {
 
   // Lookup a key in a map of type {unsigned->object}.
   // Returns null if the query is invalid.
-  LookupResult lookup_unsigned(uint64_t k, size_t& ndx) const {
+  LookupResult lookup_unsigned(uint64_t u64, size_t& ndx) const {
     if (t_ == MAP) {
       for (size_t i = 0; i < u_.items.n; ++i) {
         const CborDoc* key = &children_[2 * i];
-        if (key->t_ == UNSIGNED && key->u_.u64 == k) {
+        if (key->t_ == UNSIGNED && key->u_.u64 == u64) {
           ndx = i;
           return LookupResult{key, &children_[2 * i + 1]};
         }
@@ -270,11 +267,13 @@ class CborDoc {
 
   // Lookup a key in a map of type {negative->object}.
   // Returns null if the query is invalid.
-  LookupResult lookup_negative(int64_t k, size_t& ndx) const {
+  // N64 is the unsigned quantity stored in the CBOR document.
+  // When interpreted as an integer, it encodes -1 - N64.
+  LookupResult lookup_negative(uint64_t n64, size_t& ndx) const {
     if (t_ == MAP) {
       for (size_t i = 0; i < u_.items.n; ++i) {
         const CborDoc* key = &children_[2 * i];
-        if (key->t_ == NEGATIVE && key->u_.i64 == k) {
+        if (key->t_ == NEGATIVE && key->u_.n64 == n64) {
           ndx = i;
           return LookupResult{key, &children_[2 * i + 1]};
         }
@@ -289,6 +288,7 @@ class CborDoc {
   size_t position() const {
     switch (t_) {
       case UNSIGNED:
+      case NEGATIVE:
         return header_pos_;
       case BYTES:
         return as_bytes().pos;
@@ -314,8 +314,9 @@ class CborDoc {
   // successfully parsed.
   size_t length() const {
     switch (t_) {
-      case UNSIGNED: {
-        uint64_t val = as_unsigned();
+      case UNSIGNED:
+      case NEGATIVE: {
+        uint64_t val = (t_ == UNSIGNED) ? u_.u64 : u_.n64;
         if (val < 24) {
           return 1;
         } else if (val < 256) {
@@ -343,14 +344,20 @@ class CborDoc {
   }
 
  private:
-  // A union is used to store the attributes for either singleton objects (i.e.,
-  // UNSIGNED, NEGATIVE, PRIMITIVE), the start position and len of TEXT and
-  // BYTES array, and the children information for ARRAY or MAP objects.
-  // len of strings and byte arrays
+  // A union used to store the attributes for singleton objects (i.e.,
+  // UNSIGNED, NEGATIVE, PRIMITIVE), the start position and len of
+  // TEXT and BYTES array, or the children information for ARRAY or
+  // MAP objects.
+  //
+  // We store NEGATIVE data in a special way.  A NEGATIVE(N) datum is
+  // interpreted as the negative integer -1-N64. However, since -1-N64
+  // cannot be easily represented as a C type, we store N64 directly.
+  // This is OK because the only operation on NEGATIVE data is
+  // lookup_negative()
   union U {
-    uint64_t u64;         /* UNSIGNED */
-    int64_t i64;          /* NEGATIVE */
-    enum CborPrimitive p; /* PRIMITIVE */
+    uint64_t u64;          // UNSIGNED.
+    uint64_t n64;          // NEGATIVE.
+    enum CborPrimitive p;  // PRIMITIVE
 
     // BYTES + TEXT, represented as offset in input + length
     CborString string;

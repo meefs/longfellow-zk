@@ -513,6 +513,7 @@ TEST(MSO, Example2Real) {
     }
     gwC.invprod_decode = LC.eltw_input();
     gwC.cc0_counter = CTRC.input();
+    gwC.neg_cc0_counter = CTRC.input();
     gwC.invprod_parse = LC.eltw_input();
 
     std::vector<CborC::decode> dsC(n);
@@ -623,7 +624,8 @@ TEST(MSO, Example2Real) {
     filler.push_back(pwS[i].encoded_sel_header);
   }
   filler.push_back(gwS.invprod_decode);
-  filler.push_back(gwS.cc0_counter.e);
+  filler.push_back(gwS.cc0_counter);
+  filler.push_back(gwS.neg_cc0_counter);
   filler.push_back(gwS.invprod_parse);
 
   // jroot

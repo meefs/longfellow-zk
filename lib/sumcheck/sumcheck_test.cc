@@ -358,5 +358,39 @@ TEST(Sumcheck, ZeroOutput) {
   EXPECT_EQ(why, "ok");
 }
 
+TEST(Sumcheck, Limits) {
+  size_t logc = 4;
+  corner_t nc = 10;
+  auto CIRCUIT = addE_zero_circuit(logc, nc);
+  auto Wprover = std::make_unique<Dense<Field>>(nc, 10);
+  for (corner_t i = 0; i < nc; ++i) {
+    Wprover->v_[i + nc * wZ_ONE] = F.one();
+  }
+  auto Wverifier = Wprover->clone();
+  Proof<Field> proof(CIRCUIT->nl);
+
+  Transcript tsv((uint8_t*)"test", 4);
+  const char* why;
+
+  // Verify failure for too many layers
+  CIRCUIT->nl = Circuit<Field>::kMaxLayers + 1;
+  EXPECT_FALSE(Verifier<Field>::verify(&why, CIRCUIT.get(), &proof,
+                                       Wverifier->clone(), tsv, F));
+  EXPECT_STREQ(why, "too many layers");
+  CIRCUIT->nl = 2;  // Restore
+
+  CIRCUIT->nc = Circuit<Field>::kMaxCopies + 1;
+  EXPECT_FALSE(Verifier<Field>::verify(&why, CIRCUIT.get(), &proof,
+                                       Wverifier->clone(), tsv, F));
+  EXPECT_STREQ(why, "too many copies");
+  CIRCUIT->nc = nc;  // Restore
+
+  CIRCUIT->nv = Circuit<Field>::kMaxOutputs + 1;
+  EXPECT_FALSE(Verifier<Field>::verify(&why, CIRCUIT.get(), &proof,
+                                       Wverifier->clone(), tsv, F));
+  EXPECT_STREQ(why, "too many outputs");
+  CIRCUIT->nv = 3;  // Restore
+}
+
 }  // namespace
 }  // namespace proofs

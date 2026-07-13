@@ -130,6 +130,7 @@ void fill_eval_witness(MW& vw, const RMW& rvw, const Logic& L) {
   }
   vw.gwcb_.invprod_decode = L.konst(rvw.gwcb_.invprod_decode);
   vw.gwcb_.cc0_counter = CTR.as_counter(rvw.gwcb_.cc0_counter);
+  vw.gwcb_.neg_cc0_counter = CTR.as_counter(rvw.gwcb_.neg_cc0_counter);
   vw.gwcb_.invprod_parse = L.konst(rvw.gwcb_.invprod_parse);
 
   // The cbor indices need to be offset by the value of prepad because

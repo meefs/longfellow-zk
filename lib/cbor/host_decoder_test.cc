@@ -513,7 +513,7 @@ TEST(HostDecoderTest, Lookup) {
   EXPECT_NE(c_dk.key, nullptr);
   EXPECT_EQ(0u, ndx);
 
-  auto c_pkx = c_dk.val->lookup_negative(-1, ndx);
+  auto c_pkx = c_dk.val->lookup_negative(-1 - (-2), ndx);
   EXPECT_NE(c_pkx.key, nullptr);
   EXPECT_EQ(2u, ndx);
 

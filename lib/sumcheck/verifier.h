@@ -43,6 +43,23 @@ class Verifier : public VerifierLayers<Field> {
       return false;
     }
 
+    if (circ->nl > Circuit<Field>::kMaxLayers) {
+      *why = "too many layers";
+      return false;
+    }
+    if (circ->nc > Circuit<Field>::kMaxCopies) {
+      *why = "too many copies";
+      return false;
+    }
+    if (circ->nv > Circuit<Field>::kMaxOutputs) {
+      *why = "too many outputs";
+      return false;
+    }
+    if (circ->nl != circ->l.size() || circ->nl != proof->l.size()) {
+      *why = "circuit and proof layer counts must match";
+      return false;
+    }
+
     claims cl{};
     Challenge<Field> ch(circ->nl);
     TranscriptSumcheck<Field> tss(ts, F);

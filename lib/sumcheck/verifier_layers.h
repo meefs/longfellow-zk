@@ -54,6 +54,12 @@ class VerifierLayers {
         PROOF == nullptr || CH == nullptr) {
       return false;
     }
+
+    if (PROOF->l.size() < CIRCUIT->nl) {
+      *why = "Proof size less than circuit layers";
+      return false;
+    }
+
     *why = "ok";
 
     ts.begin_circuit(CH->q, CH->g);
