@@ -37,6 +37,10 @@ struct Layer {
 
 template <class Field>
 struct Circuit {
+  static constexpr size_t kMaxLayers = 10000;
+  static constexpr corner_t kMaxCopies = 1ULL << 24;
+  static constexpr corner_t kMaxOutputs = 1ULL << 24;
+
   corner_t nv;  // number of outputs for one copy
   size_t logv;  // number of G variables in V[G,C] in the final output
   corner_t nc;  // number of copies

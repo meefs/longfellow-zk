@@ -159,6 +159,22 @@ TEST(MerkleTree, BatchVerifyProofTooShort) {
                                                 &idx[0], idx.size()));
 }
 
+TEST(MerkleTree, BatchVerifyProofTooLong) {
+  std::vector<size_t> idx;
+  std::vector<Digest> leaves;
+  MerkleTree prover = setupBatch(300, 20, leaves, idx);
+  Digest root = prover.build_tree();
+  std::vector<Digest> proof;
+  size_t len = prover.generate_compressed_proof(proof, &idx[0], 20);
+  MerkleTreeVerifier verifier(300, root);
+
+  // Append a dummy digest to the proof to avoid out-of-bounds reads.
+  proof.push_back(Digest{});
+
+  EXPECT_FALSE(verifier.verify_compressed_proof(
+      proof.data(), len + 1, leaves.data(), idx.data(), idx.size()));
+}
+
 void print_digest(const Digest& d) {
   for (size_t i = 0; i < Digest::kLength; ++i) {
     printf("%02x", d.data[i]);

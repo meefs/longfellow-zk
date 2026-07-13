@@ -91,7 +91,8 @@ struct FullAttribute {
   const uint8_t* doc;
 
   bool operator==(const RequestedAttribute& y) const {
-    return y.id_len == id_len && memcmp(y.id, &doc[id_ind], id_len) == 0;
+    return y.id_len == id_len && id_len <= 32 &&
+           memcmp(y.id, &doc[id_ind], id_len) == 0;
   }
 
   size_t witness_length(const RequestedAttribute& attr) {
@@ -206,6 +207,12 @@ class ParsedMdoc {
         auto rand = er.lookup(resp, 6, (uint8_t*)"random", di);
         if (rand.key == nullptr) return MDOC_PROVER_ATTRIBUTE_RANDOM_MISSING;
 
+        // TODO: Handle array or map, recursive mdoc data types.
+        // For now, this circuit only matches unit types.
+        if (ev.val->is_variant(ARRAY) || ev.val->is_variant(MAP)) {
+          continue;
+        }
+
         attributes_.push_back((FullAttribute){
             //  For the elementIdentifier, the [1] index is the position and
             //  length of the value.
@@ -274,11 +281,15 @@ class ParsedMdoc {
     if (ndk.key == nullptr) return MDOC_PROVER_DEVICE_KEY_MISSING;
     copy_kv_header(dev_key_, ndk);
 
-    auto npkx = ndk.val->lookup_negative(-1, dev_key_pkx_.ndx);
+    // the key for PKX is -2 when viewed as an integer, which is encoded
+    // as NEGATIVE(-1 - (-2)) = NEGATIVE(1)
+    auto npkx = ndk.val->lookup_negative(1, dev_key_pkx_.ndx);
     if (npkx.key == nullptr) return MDOC_PROVER_DEVICE_KEY_MISSING;
     copy_kv_header(dev_key_pkx_, npkx);
 
-    auto npky = ndk.val->lookup_negative(-2, dev_key_pky_.ndx);
+    // the key for PKT is -3 when viewed as an integer, which is encoded
+    // as NEGATIVE(-1 - (-3)) = NEGATIVE(2)
+    auto npky = ndk.val->lookup_negative(2, dev_key_pky_.ndx);
     if (npky.key == nullptr) return MDOC_PROVER_DEVICE_KEY_MISSING;
     copy_kv_header(dev_key_pky_, npky);
 
@@ -561,7 +572,9 @@ MdocProverErrorCode fill_attribute(DenseFiller<Field>& filler,
                 attr.cbor_value + attr.cbor_value_len);
 
     if (vbuf.size() > 96) {
-      log(ERROR, "Attribute %s is too long: %zu", attr.id, vbuf.size());
+      log(ERROR, "Attribute %.*s is too long: %zu",
+          static_cast<int>(std::min<size_t>(attr.id_len, 32)),
+          reinterpret_cast<const char*>(attr.id), vbuf.size());
       return MDOC_PROVER_ATTRIBUTE_TOO_LONG;
     }
     size_t len = 0;
@@ -892,8 +905,8 @@ class MdocHashWitness {
         }
       }
       if (!found) {
-        log(ERROR, "Could not find attribute %.*s", attrs[i].id_len,
-            attrs[i].id);
+        log(ERROR, "Could not find attribute %.*s",
+            static_cast<int>(attrs[i].id_len), attrs[i].id);
         return MDOC_PROVER_ATTRIBUTE_NOT_FOUND;
       }
     }

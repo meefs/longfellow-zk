@@ -414,6 +414,7 @@ class FpGeneric {
     Elt e;
   };
   CElt as_counter(uint64_t a) const { return CElt{of_scalar_field(a)}; }
+  CElt negf(const CElt& a) const { return CElt{negf(a.e)}; }
 
   // Convert a counter into *some* field element such that the counter is
   // zero (as a counter) iff the field element is zero.

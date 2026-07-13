@@ -409,6 +409,13 @@ MdocProverErrorCode run_mdoc_prover(
     return MDOC_PROVER_NULL_INPUT;
   }
 
+  for (size_t i = 0; i < attrs_len; ++i) {
+    if (attrs[i].namespace_len > 64 || attrs[i].id_len > 32 ||
+        attrs[i].cbor_value_len > 64) {
+      return MDOC_PROVER_INVALID_INPUT;
+    }
+  }
+
   Elt pkX, pkY;
   if (!parsePk(pkx, pky, pkX, pkY)) {
     log(ERROR, "invalid pkx, pky");
@@ -551,6 +558,13 @@ MdocVerifierErrorCode run_mdoc_verifier(
       transcript == nullptr || now == nullptr || attrs == nullptr ||
       zkproof == nullptr || docType == nullptr || zk_spec == nullptr) {
     return MDOC_VERIFIER_NULL_INPUT;
+  }
+
+  for (size_t i = 0; i < attrs_len; ++i) {
+    if (attrs[i].namespace_len > 64 || attrs[i].id_len > 32 ||
+        attrs[i].cbor_value_len > 64) {
+      return MDOC_VERIFIER_INVALID_INPUT;
+    }
   }
 
   Elt pkX, pkY;

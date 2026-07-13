@@ -119,6 +119,16 @@ class ProverLayers {
 
     check(circ->logv <= Proof<Field>::kMaxBindings,
           "CIRCUIT->logv <= kMaxBindings");
+
+    check(pr->l.size() >= circ->nl, "Proof size must match circuit layers");
+    if (pad != nullptr) {
+      check(pad->l.size() >= circ->nl, "Pad size must match circuit layers");
+    }
+    if (aux != nullptr) {
+      check(aux->bound_quad.size() >= circ->nl,
+            "Aux size must match circuit layers");
+    }
+
     bnd.logv = circ->logv;
 
     // obtain the initial Q and G[0] bindings from the verifier
