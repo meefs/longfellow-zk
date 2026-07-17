@@ -54,125 +54,14 @@ class CircuitReader {
   // the serialization matches the id stored in the circuit.
   std::unique_ptr<Circuit<Field>> from_bytes(ReadBuffer& buf,
                                              bool enforce_circuit_id) {
-    if (!buf.have(8 * CircuitIO::kBytesPerSizeT + 1)) {
+    std::unique_ptr<Circuit<Field>> c;
+    std::shared_ptr<std::vector<Elt>> constants;
+    if (!read_header(buf, c, constants)) {
       return nullptr;
     }
 
-    uint8_t version = *buf.next(1);
-    if (version != 1) {
+    if (!read_layers(buf, c->nl, c->nv, constants->size(), constants, *c)) {
       return nullptr;
-    }
-
-    // Wire labels and indices must fit in uint32_t.
-    constexpr size_t kMaxValidWireId = 0xFFFFFFFEull;
-    constexpr size_t kMaxValidIndex = 0xFFFFFFFFull;
-
-    size_t fid_as_size_t = read_field_id(buf);
-    size_t nv = read_size(buf);
-    size_t nc = read_size(buf);
-    size_t npub_in = read_size(buf);
-    size_t subfield_boundary = read_size(buf);
-    size_t ninputs = read_size(buf);
-    size_t nl = read_size(buf);
-    size_t numconst = read_size(buf);
-
-    // Basic sanity checks.
-    if (nv == 0 || nv > kMaxValidWireId || nc == 0 || nl == 0 ||
-        nl > CircuitIO::kMaxLayers ||
-        fid_as_size_t != static_cast<size_t>(field_id_) ||
-        ninputs > kMaxValidWireId || npub_in > ninputs ||
-        subfield_boundary > ninputs || numconst > kMaxValidIndex) {
-      return nullptr;
-    }
-
-    // Ensure there are enough input bytes for the quad constants.
-    auto need = CircuitIO::checked_mul(numconst, Field::kBytes);
-    if (!need || !buf.have(need.value())) {
-      return nullptr;
-    }
-
-    auto constants = std::make_shared<std::vector<Elt>>(numconst);
-    for (size_t i = 0; i < numconst; ++i) {
-      auto vv = f_.of_bytes_field(buf.next(Field::kBytes));
-      if (!vv.has_value()) {
-        return nullptr;
-      }
-      (*constants)[i] = vv.value();
-    }
-
-    auto c = std::make_unique<Circuit<Field>>();
-    *c = Circuit<Field>{
-        .nv = nv,
-        .logv = lg(nv),
-        .nc = nc,
-        .logc = lg(nc),
-        .nl = nl,
-        .ninputs = ninputs,
-        .npub_in = npub_in,
-        .subfield_boundary = subfield_boundary,
-    };
-    c->l.reserve(nl);
-
-    // a starting bound on quad number
-    size_t max_g = nv;
-
-    // Use an approximate delta table builder, preferring quick lookup at the
-    // cost of missing some deduplications.
-    ApproximateDeltaTableBuilder<Field> db(/*prime*/ 8209);
-
-    for (size_t ly = 0; ly < nl; ++ly) {
-      // Ensure there are enough input bytes for the layer, 3 values.
-      if (!buf.have(3 * CircuitIO::kBytesPerSizeT)) {
-        return nullptr;
-      }
-
-      size_t lw = read_size(buf);
-      if (lw > LayerProof<Field>::kMaxBindings || !(lw > 0)) return nullptr;
-
-      size_t nw = read_size(buf);
-      if (!(nw > 0) || nw < lw || nw > kMaxValidWireId || nw > (1ull << lw))
-        return nullptr;
-      size_t nq = read_size(buf);
-      if (!(nq > 0) || nq > kMaxValidIndex) return nullptr;
-
-      // Each quad takes 4 values, check for overflow.
-      need = CircuitIO::checked_mul(4 * CircuitIO::kBytesPerSizeT, nq);
-      if (!need || !buf.have(need.value())) {
-        return nullptr;
-      }
-
-      auto qq = std::make_unique<Quad<Field>>(nq, constants, db.delta_table());
-      size_t prevg = 0, prevhl = 0, prevhr = 0;
-      for (size_t i = 0; i < nq; ++i) {
-        size_t g = read_index(buf, prevg);
-        if (g >= max_g) {  // index of quad must be < wires in the layer
-          return nullptr;
-        }
-        size_t hl = read_index(buf, prevhl);
-        size_t hr = read_index(buf, prevhr);
-        if (hl >= nw || hr >= nw) {
-          return nullptr;
-        }
-        size_t vi = read_num(buf);
-        if (vi >= numconst) {
-          return nullptr;
-        }
-
-        qq->assign(
-            i, db.dedup(QuadCorner(g - prevg), QuadCorner(hl - prevhl),
-                        QuadCorner(hr - prevhr), static_cast<uint32_t>(vi)));
-        prevg = g;
-        prevhl = hl;
-        prevhr = hr;
-      }
-      c->l.push_back(Layer<Field>{
-          .nw = nw,
-          .logw = lw,
-          .quad = std::unique_ptr<const Quad<Field>>(std::move(qq))});
-      // The outputs of layer ly become the inputs for layer ly+1.
-      // Thus, the new maximum value for g in the next layer is the number of
-      // wires in this layer.
-      max_g = nw;
     }
     // Read the circuit name from the serialization.
     if (!buf.have(CircuitIO::kIdSize)) {
@@ -191,6 +80,143 @@ class CircuitReader {
   }
 
  private:
+  bool read_header(ReadBuffer& buf, std::unique_ptr<Circuit<Field>>& c,
+                   std::shared_ptr<std::vector<Elt>>& constants) {
+    if (!buf.have(8 * CircuitIO::kBytesPerSizeT + 1)) {
+      return false;
+    }
+
+    uint8_t version = *buf.next(1);
+    if (version != 1) {
+      return false;
+    }
+
+    size_t fid_as_size_t = read_field_id(buf);
+    size_t nv = read_size(buf);
+    size_t nc = read_size(buf);
+    size_t npub_in = read_size(buf);
+    size_t subfield_boundary = read_size(buf);
+    size_t ninputs = read_size(buf);
+    size_t nl = read_size(buf);
+    size_t numconst = read_size(buf);
+
+    // Basic sanity checks.
+    if (nv == 0 || nv > kMaxValidWireId || nc == 0 || nl == 0 ||
+        nl > CircuitIO::kMaxLayers ||
+        fid_as_size_t != static_cast<size_t>(field_id_) ||
+        ninputs > kMaxValidWireId || npub_in > ninputs ||
+        subfield_boundary > ninputs || numconst > kMaxValidIndex) {
+      return false;
+    }
+
+    // Ensure there are enough input bytes for the quad constants.
+    auto need = CircuitIO::checked_mul(numconst, Field::kBytes);
+    if (!need || !buf.have(need.value())) {
+      return false;
+    }
+
+    constants = std::make_shared<std::vector<Elt>>(numconst);
+    for (size_t i = 0; i < numconst; ++i) {
+      auto vv = f_.of_bytes_field(buf.next(Field::kBytes));
+      if (!vv.has_value()) {
+        return false;
+      }
+      (*constants)[i] = vv.value();
+    }
+
+    c = std::make_unique<Circuit<Field>>();
+    *c = Circuit<Field>{
+        .nv = nv,
+        .logv = lg(nv),
+        .nc = nc,
+        .logc = lg(nc),
+        .nl = nl,
+        .ninputs = ninputs,
+        .npub_in = npub_in,
+        .subfield_boundary = subfield_boundary,
+    };
+    c->l.reserve(nl);
+    return true;
+  }
+  static constexpr size_t kMaxValidWireId = 0xFFFFFFFEull;
+  static constexpr size_t kMaxValidIndex = 0xFFFFFFFFull;
+
+  bool read_layers(ReadBuffer& buf, size_t nl, size_t nv, size_t numconst,
+                   const std::shared_ptr<std::vector<Elt>>& constants,
+                   Circuit<Field>& c) {
+    // a starting bound on quad number
+    size_t max_g = nv;
+
+    // Use an approximate delta table builder, preferring quick lookup at the
+    // cost of missing some deduplications.
+    ApproximateDeltaTableBuilder<Field> db(/*prime*/ 8209);
+
+    for (size_t ly = 0; ly < nl; ++ly) {
+      // Ensure there are enough input bytes for the layer, 3 values.
+      if (!buf.have(3 * CircuitIO::kBytesPerSizeT)) {
+        return false;
+      }
+
+      size_t lw = read_size(buf);
+      if (lw > LayerProof<Field>::kMaxBindings || !(lw > 0)) return false;
+
+      size_t nw = read_size(buf);
+      if (!(nw > 0) || nw < lw || nw > kMaxValidWireId || nw > (1ull << lw))
+        return false;
+
+      size_t nq = read_size(buf);
+      if (!(nq > 0) || nq > kMaxValidIndex) return false;
+
+      // Each quad takes 4 values, check for overflow.
+      auto need = CircuitIO::checked_mul(4 * CircuitIO::kBytesPerSizeT, nq);
+      if (!need || !buf.have(need.value())) {
+        return false;
+      }
+
+      auto qq = std::make_unique<Quad<Field>>(nq, constants, db.delta_table());
+      if (!read_quads(buf, nq, max_g, nw, numconst, *qq, db)) {
+        return false;
+      }
+      c.l.push_back(Layer<Field>{
+          .nw = nw,
+          .logw = lw,
+          .quad = std::unique_ptr<const Quad<Field>>(std::move(qq))});
+      // The outputs of layer ly become the inputs for layer ly+1.
+      // Thus, the new maximum value for g in the next layer is the number of
+      // wires in this layer.
+      max_g = nw;
+    }
+    return true;
+  }
+
+  bool read_quads(ReadBuffer& buf, size_t nq, size_t max_g, size_t nw,
+                  size_t numconst, Quad<Field>& qq,
+                  ApproximateDeltaTableBuilder<Field>& db) {
+    size_t prevg = 0, prevhl = 0, prevhr = 0;
+    for (size_t i = 0; i < nq; ++i) {
+      size_t g = read_index(buf, prevg);
+      if (g >= max_g) {  // index of quad must be < wires in the layer
+        return false;
+      }
+      size_t hl = read_index(buf, prevhl);
+      size_t hr = read_index(buf, prevhr);
+      if (hl >= nw || hr >= nw) {
+        return false;
+      }
+      size_t vi = read_num(buf);
+      if (vi >= numconst) {
+        return false;
+      }
+
+      qq.assign(i,
+                db.dedup(QuadCorner(g - prevg), QuadCorner(hl - prevhl),
+                         QuadCorner(hr - prevhr), static_cast<uint32_t>(vi)));
+      prevg = g;
+      prevhl = hl;
+      prevhr = hr;
+    }
+    return true;
+  }
   // Do not cast to FieldID, since the input is untrusted and the
   // cast may fail.
   static size_t read_field_id(ReadBuffer& buf) { return read_num(buf); }
