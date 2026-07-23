@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ TEST(mdoc, mdoc_signature_test) {
 
     MdocSig mdoc_sig(LC, p256, n256_order);
 
-    EltW pkX = Q.input(), pkY = Q.input(), htr = Q.input();
+    EltW pkX = LC.eltw_input(), pkY = LC.eltw_input(), htr = LC.eltw_input();
     v128 emac[2] = {LC.vinput<128>(), LC.vinput<128>()};
     v128 xmac[2] = {LC.vinput<128>(), LC.vinput<128>()};
     v128 ymac[2] = {LC.vinput<128>(), LC.vinput<128>()};
@@ -81,7 +81,7 @@ TEST(mdoc, mdoc_signature_test) {
     Q.private_input();
 
     MdocSig::Witness vwc;
-    vwc.input(Q, LC);
+    vwc.input(LC);
 
     mdoc_sig.assert_signatures(pkX, pkY, htr, emac, xmac, ymac, a_v, vwc);
 
@@ -101,14 +101,14 @@ TEST(mdoc, mdoc_signature_test) {
 
   {
     constexpr size_t t_ind = 2;
-    const uint8_t *mdoc = mdoc_tests[t_ind].mdoc;
+    const uint8_t* mdoc = mdoc_tests[t_ind].mdoc;
     pkX = p256_base.of_string(mdoc_tests[t_ind].pkx);
     pkY = p256_base.of_string(mdoc_tests[t_ind].pky);
-    bool ok = sw.compute_witness(pkX, pkY, mdoc, mdoc_tests[t_ind].mdoc_size,
-                                 mdoc_tests[t_ind].transcript,
-                                 mdoc_tests[t_ind].transcript_size);
+    MdocProverErrorCode ok = sw.compute_witness(
+        pkX, pkY, mdoc, mdoc_tests[t_ind].mdoc_size,
+        mdoc_tests[t_ind].transcript, mdoc_tests[t_ind].transcript_size);
 
-    check(ok, "Could not compute signature witness");
+    check(ok == MDOC_PROVER_SUCCESS, "Could not compute signature witness");
 
     MACReference<GF2_128<>> mac_ref;
 
@@ -160,8 +160,8 @@ TEST(mdoc, mdoc_signature_test) {
       *CIRCUIT, W, pub, p256_base,
       p256_base.of_string("1126492241464102818735004576096902583730188404304894"
                           "08729223714171582664680802"), /* omega_x*/
-      p256_base.of_string("3170409485181534106695698552158891296990397441810793"
-                          "5446220613054416637641043"), /* omega_y */
+      p256_base.of_string("8408799435854090769574046142781866056018216899718237"
+                          "8749313018254450460212908"), /* omega_y */
       1ull << 31);
 }
 
@@ -169,7 +169,7 @@ TEST(mdoc, mdoc_issuer_list_valid) {
   using Elt = Fp256Base::Elt;
   // Verify the two constraints on issuer lists.
 
-  size_t sz = sizeof(kIssuerPKY) / sizeof(char *);
+  size_t sz = sizeof(kIssuerPKY) / sizeof(char*);
   std::vector<Elt> pkY(sz);
   for (size_t i = 0; i < sz; ++i) {
     Elt pkX = p256_base.of_string(kIssuerPKX[i]);
@@ -208,7 +208,7 @@ TEST(mdoc, mdoc_signature_test_with_issuer_list) {
     MdocSig mdoc_sig(LC, p256, n256_order);
 
     // public inputs
-    EltW htr = Q.input();
+    EltW htr = LC.eltw_input();
     v128 emac[2] = {LC.vinput<128>(), LC.vinput<128>()};
     v128 xmac[2] = {LC.vinput<128>(), LC.vinput<128>()};
     v128 ymac[2] = {LC.vinput<128>(), LC.vinput<128>()};
@@ -216,16 +216,16 @@ TEST(mdoc, mdoc_signature_test_with_issuer_list) {
     v128 a_v = LC.vinput<128>();
     EltW xlist[MAX_ISSUERS], ylist[MAX_ISSUERS];
     for (size_t i = 0; i < MAX_ISSUERS; ++i) {
-      xlist[i] = Q.input();
+      xlist[i] = LC.eltw_input();
     }
     for (size_t i = 0; i < MAX_ISSUERS; ++i) {
-      ylist[i] = Q.input();
+      ylist[i] = LC.eltw_input();
     }
 
     Q.private_input();
-    EltW pkX = Q.input(), pkY = Q.input();
+    EltW pkX = LC.eltw_input(), pkY = LC.eltw_input();
     MdocSig::Witness vwc;
-    vwc.input(Q, LC);
+    vwc.input(LC);
 
     mdoc_sig.assert_signatures_with_issuer_list(
         htr, emac, xmac, ymac, a_v, xlist, ylist, MAX_ISSUERS, pkX, pkY, vwc);
@@ -247,14 +247,14 @@ TEST(mdoc, mdoc_signature_test_with_issuer_list) {
 
   {
     constexpr size_t t_ind = 2;
-    const uint8_t *mdoc = mdoc_tests[t_ind].mdoc;
+    const uint8_t* mdoc = mdoc_tests[t_ind].mdoc;
     pkX = p256_base.of_string(mdoc_tests[t_ind].pkx);
     pkY = p256_base.of_string(mdoc_tests[t_ind].pky);
-    bool ok = sw.compute_witness(pkX, pkY, mdoc, mdoc_tests[t_ind].mdoc_size,
-                                 mdoc_tests[t_ind].transcript,
-                                 mdoc_tests[t_ind].transcript_size);
+    MdocProverErrorCode ok = sw.compute_witness(
+        pkX, pkY, mdoc, mdoc_tests[t_ind].mdoc_size,
+        mdoc_tests[t_ind].transcript, mdoc_tests[t_ind].transcript_size);
 
-    check(ok, "Could not compute signature witness");
+    check(ok == MDOC_PROVER_SUCCESS, "Could not compute signature witness");
 
     MACReference<GF2_128<>> mac_ref;
 
@@ -273,7 +273,7 @@ TEST(mdoc, mdoc_signature_test_with_issuer_list) {
     }
 
     // It is OK to repeat the issuers.
-    size_t numIssuer = sizeof(kIssuerPKX) / sizeof(char *);
+    size_t numIssuer = sizeof(kIssuerPKX) / sizeof(char*);
     for (size_t i = 0; i < MAX_ISSUERS; ++i) {
       issuerX[i] = p256_base.of_string(kIssuerPKX[i % numIssuer]);
       issuerY[i] = p256_base.of_string(kIssuerPKY[i % numIssuer]);
@@ -320,14 +320,14 @@ TEST(mdoc, mdoc_signature_test_with_issuer_list) {
       *CIRCUIT, W, pub, p256_base,
       p256_base.of_string("1126492241464102818735004576096902583730188404304894"
                           "08729223714171582664680802"), /* omega_x*/
-      p256_base.of_string("3170409485181534106695698552158891296990397441810793"
-                          "5446220613054416637641043"), /* omega_y */
+      p256_base.of_string("8408799435854090769574046142781866056018216899718237"
+                          "8749313018254450460212908"), /* omega_y */
       1ull << 31);
 }
 
 template <class Field>
-void mdoc_hash_run(const typename Field::Elt &omega, uint64_t omega_order,
-                   const Field &F, std::vector<RequestedAttribute> attrs) {
+void mdoc_hash_run(const typename Field::Elt& omega, uint64_t omega_order,
+                   const Field& F, std::vector<RequestedAttribute> attrs) {
   using MdocHw = MdocHashWitness<P256, Field>;
 
   set_log_level(INFO);
@@ -362,7 +362,7 @@ void mdoc_hash_run(const typename Field::Elt &omega, uint64_t omega_order,
     v256 dpky = LC.template vinput<256>();
 
     typename MdocHash::Witness vwc(attrs.size());
-    vwc.input(Q, LC);
+    vwc.input(LC);
 
     mdoc_hash.assert_valid_hash_mdoc(oa.data(), now, e, dpkx, dpky, vwc);
 
@@ -374,14 +374,14 @@ void mdoc_hash_run(const typename Field::Elt &omega, uint64_t omega_order,
   // ======== Witness: use the large Canonical Playground example
   MdocHw hw(attrs.size(), p256, F);
   constexpr size_t t_ind = 3;
-  const uint8_t *mdoc = mdoc_tests[t_ind].mdoc;
+  const uint8_t* mdoc = mdoc_tests[t_ind].mdoc;
 
-  bool ok = hw.compute_witness(
+  MdocProverErrorCode ok = hw.compute_witness(
       mdoc, mdoc_tests[t_ind].mdoc_size, mdoc_tests[t_ind].transcript,
       mdoc_tests[t_ind].transcript_size, attrs.data(), attrs.size(),
-      mdoc_tests[t_ind].now, 4 /* version */);
+      7 /* version */);
 
-  check(ok, "Could not compute hash witness");
+  check(ok == MDOC_PROVER_SUCCESS, "Could not compute hash witness");
 
   log(INFO, "Witness done");
 
@@ -394,8 +394,8 @@ void mdoc_hash_run(const typename Field::Elt &omega, uint64_t omega_order,
   pub_filler.push_back(F.one());
 
   for (size_t ai = 0; ai < attrs.size(); ++ai) {
-    fill_attribute(filler, attrs[ai], F, 4 /* version */);
-    fill_attribute(pub_filler, attrs[ai], F, 4 /* version */);
+    fill_attribute(filler, attrs[ai], F, 7 /* version */);
+    fill_attribute(pub_filler, attrs[ai], F, 7 /* version */);
   }
   fill_bit_string(filler, mdoc_tests[t_ind].now, 20, 20, F);
   fill_bit_string(pub_filler, mdoc_tests[t_ind].now, 20, 20, F);
@@ -408,7 +408,7 @@ void mdoc_hash_run(const typename Field::Elt &omega, uint64_t omega_order,
     fill_bit_string(filler, buf, 32, 32, F);
   }
 
-  hw.fill_witness(filler);
+  hw.fill_witness(filler, 7);
 
   log(INFO, "Fill done");
 

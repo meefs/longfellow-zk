@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -147,8 +147,8 @@ void BM_FFTInterpolationFp2(benchmark::State& state) {
   const Elt OMEGA31 = F.of_string(
       "112649224146410281873500457609690258373018840430489408729223714171582664"
       "680802",
-      "317040948518153410669569855215889129699039744181079354462206130544166376"
-      "41043");
+      "840879943585409076957404614278186605601821689971823787493130182544504602"
+      "12908");
   Bogorng<BaseField> rng(&F0);
   size_t N = state.range(0);
   std::vector<Elt> A(N);

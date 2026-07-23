@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,6 +33,9 @@ class Limb {
   using T = Limb<W64>;
 
 #if __WORDSIZE == 64
+  // Use the native word size as the limb size.  However, changing
+  // limb_t to uint32_t is expected to work at least on x86_64, as a
+  // way to test 32-bit arithmetic without cross-compiling
   using limb_t = uint64_t;
 #else
   using limb_t = uint32_t;
@@ -69,6 +72,8 @@ class Limb {
     }
   }
 
+  // The standard equality operator is not constant-time.
+  // constant_time_eq() below implements a constant-time variant.
   bool operator==(const T& other) const {
     for (size_t i = 0; i < kLimbs; ++i) {
       if (limb_[i] != other.limb_[i]) {
@@ -78,6 +83,14 @@ class Limb {
     return true;
   }
   bool operator!=(const T& other) const { return !(operator==(other)); }
+
+  bool constant_time_eq(const T& y) const {
+    limb_t diff = 0;
+    for (size_t i = 0; i < kLimbs; ++i) {
+      diff |= (limb_[i] ^ y.limb_[i]);
+    }
+    return diff == 0;
+  }
 
   // Shift right by z.  Return the bits that fall off
   // the edge.

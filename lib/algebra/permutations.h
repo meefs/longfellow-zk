@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,12 +35,75 @@ class Permutations {
     }
   }
 
+  /* X[i] = X[(i+shift) mod N] */
+  /* We now use the notation X{N} to denote that X consists of N
+     elements.  We have X = [A{SHIFT} B{N-SHIFT}].  We want
+     X' = [B A] = rev[rev(A) rev(B)], where rev(A) reverses
+     array A in-place.
+  */
+  static void rotate(Elt* x, size_t n, size_t shift) {
+    if (shift > 0) {
+      reverse(x, 0, shift);
+      reverse(x, shift, n);
+      reverse(x, 0, n);
+    }
+  }
+
+  static void unrotate(Elt* x, size_t n, size_t shift) {
+    if (shift > 0) {
+      reverse(x, 0, n);
+      reverse(x, shift, n);
+      reverse(x, 0, shift);
+    }
+  }
+
+  static void transpose(Elt A[/*n*/], size_t lda, size_t n) {
+    if (n <= kTransposeBasecase) {
+      for (size_t i = 0; i < n; ++i) {
+        for (size_t j = i + 1; j < n; ++j) {
+          std::swap(A[i * lda + j], A[j * lda + i]);
+        }
+      }
+    } else {
+      transpose(A, lda, n / 2);
+      transpose_and_swap(A + n / 2, A + lda * (n / 2), lda, n / 2);
+      transpose(A + (lda + 1) * (n / 2), lda, n / 2);
+    }
+  }
+
  private:
+  static constexpr size_t kTransposeBasecase = 8;
+
+  static void transpose_and_swap(Elt* A, Elt* B, size_t lda, size_t n) {
+    if (n <= kTransposeBasecase) {
+      for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+          std::swap(A[i * lda + j], B[j * lda + i]);
+        }
+      }
+    } else {
+      transpose_and_swap(A, B, lda, n / 2);
+      transpose_and_swap(A + n / 2, B + lda * (n / 2), lda, n / 2);
+      transpose_and_swap(A + lda * (n / 2), B + (n / 2), lda, n / 2);
+      transpose_and_swap(A + (lda + 1) * (n / 2), B + (lda + 1) * (n / 2), lda,
+                         n / 2);
+    }
+  }
+
   static void bitrev_increment(size_t* j, size_t bit) {
     do {
       bit >>= 1;
       *j ^= bit;
     } while (!(*j & bit));
+  }
+
+  // reverse x[i,j)
+  static void reverse(Elt* x, size_t i, size_t j) {
+    while (i + 1 < j) {
+      --j;
+      std::swap(x[i], x[j]);
+      i++;
+    }
   }
 };
 }  // namespace proofs

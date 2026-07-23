@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ class Prover : public ProverLayers<Field> {
   // the inputs do not satisfy the circuit.
   void prove(Proof<Field>* proof, const Proof<Field>* pad,
              const Circuit<Field>* circ, const inputs& in, Transcript& t) {
-    if (proof == nullptr || circ == nullptr) return;
+    if (proof == nullptr || circ == nullptr || circ->nl == 0) return;
 
     TranscriptSumcheck<Field> ts(t, super::f_);
     // The input X is stored at in's layer nl - 1.

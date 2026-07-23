@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@
 #include <cstdint>
 #include <vector>
 
-#include "circuits/compiler/compiler.h"
 #include "circuits/logic/bit_adder.h"
 #include "circuits/sha/sha256_constants.h"
 
@@ -51,9 +50,11 @@ namespace proofs {
 template <class Logic, class BitPlucker>
 class FlatSHA256Circuit {
  public:
+  using BitW = typename Logic::BitW;
   using v8 = typename Logic::v8;
   using v256 = typename Logic::v256;
   using v32 = typename Logic::v32;
+  using v64 = typename Logic::v64;
   using EltW = typename Logic::EltW;
   using Field = typename Logic::Field;
   using packed_v32 = typename BitPlucker::packed_v32;
@@ -61,43 +62,31 @@ class FlatSHA256Circuit {
   const Logic& l_;
   BitPlucker bp_; /* public, so caller can encode input */
 
+  static packed_v32 packed_input(const Logic& lc) {
+    return BitPlucker::template packed_input<packed_v32>(lc);
+  }
+
   struct BlockWitness {
     packed_v32 outw[48];
     packed_v32 oute[64];
     packed_v32 outa[64];
     packed_v32 h1[8];
 
-    static packed_v32 packed_input(QuadCircuit<typename Logic::Field>& Q) {
-      packed_v32 r;
-      for (size_t i = 0; i < r.size(); ++i) {
-        r[i] = Q.input();
-      }
-      return r;
-    }
-
-    void input(QuadCircuit<typename Logic::Field>& Q) {
+    void input(const Logic& lc) {
       for (size_t k = 0; k < 48; ++k) {
-        outw[k] = packed_input(Q);
+        outw[k] = packed_input(lc);
       }
       for (size_t k = 0; k < 64; ++k) {
-        oute[k] = packed_input(Q);
-        outa[k] = packed_input(Q);
+        oute[k] = packed_input(lc);
+        outa[k] = packed_input(lc);
       }
       for (size_t k = 0; k < 8; ++k) {
-        h1[k] = packed_input(Q);
+        h1[k] = packed_input(lc);
       }
     }
   };
 
   explicit FlatSHA256Circuit(const Logic& l) : l_(l), bp_(l_) {}
-
-  static packed_v32 packed_input(QuadCircuit<Field>& Q) {
-    packed_v32 r;
-    for (size_t i = 0; i < r.size(); ++i) {
-      r[i] = Q.input();
-    }
-    return r;
-  }
 
   void assert_transform_block(const v32 in[16], const v32 H0[8],
                               const v32 outw[48], const v32 oute[64],
@@ -111,43 +100,40 @@ class FlatSHA256Circuit {
     }
 
     for (size_t i = 16; i < 64; ++i) {
-      auto sw2 = sigma1(w[i - 2]);
-      auto sw15 = sigma0(w[i - 15]);
-      std::vector<v32> terms = {sw2, w[i - 7], sw15, w[i - 16]};
       w[i] = outw[i - 16];
-      BA.assert_eqmod(w[i], BA.add(terms), 4);
+      BA.assert_eqmod(
+          w[i],
+          BA.add({sigma1(w[i - 2]), w[i - 7], sigma0(w[i - 15]), w[i - 16]}),
+          4);
     }
 
-    v32 a = H0[0];
-    v32 b = H0[1];
-    v32 c = H0[2];
-    v32 d = H0[3];
-    v32 e = H0[4];
-    v32 f = H0[5];
-    v32 g = H0[6];
-    v32 h = H0[7];
+    v32 a(H0[0]);
+    v32 b(H0[1]);
+    v32 c(H0[2]);
+    v32 d(H0[3]);
+    v32 e(H0[4]);
+    v32 f(H0[5]);
+    v32 g(H0[6]);
+    v32 h(H0[7]);
 
     for (size_t t = 0; t < 64; ++t) {
-      auto s1e = Sigma1(e);
-      auto ch = L.vCh(&e, &f, g);
-      auto rt = L.vbit32(kSha256Round[t]);
-      std::vector<v32> t1_terms = {h, s1e, ch, rt, w[t]};
-      EltW t1 = BA.add(t1_terms);
+      EltW t1 = BA.add(
+          {h, Sigma1(e), L.vCh(e, f, g), L.vbit32(kSha256Round[t]), w[t]});
       EltW sigma0 = BA.as_field_element(Sigma0(a));
-      EltW vmaj = BA.as_field_element(L.vMaj(&a, &b, c));
-      EltW t2 = BA.add(&sigma0, vmaj);
+      EltW vmaj = BA.as_field_element(L.vMaj(a, b, c));
+      EltW t2 = BA.add(sigma0, vmaj);
 
       h = g;
       g = f;
       f = e;
       e = oute[t];
       EltW ed = BA.as_field_element(d);
-      BA.assert_eqmod(e, BA.add(&t1, ed), 6);
+      BA.assert_eqmod(e, BA.add(t1, ed), 6);
       d = c;
       c = b;
       b = a;
       a = outa[t];
-      BA.assert_eqmod(a, BA.add(&t1, t2), 7);
+      BA.assert_eqmod(a, BA.add(t1, t2), 7);
     }
 
     BA.assert_eqmod(H1[0], BA.add(H0[0], a), 2);
@@ -226,27 +212,7 @@ class FlatSHA256Circuit {
       }
       H = bw[b].h1;
     }
-  }
-
-  /* This method checks that the block witness corresponds to the iterated
-     computation of the sha block transform on the prefix || input.
-  */
-  void assert_message_with_prefix(size_t max, const v8& nb,
-                                  const v8 in[/* < 64*max */],
-                                  const uint8_t prefix[/* len */], size_t len,
-                                  const BlockWitness bw[/*max*/]) const {
-    const Logic& L = l_;  // shorthand
-    std::vector<v32> tmp(16);
-
-    std::vector<v8> bbuf(64 * max);
-    for (size_t i = 0; i < len; ++i) {
-      L.bits(8, bbuf[i].data(), prefix[i]);
-    }
-    for (size_t i = 0; i + len < 64 * max; ++i) {
-      bbuf[i + len] = in[i];
-    }
-
-    assert_message(max, nb, bbuf.data(), bw);
+    assert_zero_padding(max, nb, in);
   }
 
   /* This method checks if H(in) == target. The method requires that in[]
@@ -257,21 +223,6 @@ class FlatSHA256Circuit {
                            const v256& target,
                            const BlockWitness bw[/*max*/]) const {
     assert_message(max, nb, in, bw);
-    assert_hash(max, target, nb, bw);
-  }
-
-  // This method checks if H(prefix || in) == target.
-  // Since the prefix is hardcoded, the compiler can propagate constants
-  // and produce smaller circuits. As above, the method requires that in[]
-  // contains exactly nb*64 bytes and has been padded according to the SHA256
-  // specification. To use this method, compute the block_witness for the
-  // entire message as usual.
-  void assert_message_hash_with_prefix(size_t max, const v8& nb,
-                                       const v8 in[/* 64*max */],
-                                       const uint8_t prefix[/* len */],
-                                       size_t len, const v256& target,
-                                       const BlockWitness bw[/*max*/]) const {
-    assert_message_with_prefix(max, nb, in, prefix, len, bw);
     assert_hash(max, target, nb, bw);
   }
 
@@ -288,10 +239,10 @@ class FlatSHA256Circuit {
       for (size_t i = 0; i < 8; ++i) {
         for (size_t k = 0; k < bp_.kNv32Elts; ++k) {
           if (b == 0) {
-            x[i][k] = l_.mul(&ebt, bw[b].h1[i][k]);
+            x[i][k] = l_.mul(ebt, bw[b].h1[i][k]);
           } else {
-            auto maybe_sha = l_.mul(&ebt, bw[b].h1[i][k]);
-            x[i][k] = l_.add(&x[i][k], maybe_sha);
+            auto maybe_sha = l_.mul(ebt, bw[b].h1[i][k]);
+            x[i][k] = l_.add(x[i][k], maybe_sha);
           }
         }
       }
@@ -305,7 +256,38 @@ class FlatSHA256Circuit {
         mm[((7 - j) * 32 + k)] = hj[k];
       }
     }
-    l_.vassert_eq(&mm, e);
+    l_.vassert_eq(mm, e);
+  }
+
+  // Checks that the padding bytes of the input, i.e., any bytes that are
+  // not part of the SHA blocks that contain the mdoc, are zero.
+  void assert_zero_padding(size_t max, const v8& nb,
+                           const v8 in[/*64 * max*/]) const {
+    for (size_t i = 0; i < max; ++i) {
+      auto wantzero = l_.vleq(nb, i);  // If nb <= i, block should be 0.
+      for (size_t j = 0; j < 64; ++j) {
+        size_t ind = i * 64 + j;
+        auto zero = l_.veq(in[ind], 0);
+        l_.assert_implies(wantzero, zero);
+      }
+    }
+  }
+
+  // This function extracts the length of the message in bits from the SHA
+  // block that is verified.  It only extracts the bits and performs
+  // no other checks.
+  v64 find_len_bits(size_t max, const v8 in[/*64*max*/], const v8& nb) const {
+    v64 len_bits = l_.template vbit<64>(0);
+    for (size_t i = 0; i < max; ++i) {
+      auto isblk = l_.veq(nb, i + 1);  // If nb == i, i is zero-indexed.
+      size_t ind = i * 64 + 63;
+      for (size_t j = 0; j < 64; ++j) { /* this loop is over bits */
+        len_bits[j] = l_.lor_exclusive(len_bits[j],
+                                       l_.land(isblk, in[ind - j / 8][j % 8]));
+      }
+    }
+    l_.vassert_is_bit(len_bits);
+    return len_bits;
   }
 
  private:
@@ -321,25 +303,25 @@ class FlatSHA256Circuit {
   v32 Sigma0(const v32& x) const {
     auto x2 = l_.vrotr(x, 2);
     auto x13 = l_.vrotr(x, 13);
-    return l_.vxor3(&x2, &x13, l_.vrotr(x, 22));
+    return l_.vxor3(x2, x13, l_.vrotr(x, 22));
   }
 
   v32 Sigma1(const v32& x) const {
     auto x6 = l_.vrotr(x, 6);
     auto x11 = l_.vrotr(x, 11);
-    return l_.vxor3(&x6, &x11, l_.vrotr(x, 25));
+    return l_.vxor3(x6, x11, l_.vrotr(x, 25));
   }
 
   v32 sigma0(const v32& x) const {
     auto x7 = l_.vrotr(x, 7);
     auto x18 = l_.vrotr(x, 18);
-    return l_.vxor3(&x7, &x18, l_.vshr(x, 3));
+    return l_.vxor3(x7, x18, l_.vshr(x, 3));
   }
 
   v32 sigma1(const v32& x) const {
     auto x17 = l_.vrotr(x, 17);
     auto x19 = l_.vrotr(x, 19);
-    return l_.vxor3(&x17, &x19, l_.vshr(x, 10));
+    return l_.vxor3(x17, x19, l_.vshr(x, 10));
   }
 };
 

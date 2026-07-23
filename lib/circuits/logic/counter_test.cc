@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,11 +43,9 @@ void test_counter() {
     // Computing CA in the circuit from a bitvec
     // produces the same result as computing CA in the field
     {
-      auto ca_field = CTR.as_counter(F.as_counter(a));
-      auto ca_bv = CTR.as_counter(L.template vbit<w>(a));
-      CTR.assert_eq(&ca, ca_field);
+      CTR.assert_eq(ca, CTR.as_counter(F.as_counter(a)));
       EXPECT_FALSE(ebk.assertion_failed());
-      CTR.assert_eq(&ca, ca_bv);
+      CTR.assert_eq(ca, CTR.as_counter(L.template vbit<w>(a)));
       EXPECT_FALSE(ebk.assertion_failed());
     }
 
@@ -58,8 +56,7 @@ void test_counter() {
 
       // F.znz_indicator() and CTR.znz_indicator() must compute the
       // same thing
-      auto eca1 = L.konst(F.znz_indicator(F.as_counter(a)));
-      L.assert_eq(&eca, eca1);
+      L.assert_eq(eca, L.konst(F.znz_indicator(F.as_counter(a))));
       EXPECT_FALSE(ebk.assertion_failed());
     }
 
@@ -71,13 +68,13 @@ void test_counter() {
 
     {
       // minus one works as expected
-      auto cam1 = CTR.add(&ca, CTR.mone());
+      auto cam1 = CTR.add(ca, CTR.mone());
       CTR.assert0(cam1);
       EXPECT_EQ(ebk.assertion_failed(), (a != 1));
 
       if (a > 0) {
         auto want_cam1 = CTR.as_counter(a - 1);
-        CTR.assert_eq(&cam1, want_cam1);
+        CTR.assert_eq(cam1, want_cam1);
         EXPECT_FALSE(ebk.assertion_failed());
       }
     }
@@ -88,11 +85,34 @@ void test_counter() {
       for (size_t s = 0; s < (2 << w); ++s) {
         auto cs = CTR.as_counter(s);
 
-        auto ab = CTR.add(&ca, cb);
-        CTR.assert_eq(&ab, cs);
+        auto ab = CTR.add(ca, cb);
+        CTR.assert_eq(ab, cs);
         EXPECT_EQ(ebk.assertion_failed(), ((a + b) != s));
       }
     }
+  }
+
+  {
+    // Range addition works as expected
+    auto r_sum = CTR.add(0, w, [&](size_t i) { return CTR.as_counter(i); });
+    size_t expected_sum = w * (w - 1) / 2;
+    CTR.assert_eq(r_sum, CTR.as_counter(expected_sum));
+    EXPECT_FALSE(ebk.assertion_failed());
+  }
+
+  {
+    // Empty range addition works as expected
+    auto empty_sum = CTR.add(3, 3, [&](size_t i) { return CTR.as_counter(i); });
+    CTR.assert_eq(empty_sum, CTR.as_counter(0));
+    EXPECT_FALSE(ebk.assertion_failed());
+  }
+
+  {
+    // Single element range addition works as expected
+    auto single_sum =
+        CTR.add(3, 4, [&](size_t i) { return CTR.as_counter(i); });
+    CTR.assert_eq(single_sum, CTR.as_counter(3));
+    EXPECT_FALSE(ebk.assertion_failed());
   }
 }
 

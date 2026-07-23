@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 #include <stddef.h>
 
 #include <cstdint>
+#include <functional>
 
 // Embedding of small unsigned integers into an additive group of
 // unspecified size, but assumed to be able to encode 16 bits or so.
@@ -66,23 +67,33 @@ class CounterAux<Logic_, /*kCharacteristicTwo=*/false> {
     return CEltW{l_.as_scalar(v)};
   }
 
-  CEltW add(const CEltW* a, const CEltW& b) const {
-    return CEltW{l_.add(&a->e, b.e)};
+  CEltW add(const CEltW& a, const CEltW& b) const {
+    return CEltW{l_.add(a.e, b.e)};
+  }
+
+  CEltW add(size_t i0, size_t i1, const std::function<CEltW(size_t)>& f) const {
+    if (i1 <= i0) {
+      return as_counter(0);
+    } else if (i1 == i0 + 1) {
+      return f(i0);
+    } else {
+      size_t im = i0 + (i1 - i0) / 2;
+      return add(add(i0, im, f), add(im, i1, f));
+    }
   }
 
   // a ? b : 0
-  CEltW ite0(const BitW* a, const CEltW& b) const {
-    EltW ae = l_.eval(*a);
-    return CEltW{l_.mul(&ae, b.e)};
+  CEltW ite0(const BitW& a, const CEltW& b) const {
+    return CEltW{l_.mul(l_.eval(a), b.e)};
   }
 
   // a ? b : c
-  CEltW mux(const BitW* a, const CEltW* b, const CEltW& c) const {
-    return add(&c, ite0(a, sub(b, c)));
+  CEltW mux(const BitW& a, const CEltW& b, const CEltW& c) const {
+    return add(c, ite0(a, sub(b, c)));
   }
   void assert0(const CEltW& a) const { l_.assert0(a.e); }
-  void assert_eq(const CEltW* a, const CEltW& b) const {
-    l_.assert_eq(&a->e, b.e);
+  void assert_eq(const CEltW& a, const CEltW& b) const {
+    l_.assert_eq(a.e, b.e);
   }
 
   CEltW input() const { return CEltW{l_.eltw_input()}; }
@@ -92,8 +103,8 @@ class CounterAux<Logic_, /*kCharacteristicTwo=*/false> {
 
   // used only internally, do not export since we don't
   // want to invert in the multiplicative group
-  CEltW sub(const CEltW* a, const CEltW& b) const {
-    return CEltW{l_.sub(&a->e, b.e)};
+  CEltW sub(const CEltW& a, const CEltW& b) const {
+    return CEltW{l_.sub(a.e, b.e)};
   }
 };
 
@@ -118,7 +129,7 @@ class CounterAux<Logic_, /*kCharacteristicTwo=*/true> {
   // Convert a counter into *some* field element such that the counter is
   // nonzero (as a counter) iff the field element is nonzero.
   EltW znz_indicator(const CEltW& celt) const {
-    return l_.sub(&celt.e, l_.konst(l_.one()));
+    return l_.sub(celt.e, l_.konst(l_.one()));
   }
 
   CEltW mone() const { return CEltW{l_.konst(l_.f_.invg())}; }
@@ -129,39 +140,45 @@ class CounterAux<Logic_, /*kCharacteristicTwo=*/true> {
 
   CEltW as_counter(const BitW& b) const {
     CEltW iftrue = CEltW{l_.konst(l_.f_.g())};
-    return ite0(&b, iftrue);
+    return ite0(b, iftrue);
   }
 
   template <size_t N>
   CEltW as_counter(const typename Logic::template bitvec<N>& v) const {
-    const Logic& L = l_;  // shorthand
-
     // do the multiplication in Logic since we don't have
     // a range addition in Counter
-    EltW p = L.mul(0, N, [&](size_t i) {
-      auto g2i = L.konst(L.f_.counter_beta(i));
-      return L.mux(&v[i], &g2i, L.konst(L.one()));
-    });
-
-    return CEltW{p};
+    return CEltW{l_.mul(0, N, [&](size_t i) {
+      return l_.mux(v[i], l_.konst(l_.f_.counter_beta(i)), l_.konst(l_.one()));
+    })};
   }
 
-  CEltW add(const CEltW* a, const CEltW& b) const {
-    return CEltW{l_.mul(&a->e, b.e)};
+  CEltW add(const CEltW& a, const CEltW& b) const {
+    return CEltW{l_.mul(a.e, b.e)};
+  }
+
+  CEltW add(size_t i0, size_t i1, const std::function<CEltW(size_t)>& f) const {
+    if (i1 <= i0) {
+      return as_counter(0);
+    } else if (i1 == i0 + 1) {
+      return f(i0);
+    } else {
+      size_t im = i0 + (i1 - i0) / 2;
+      return add(add(i0, im, f), add(im, i1, f));
+    }
   }
 
   // a ? b : 0
-  CEltW ite0(const BitW* a, const CEltW& b) const {
-    return CEltW{l_.mux(a, &b.e, l_.konst(l_.one()))};
+  CEltW ite0(const BitW& a, const CEltW& b) const {
+    return CEltW{l_.mux(a, b.e, l_.konst(l_.one()))};
   }
 
   // a ? b : c
-  CEltW mux(const BitW* a, const CEltW* b, const CEltW& c) const {
-    return CEltW{l_.mux(a, &b->e, c.e)};
+  CEltW mux(const BitW& a, const CEltW& b, const CEltW& c) const {
+    return CEltW{l_.mux(a, b.e, c.e)};
   }
-  void assert0(const CEltW& a) const { l_.assert_eq(&a.e, l_.konst(l_.one())); }
-  void assert_eq(const CEltW* a, const CEltW& b) const {
-    l_.assert_eq(&a->e, b.e);
+  void assert0(const CEltW& a) const { l_.assert_eq(a.e, l_.konst(l_.one())); }
+  void assert_eq(const CEltW& a, const CEltW& b) const {
+    l_.assert_eq(a.e, b.e);
   }
 
   CEltW input() const { return CEltW{l_.eltw_input()}; }

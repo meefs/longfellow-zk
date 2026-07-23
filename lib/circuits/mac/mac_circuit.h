@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,6 @@
 #include <algorithm>
 #include <cstddef>
 
-#include "circuits/compiler/compiler.h"
 #include "circuits/logic/logic.h"
 #include "gf2k/gf2_128.h"
 
@@ -74,19 +73,10 @@ class MAC {
     packed_v128 aa_[2];
     packed_v256 xx_;  // The value to be checked
 
-    template <typename T>
-    static T packed_input(QuadCircuit<typename Logic::Field>& Q) {
-      T r;
-      for (size_t i = 0; i < r.size(); ++i) {
-        r[i] = Q.input();
-      }
-      return r;
-    }
-
-    void input(const Logic& LC, QuadCircuit<typename Logic::Field>& Q) {
-      aa_[0] = packed_input<packed_v128>(Q);
-      aa_[1] = packed_input<packed_v128>(Q);
-      xx_ = packed_input<packed_v256>(Q);
+    void input(const Logic& lc) {
+      aa_[0] = BitPlucker::template packed_input<packed_v128>(lc);
+      aa_[1] = BitPlucker::template packed_input<packed_v128>(lc);
+      xx_ = BitPlucker::template packed_input<packed_v256>(lc);
     }
   };
 
@@ -98,7 +88,7 @@ class MAC {
   // that takes the message in bit-wise form. Additionally, the order parameter
   // is used to ensure that the message does not overflow the field.
   void verify_mac(EltW msg, const v128 mac[/*2*/], const v128& av,
-                     const Witness& vw, Nat order) const {
+                  const Witness& vw, Nat order) const {
     check(Field::kBits >= 256, "Field::kBits < 256");
     v128 msg2[2];
     unpack_msg(msg2, msg, order, vw);
@@ -112,9 +102,9 @@ class MAC {
     v128 mv;
     for (size_t i = 0; i < 2; ++i) {
       v128 ap = bp_.template unpack<v128, packed_v128>(vw.aa_[i]);
-      v128 key = lc_.vxor(&av, ap);
+      v128 key = lc_.vxor(av, ap);
       lc_.gf2_128_mul(mv, key, xi[i]);
-      lc_.vassert_eq(&mac[i], mv);
+      lc_.vassert_eq(mac[i], mv);
     }
   }
 
@@ -129,16 +119,16 @@ class MAC {
     for (size_t i = 0; i < 256; ++i) {
       bits_n[i] = lc_.bit(order.bit(i));
     }
-    lc_.assert1(lc_.vlt(&x, bits_n));
+    lc_.assert1(lc_.vlt(x, bits_n));
 
     // Verify that the message bits in the witness correspond to msg.
     EltW te = lc_.konst(lc_.zero());
     Elt twok = lc_.one();
     for (size_t i = 0; i < 256; ++i) {
-      te = lc_.axpy(&te, twok, lc_.eval(x[i]));
+      te = lc_.axpy(te, twok, lc_.eval(x[i]));
       lc_.f_.add(twok, twok);
     }
-    lc_.assert_eq(&te, msgw);
+    lc_.assert_eq(te, msgw);
   }
 
   const Logic& lc_;
@@ -159,16 +149,14 @@ class MACGF2 {
   using v8 = typename Logic<GF2_128<>, Backend>::v8;
   using v256 = typename Logic<GF2_128<>, Backend>::v256;
 
-  explicit MACGF2(const Logic<GF2_128<>, Backend>& lc)
-      : lc_(lc) {}
+  explicit MACGF2(const Logic<GF2_128<>, Backend>& lc) : lc_(lc) {}
   class Witness {
    public:
     EltW aa_[2];
 
-    void input(const Logic<GF2_128<>, Backend>& lc,
-               QuadCircuit<GF2_128<>>& Q) {
-      aa_[0] = Q.input();
-      aa_[1] = Q.input();
+    void input(const Logic<GF2_128<>, Backend>& lc) {
+      aa_[0] = lc.eltw_input();
+      aa_[1] = lc.eltw_input();
     }
   };
 
@@ -178,9 +166,9 @@ class MACGF2 {
     // Check that mac[i] = (a_p + a_v)*mm[i] for i=0..1.
     for (size_t i = 0; i < 2; ++i) {
       EltW mm = pack(&msg[i * 128]);
-      EltW key = lc_.add(&av, vw.aa_[i]);
-      EltW got = lc_.mul(&key, mm);
-      lc_.assert_eq(&mac[i], got);
+      EltW key = lc_.add(av, vw.aa_[i]);
+      EltW got = lc_.mul(key, mm);
+      lc_.assert_eq(mac[i], got);
     }
   }
 
@@ -191,7 +179,7 @@ class MACGF2 {
     Elt xi = lc_.f_.one();
     EltW m = lc_.konst(0);
     for (size_t i = 0; i < 128; ++i) {
-      m = lc_.axpy(&m, xi, lc_.eval(msg[i]));
+      m = lc_.axpy(m, xi, lc_.eval(msg[i]));
       xi = lc_.mulf(xi, alpha);
     }
     return m;

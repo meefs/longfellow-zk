@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,9 +20,11 @@
 #include <cstdint>
 #include <vector>
 
+#include "algebra/bogorng.h"
 #include "algebra/fft.h"
 #include "algebra/fp2.h"
 #include "algebra/fp_p256.h"
+#include "benchmark/benchmark.h"
 #include "gtest/gtest.h"
 
 namespace proofs {
@@ -36,21 +38,27 @@ TEST(RFFTTest, Simple) {
   const BaseField F0;        // base field
   const ExtField F_ext(F0);  // p^2 field extension
 
-  ExtElt omega = F_ext.of_string(
+  ExtElt omega0 = F_ext.of_string(
       "112649224146410281873500457609690258373018840430489408729223714171582664"
       "680802",
-      "317040948518153410669569855215889129699039744181079354462206130544166376"
-      "41043");
+      "840879943585409076957404614278186605601821689971823787493130182544504602"
+      "12908");
   uint64_t omega_order = 1ull << 31;
 
-  ExtElt one = F_ext.mulf(omega, F_ext.conjf(omega));
-  EXPECT_EQ(one, F_ext.one());
-
+  // Try various roots of unity while maintaining the invariant that
+  // omega^{n/4} = I.  The goal of this exercise is to make sure that
+  // the rfft does not depend on a specific 8-th root of unity.
+  //
+  // The actual root of unity used in the FFT is (omega^r) for r =
+  // omega_order / n, and omega^{r*n/4} = I (as opposed to -I) holds.
+  // Thus (omega^{1+4*j})^{r*n/4} = I also holds for all j, but the
+  // 8-th roots are different.  Since there are only two eight roots
+  // of unity under the constraint, two iterations are sufficient.
+  //
+  ExtElt omega = omega0;
   for (size_t iter = 0; iter < 2; ++iter) {
-    // Everything must work for both omega and conj(omega).
-    // (The test would fail, e.g., if RFFT hardcodes that
-    // omega^(n/4) = I or -I somewhere.)
-    F_ext.conj(omega);
+    ExtElt one = F_ext.mulf(omega, F_ext.conjf(omega));
+    EXPECT_EQ(one, F_ext.one());
 
     for (size_t n = 1; n < 1024; n *= 2) {
       std::vector<BaseElt> AR0(n);
@@ -83,8 +91,44 @@ TEST(RFFTTest, Simple) {
         EXPECT_EQ(AR0[i], F0.mulf(scale, AR1[i]));
       }
     }
+
+    // advance root of unity
+    F_ext.mul(omega, omega0);
+    F_ext.mul(omega, omega0);
+    F_ext.mul(omega, omega0);
+    F_ext.mul(omega, omega0);
   }
 }
+
+// ================= Benchmarks
+
+void BM_RFFT_Fp256_2(benchmark::State& state) {
+  using BaseField = Fp256<>;
+  using BaseElt = BaseField::Elt;
+  using ExtField = Fp2<BaseField>;
+  using ExtElt = ExtField::Elt;
+
+  const BaseField F0;        // base field
+  const ExtField F_ext(F0);  // p^2 field extension
+
+  const ExtElt omega = F_ext.of_string(
+      "112649224146410281873500457609690258373018840430489408729223714171582664"
+      "680802",
+      "840879943585409076957404614278186605601821689971823787493130182544504602"
+      "12908");
+  uint64_t omega_order = 1ull << 31;
+
+  Bogorng<BaseField> rng(&F0);
+  size_t N = state.range(0);
+  std::vector<BaseElt> A(N);
+  for (size_t i = 0; i < N; ++i) {
+    A[i] = rng.next();
+  }
+  for (auto _ : state) {
+    RFFT<ExtField>::r2hc(&A[0], N, omega, omega_order, F_ext);
+  }
+}
+BENCHMARK(BM_RFFT_Fp256_2)->RangeMultiplier(4)->Range(1024, (1 << 22));
 
 }  // namespace
 }  // namespace proofs

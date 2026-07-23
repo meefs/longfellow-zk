@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,8 +18,15 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "algebra/bogorng.h"
+#include "algebra/fp24.h"
 #include "algebra/fp_p128.h"
 #include "algebra/fp_p256.h"
+#include "algebra/fp_p256k1.h"
+#include "algebra/fp_p384.h"
+#include "algebra/fp_p521.h"
+#include "algebra/nat.h"
+#include "benchmark/benchmark.h"
 #include "gtest/gtest.h"
 
 namespace proofs {
@@ -153,7 +160,8 @@ void of_scalar(const Field& F) {
     n[i] = i + 47;
   }
   auto want = F.zero();
-  auto base = F.of_scalar(1ull << 32);
+  auto base = F.of_scalar(1ull << 16);
+  F.mul(base, base);  // base = 2^32
   F.mul(base, base);  // base = 2^64
   for (size_t i = Field::kU64; i-- > 0;) {
     want = F.addf(F.of_scalar(i + 47), F.mulf(base, want));
@@ -178,8 +186,66 @@ void of_scalar(const Field& F) {
   // powers of two
   for (size_t i = 0; i < 64; ++i) {
     uint64_t k = static_cast<uint64_t>(1) << i;
-    EXPECT_EQ(F.of_scalar(k), F.beta(i));
+    if (F.fits(k)) {
+      EXPECT_EQ(F.of_scalar(k), F.beta(i));
+    }
   }
+}
+
+template <size_t WX, class Field>
+void reduce(const Field& F) {
+  auto e = F.one();
+  const Nat<WX> one(1);
+  Nat<WX> n(1);
+
+  // test all 2^i and 2^i - 1
+  for (size_t i = 0; i < Nat<WX>::kBits; ++i) {
+    auto x = F.reduce(n);
+    EXPECT_EQ(x, e);
+
+    auto em1 = F.subf(e, F.of_scalar(1));
+    auto nm1 = n;
+    nm1.sub(one);
+    auto xm1 = F.reduce(nm1);
+    EXPECT_EQ(xm1, em1);
+
+    F.add(e, e);
+    n.add(n);
+  }
+}
+
+template <class Field>
+void accum(const Field& F) {
+  constexpr size_t n = 20;
+
+  typename Field::Elt want{};
+  typename Field::Accum a{};
+
+  for (size_t i = 0; i < n; ++i) {
+    auto x = F.of_scalar(i * i + 3);
+    auto y = F.of_scalar(i + 7);
+    F.mac(a, x, y);
+    F.add(want, F.mulf(x, y));
+  }
+  EXPECT_EQ(F.reduce(a), want);
+}
+
+template <class Field>
+void dot(const Field& F) {
+  constexpr size_t n = 20;
+  std::vector<Nat<1>> e(n);
+  std::vector<typename Field::NatScaledForDot> d(n);
+
+  uint64_t want = 0;
+  for (size_t i = 0; i < n; ++i) {
+    uint64_t ei = i * i + 3;
+    uint64_t di = i + 7;
+    e[i] = Nat<1>(ei);
+    d[i] = F.prescale_for_dot(F.of_scalar(di));
+    want += ei * di;
+  }
+  auto got = F.dot(n, e.data(), d.data());
+  EXPECT_EQ(got, F.of_scalar(want));
 }
 
 // test add/sub around the -1..0 boundary in raw (not montgomery)
@@ -239,18 +305,31 @@ void onefield(const Field& F) {
   inverse(F);
   of_scalar(F);
   poly_evaluation_points(F);
+  if (F.kSupportsDot) {
+    dot(F);
+    reduce<1>(F);
+    reduce<2>(F);
+    reduce<3>(F);
+    reduce<4>(F);
+    reduce<5>(F);
+    reduce<6>(F);
+    reduce<30>(F);
+  }
 
   EXPECT_EQ(F.zero(), F.addf(F.one(), F.mone()));
   EXPECT_EQ(F.one(), F.addf(F.half(), F.half()));
   EXPECT_EQ(F.two(), F.addf(F.one(), F.one()));
 
-  EXPECT_EQ(F.of_string("0x123456789abcdef0"),
-            F.of_scalar(0x123456789abcdef0ull));
-  EXPECT_EQ(F.of_string("0X123456789ABCDEF0"),
-            F.of_scalar(0x123456789abcdef0ull));
+  const uint64_t c = 0x123456789abcdef0ull;
+  if (F.fits(c)) {
+    EXPECT_EQ(F.of_string("0x123456789abcdef0"), F.of_scalar(c));
+    EXPECT_EQ(F.of_string("0X123456789ABCDEF0"), F.of_scalar(c));
+  }
 }
 
 TEST(Fp, AllSizes) {
+  onefield(Fp24(8380417));   // ML-DSA44 prime
+  onefield(Fp24(16777213));  // largest 24-bit prime
   onefield(Fp<1>("18446744073709551557"));
   onefield(Fp<2>("340282366920938463463374607431768211297"));
   onefield(Fp<3>("6277101735386680763835789423207666416102355444464034512659"));
@@ -264,7 +343,35 @@ TEST(Fp, AllSizes) {
       Fp<6>("394020061963944792122790401001436138050797392704654466679482934042"
             "45721771497210611414266254884915640806627990306499"));
   onefield(Fp256<>());
+  onefield(Fp256k1<>());
   onefield(Fp128<>());
+  onefield(Fp384<>());
+  onefield(Fp521<>());
+
+  // Our field implementation "works" in a ring.
+  // 3906555671 * 4254597877 = 16620823464218910467
+  onefield(Fp<1>("16620823464218910467"));
+  // 1057848127303065953 * 2108036397730900859 =
+  // 2229982355626334583552843599381353627
+  onefield(Fp<2>("2229982355626334583552843599381353627"));
+}
+
+TEST(Fp, ExactBits) {
+  Fp<1> F17("17");
+  EXPECT_EQ(F17.exact_bits_, 5);  // 17 is 10001 in binary, which is 5 bits
+
+  Fp<1> F_large("18446744073709551557");  // Near 2^64
+  EXPECT_EQ(F_large.exact_bits_, 64);
+
+  Fp256k1<> F_secp256k1;
+  // secp256k1 modulus is 256 bits exactly
+  EXPECT_EQ(F_secp256k1.exact_bits_, 256);
+
+  Fp384<> F_p384;
+  EXPECT_EQ(F_p384.exact_bits_, 384);
+
+  Fp521<> F_p521;
+  EXPECT_EQ(F_p521.exact_bits_, 521);
 }
 
 TEST(Fp, SmallField) {
@@ -324,6 +431,108 @@ TEST(Fp, castable) {
   EXPECT_TRUE(F.of_bytes_field(b));
 }
 
+// ======= Benchmarks ============
+
+template <class Field>
+void bench_add(const Field& F, benchmark::State& state) {
+  Bogorng<Field> rng(&F);
+  auto a = rng.next();
+  for (auto _ : state) {
+    a = F.addf(a, a);
+    benchmark::DoNotOptimize(a);
+  }
+}
+
+template <class Field>
+void bench_mul(const Field& F, benchmark::State& state) {
+  Bogorng<Field> rng(&F);
+  auto a = rng.next();
+  for (auto _ : state) {
+    a = F.mulf(a, a);
+    benchmark::DoNotOptimize(a);
+  }
+}
+
+void BM_Fp24_add(benchmark::State& state) {
+  const Fp24 F(16777213);
+  bench_add(F, state);
+}
+BENCHMARK(BM_Fp24_add);
+
+void BM_Fp1_add(benchmark::State& state) {
+  const Fp<1> F("18446744073709551557");
+  bench_add(F, state);
+}
+BENCHMARK(BM_Fp1_add);
+
+void BM_p256_add(benchmark::State& state) {
+  const Fp256<true> F;
+  bench_add(F, state);
+}
+BENCHMARK(BM_p256_add);
+
+void BM_p256k1_add(benchmark::State& state) {
+  const Fp256k1<true> F;
+  bench_add(F, state);
+}
+BENCHMARK(BM_p256k1_add);
+
+void BM_p384_add(benchmark::State& state) {
+  const Fp384<true> F;
+  bench_add(F, state);
+}
+BENCHMARK(BM_p384_add);
+
+void BM_p521_add(benchmark::State& state) {
+  const Fp521<true> F;
+  bench_add(F, state);
+}
+BENCHMARK(BM_p521_add);
+
+void BM_Fp24_mul(benchmark::State& state) {
+  const Fp24 F(16777213);
+  bench_mul(F, state);
+}
+BENCHMARK(BM_Fp24_mul);
+
+void BM_Fp1_mul(benchmark::State& state) {
+  const Fp<1> F("18446744073709551557");
+  bench_mul(F, state);
+}
+BENCHMARK(BM_Fp1_mul);
+
+void BM_p256_mul(benchmark::State& state) {
+  const Fp256<true> F;
+  bench_mul(F, state);
+}
+BENCHMARK(BM_p256_mul);
+
+void BM_p256k1_mul(benchmark::State& state) {
+  const Fp256k1<true> F;
+  bench_mul(F, state);
+}
+BENCHMARK(BM_p256k1_mul);
+
+void BM_p384_mul(benchmark::State& state) {
+  const Fp384<true> F;
+  bench_mul(F, state);
+}
+BENCHMARK(BM_p384_mul);
+
+// Bench
+void BM_p384_mul_normal(benchmark::State& state) {
+  const Fp<6, true> F(
+      "394020061963944792122790401001436138050797392704654466679482934042457217"
+      "71496870329047266088258938001861606973112319");
+  bench_mul(F, state);
+}
+BENCHMARK(BM_p384_mul_normal);
+
+void BM_p521_mul(benchmark::State& state) {
+  const Fp521<true> F;
+  bench_mul(F, state);
+}
+BENCHMARK(BM_p521_mul);
 
 }  // namespace
 }  // namespace proofs

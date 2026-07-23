@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <string>
+#include <vector>
 
 #include "circuits/mdoc/mdoc_examples.h"
 #include "circuits/mdoc/mdoc_test_attributes.h"
@@ -56,15 +58,15 @@ class MdocZKTest : public testing::Test {
     }
   }
 
-  void run_test(const char *test_name, size_t num_attrs,
-                const RequestedAttribute *attrs, const MdocTests *test,
+  void run_test(const char* test_name, size_t num_attrs,
+                const RequestedAttribute* attrs, const MdocTests* test,
                 MdocProverErrorCode want_ret = MDOC_PROVER_SUCCESS) {
-    uint8_t *circuit = num_attrs == 1 ? circuit1_ : circuit2_;
+    uint8_t* circuit = num_attrs == 1 ? circuit1_ : circuit2_;
     size_t circuit_len = num_attrs == 1 ? circuit_len1_ : circuit_len2_;
     const ZkSpecStruct zk_spec = num_attrs == 1 ? kZkSpecs[0] : kZkSpecs[1];
     EXPECT_TRUE(circuit != nullptr);
 
-    uint8_t *zkproof;
+    uint8_t* zkproof = nullptr;
     size_t proof_len;
 
     log(INFO, "========== Test %s", test_name);
@@ -73,7 +75,7 @@ class MdocZKTest : public testing::Test {
       MdocProverErrorCode ret = run_mdoc_prover(
           circuit, circuit_len, test->mdoc, test->mdoc_size,
           test->pkx.as_pointer, test->pky.as_pointer, test->transcript,
-          test->transcript_size, attrs, num_attrs, (const char *)test->now,
+          test->transcript_size, attrs, num_attrs, (const char*)test->now,
           &zkproof, &proof_len, &zk_spec);
       EXPECT_EQ(ret, want_ret);
     }
@@ -83,9 +85,11 @@ class MdocZKTest : public testing::Test {
       MdocVerifierErrorCode ret = run_mdoc_verifier(
           circuit, circuit_len, test->pkx.as_pointer, test->pky.as_pointer,
           test->transcript, test->transcript_size, attrs, num_attrs,
-          (const char *)test->now, zkproof, proof_len, test->doc_type,
-          &zk_spec);
+          (const char*)test->now, zkproof, proof_len, test->doc_type, &zk_spec);
       EXPECT_EQ(ret, MDOC_VERIFIER_SUCCESS);
+    }
+
+    if (zkproof != nullptr) {
       free(zkproof);
     }
   }
@@ -95,21 +99,21 @@ class MdocZKTest : public testing::Test {
   static size_t circuit_len1_, circuit_len2_;
 };
 
-uint8_t *MdocZKTest::circuit1_ = nullptr;
-uint8_t *MdocZKTest::circuit2_ = nullptr;
+uint8_t* MdocZKTest::circuit1_ = nullptr;
+uint8_t* MdocZKTest::circuit2_ = nullptr;
 size_t MdocZKTest::circuit_len1_ = 0;
 size_t MdocZKTest::circuit_len2_ = 0;
 
 typedef struct {
-  const char *test_name;
+  const char* test_name;
   RequestedAttribute claims[1];
-  const MdocTests *mdoc;
+  const MdocTests* mdoc;
 } Claims;
 
 typedef struct {
-  const char *test_name;
+  const char* test_name;
   RequestedAttribute claims[2];
-  const MdocTests *mdoc;
+  const MdocTests* mdoc;
 } TwoClaims;
 
 TEST_F(MdocZKTest, one_claim) {
@@ -134,7 +138,31 @@ TEST_F(MdocZKTest, one_claim) {
       // Large mdoc from 2025-06-10.
       {"not_over_18-large-mdoc[6]", {test::not_over_18}, &mdoc_tests[6]},
       // Integer field.
-      {"age_birth_year-mdoc[8]", {test::age_birth_year}, &mdoc_tests[8]}};
+      {"age_birth_year-mdoc[8]", {test::age_birth_year}, &mdoc_tests[8]},
+      // AAMVA DHS_compliance field.
+      {"DHS_compliance-mdoc[10]",
+       {test::aamva_dhs_compliance},
+       &mdoc_tests[10]},
+      // Sparkasse Age Assurance test.
+      {"Sparkasse_Age-mdoc[11]", {test::age_over_18}, &mdoc_tests[11]},
+      // MT Prod test
+      {"MT_Prod_Age_Over_18-mdoc[12]", {test::age_over_18}, &mdoc_tests[12]},
+      {"MT_Prod_Age_Over_18-mdoc[14]", {test::age_over_18}, &mdoc_tests[14]},
+      // AZ Prod test
+      {"AZ_Prod_Age_Over_18-mdoc[13]", {test::age_over_18}, &mdoc_tests[13]},
+      // EUAV order tests
+      {"EUAV_Age_Over_18-mdoc[15]", {test::age_over_18}, &mdoc_tests[15]},
+      {"EUAV_Age_Over_18-mdoc[16]", {test::age_over_18}, &mdoc_tests[16]},
+      {"EUAV_Age_Over_18-mdoc[17]", {test::age_over_18}, &mdoc_tests[17]},
+      {"EUAV_Age_Over_18-mdoc[18]", {test::age_over_18}, &mdoc_tests[18]},
+      {"EUAV_Age_Over_18-mdoc[19]", {test::age_over_18}, &mdoc_tests[19]},
+      {"EUAV_Age_Over_18-mdoc[20]", {test::age_over_18}, &mdoc_tests[20]},
+      {"EUAV_Age_Over_18-mdoc[21]", {test::age_over_18}, &mdoc_tests[21]},
+      {"EUAV_Age_Over_18-mdoc[22]", {test::age_over_18}, &mdoc_tests[22]},
+      {"EUAV_Age_Over_18-mdoc[23]", {test::age_over_18}, &mdoc_tests[23]},
+      {"EUAV_Age_Over_18-mdoc[24]", {test::age_over_18}, &mdoc_tests[24]},
+      {"Aadhaar_age_above18-mdoc[25]", {test::age_above18}, &mdoc_tests[25]},
+  };
 
   for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); ++i) {
     run_test(tests[i].test_name, 1, tests[i].claims, tests[i].mdoc);
@@ -142,7 +170,7 @@ TEST_F(MdocZKTest, one_claim) {
 }
 
 TEST_F(MdocZKTest, long_attribute) {
-  uint8_t *zkproof;
+  uint8_t* zkproof;
   size_t proof_len;
   RequestedAttribute attrs[1] = {test::age_over_18};
   auto test = &mdoc_tests[0];
@@ -151,7 +179,7 @@ TEST_F(MdocZKTest, long_attribute) {
     MdocProverErrorCode ret = run_mdoc_prover(
         circuit1_, circuit_len1_, test->mdoc, test->mdoc_size,
         test->pkx.as_pointer, test->pky.as_pointer, test->transcript,
-        test->transcript_size, attrs, 1, (const char *)test->now, &zkproof,
+        test->transcript_size, attrs, 1, (const char*)test->now, &zkproof,
         &proof_len, &kZkSpecs[0]);
     EXPECT_EQ(ret, MDOC_PROVER_SUCCESS);
   }
@@ -174,9 +202,8 @@ TEST_F(MdocZKTest, long_attribute) {
   MdocVerifierErrorCode ret = run_mdoc_verifier(
       circuit1_, circuit_len1_, test->pkx.as_pointer, test->pky.as_pointer,
       test->transcript, test->transcript_size, long_attr, 1,
-      (const char *)test->now, zkproof, proof_len, test->doc_type,
-      &kZkSpecs[0]);
-  EXPECT_EQ(ret, MDOC_VERIFIER_GENERAL_FAILURE);
+      (const char*)test->now, zkproof, proof_len, test->doc_type, &kZkSpecs[0]);
+  EXPECT_EQ(ret, MDOC_VERIFIER_INVALID_CBOR);
   free(zkproof);
 }
 
@@ -275,7 +302,7 @@ TEST_F(MdocZKTest, wrong_witness) {
 
 TEST_F(MdocZKTest, bad_arguments) {
   constexpr int num_attrs = 1;
-  const ZkSpecStruct &zk_spec_1 = kZkSpecs[0];
+  const ZkSpecStruct& zk_spec_1 = kZkSpecs[0];
   RequestedAttribute attrs[num_attrs] = {
       test::age_over_18,
   };
@@ -283,9 +310,9 @@ TEST_F(MdocZKTest, bad_arguments) {
   uint8_t zkproof[30000] = {0};
   uint8_t circuit[60000] = {0};
   uint8_t mdoc[60000] = {0};
-  const char *pk = "0x15";
-  const char *pk2 = "bad_pk";
-  const char *now = "2023-11-02T09:00:00Z";
+  const char* pk = "0x15";
+  const char* pk2 = "bad_pk";
+  const char* now = "2023-11-02T09:00:00Z";
   size_t proof_len;
   // ZStd encoding for "hello".
   uint8_t bad_circuit[50001] = {0x28, 0xb5, 0x2f, 0xfd, 0x20, 0x05, 0x29,
@@ -293,41 +320,41 @@ TEST_F(MdocZKTest, bad_arguments) {
 
   // Invalid arguments to generate_circuit.
   size_t circuit_len;
-  EXPECT_EQ(generate_circuit(nullptr, (uint8_t **)&circuit, &circuit_len),
+  EXPECT_EQ(generate_circuit(nullptr, (uint8_t**)&circuit, &circuit_len),
             CIRCUIT_GENERATION_NULL_INPUT);
   EXPECT_EQ(generate_circuit(&zk_spec_1, nullptr, &circuit_len),
             CIRCUIT_GENERATION_NULL_INPUT);
-  EXPECT_EQ(generate_circuit(&zk_spec_1, (uint8_t **)&circuit, nullptr),
+  EXPECT_EQ(generate_circuit(&zk_spec_1, (uint8_t**)&circuit, nullptr),
             CIRCUIT_GENERATION_NULL_INPUT);
 
   // Basic prover tests that pass in a null ptr.
   EXPECT_EQ(run_mdoc_prover(nullptr, sizeof(circuit), mdoc, sizeof(mdoc), pk,
                             pk, tr, sizeof(tr), attrs, num_attrs, now,
-                            (uint8_t **)&zkproof, &proof_len, &zk_spec_1),
+                            (uint8_t**)&zkproof, &proof_len, &zk_spec_1),
             MDOC_PROVER_NULL_INPUT);
   EXPECT_EQ(run_mdoc_prover(circuit, sizeof(circuit), nullptr, sizeof(mdoc), pk,
                             pk, tr, sizeof(tr), attrs, num_attrs, now,
-                            (uint8_t **)&zkproof, &proof_len, &zk_spec_1),
+                            (uint8_t**)&zkproof, &proof_len, &zk_spec_1),
             MDOC_PROVER_NULL_INPUT);
   EXPECT_EQ(run_mdoc_prover(circuit, sizeof(circuit), mdoc, sizeof(mdoc),
                             nullptr, pk, tr, sizeof(tr), attrs, num_attrs, now,
-                            (uint8_t **)&zkproof, &proof_len, &zk_spec_1),
+                            (uint8_t**)&zkproof, &proof_len, &zk_spec_1),
             MDOC_PROVER_NULL_INPUT);
   EXPECT_EQ(run_mdoc_prover(circuit, sizeof(circuit), mdoc, sizeof(mdoc), pk,
                             nullptr, tr, sizeof(tr), attrs, num_attrs, now,
-                            (uint8_t **)&zkproof, &proof_len, &zk_spec_1),
+                            (uint8_t**)&zkproof, &proof_len, &zk_spec_1),
             MDOC_PROVER_NULL_INPUT);
   EXPECT_EQ(run_mdoc_prover(circuit, sizeof(circuit), mdoc, sizeof(mdoc), pk,
                             pk, nullptr, sizeof(tr), attrs, num_attrs, now,
-                            (uint8_t **)&zkproof, &proof_len, &zk_spec_1),
+                            (uint8_t**)&zkproof, &proof_len, &zk_spec_1),
             MDOC_PROVER_NULL_INPUT);
   EXPECT_EQ(run_mdoc_prover(circuit, sizeof(circuit), mdoc, sizeof(mdoc), pk,
                             pk, tr, sizeof(tr), nullptr, num_attrs, now,
-                            (uint8_t **)&zkproof, &proof_len, &zk_spec_1),
+                            (uint8_t**)&zkproof, &proof_len, &zk_spec_1),
             MDOC_PROVER_NULL_INPUT);
   EXPECT_EQ(run_mdoc_prover(circuit, sizeof(circuit), mdoc, sizeof(mdoc), pk,
                             pk, tr, sizeof(tr), attrs, num_attrs, nullptr,
-                            (uint8_t **)&zkproof, &proof_len, &zk_spec_1),
+                            (uint8_t**)&zkproof, &proof_len, &zk_spec_1),
             MDOC_PROVER_NULL_INPUT);
   EXPECT_EQ(run_mdoc_prover(circuit, sizeof(circuit), mdoc, sizeof(mdoc), pk,
                             pk, tr, sizeof(tr), attrs, num_attrs, now, nullptr,
@@ -335,43 +362,41 @@ TEST_F(MdocZKTest, bad_arguments) {
             MDOC_PROVER_NULL_INPUT);
   EXPECT_EQ(run_mdoc_prover(circuit, sizeof(circuit), mdoc, sizeof(mdoc), pk,
                             pk, tr, sizeof(tr), attrs, num_attrs, now,
-                            (uint8_t **)&zkproof, nullptr, &zk_spec_1),
+                            (uint8_t**)&zkproof, nullptr, &zk_spec_1),
             MDOC_PROVER_NULL_INPUT);
   EXPECT_EQ(run_mdoc_prover(circuit, sizeof(circuit), mdoc, sizeof(mdoc), pk,
                             pk, tr, sizeof(tr), attrs, num_attrs, now,
-                            (uint8_t **)&zkproof, &proof_len, nullptr),
+                            (uint8_t**)&zkproof, &proof_len, nullptr),
             MDOC_PROVER_NULL_INPUT);
 
   // Invalid pk.
   EXPECT_EQ(run_mdoc_prover(circuit, sizeof(circuit), mdoc, sizeof(mdoc), pk2,
                             pk, tr, sizeof(tr), attrs, num_attrs, now,
-                            (uint8_t **)&zkproof, &proof_len, &zk_spec_1),
+                            (uint8_t**)&zkproof, &proof_len, &zk_spec_1),
             MDOC_PROVER_INVALID_INPUT);
 
   // Invalid circuit.
   EXPECT_EQ(run_mdoc_prover(circuit, sizeof(circuit), mdoc, sizeof(mdoc), pk,
                             pk, tr, sizeof(tr), attrs, num_attrs, now,
-                            (uint8_t **)&zkproof, &proof_len, &zk_spec_1),
+                            (uint8_t**)&zkproof, &proof_len, &zk_spec_1),
             MDOC_PROVER_CIRCUIT_PARSING_FAILURE);
   EXPECT_EQ(
       run_mdoc_prover(bad_circuit, sizeof(bad_circuit), mdoc, sizeof(mdoc), pk,
                       pk, tr, sizeof(tr), attrs, num_attrs, now,
-                      (uint8_t **)&zkproof, &proof_len, &zk_spec_1),
+                      (uint8_t**)&zkproof, &proof_len, &zk_spec_1),
       MDOC_PROVER_CIRCUIT_PARSING_FAILURE);
 
   // Invalid attributes, two different namespaces.
-    RequestedAttribute attrs2[2] = {
-      test::age_over_18,
-      test::aamva_name_suffix_mr
-  };
+  RequestedAttribute attrs2[2] = {test::age_over_18,
+                                  test::aamva_name_suffix_mr};
 
   EXPECT_EQ(run_mdoc_prover(circuit, sizeof(circuit), mdoc, sizeof(mdoc), pk,
                             pk, tr, sizeof(tr), attrs2, 2, now,
-                            (uint8_t **)&zkproof, &proof_len, &zk_spec_1),
+                            (uint8_t**)&zkproof, &proof_len, &zk_spec_1),
             MDOC_PROVER_INVALID_INPUT);
   EXPECT_EQ(run_mdoc_verifier(circuit1_, circuit_len1_, pk, pk, tr, sizeof(tr),
-                              attrs2, 2, now, zkproof, 100,
-                              kDefaultDocType, &zk_spec_1),
+                              attrs2, 2, now, zkproof, 100, kDefaultDocType,
+                              &zk_spec_1),
             MDOC_VERIFIER_INVALID_INPUT);
 
   // Basic verifier tests that pass in a null ptr.
@@ -422,6 +447,20 @@ TEST_F(MdocZKTest, bad_arguments) {
                               kDefaultDocType, &zk_spec_1),
             MDOC_VERIFIER_ARGUMENTS_TOO_SMALL);
 
+  RequestedAttribute attrs_prefix[1] = {RequestedAttribute(
+      {.namespace_id = {'o', 'r', 'g', '.', 'i', 's', 'o', '.', '1', '8', '0',
+                        '1', '3', '.', '5', '.', '1'},
+       .id = {'b', 'i', 'r', 't', 'h', '_', 'd', 'a', 't', 'e'},
+       .cbor_value = {0xD9, 0x03, 0xEC, 0x6A, '1', '9', '7', '1', '-', '0', '9',
+                      '-', '0'},
+       .namespace_len = 17,
+       .id_len = 10,
+       .cbor_value_len = 13})};
+  EXPECT_EQ(run_mdoc_verifier(circuit, sizeof(circuit), pk, pk, tr, sizeof(tr),
+                              attrs_prefix, 1, now, zkproof, sizeof(zkproof),
+                              kDefaultDocType, &zk_spec_1),
+            MDOC_VERIFIER_INVALID_CBOR);
+
   // Broken now.
   EXPECT_EQ(run_mdoc_verifier(circuit, sizeof(circuit), pk, pk, tr, sizeof(tr),
                               attrs, num_attrs, nullptr, zkproof,
@@ -449,18 +488,18 @@ TEST_F(MdocZKTest, bad_arguments) {
 }
 
 TEST_F(MdocZKTest, attr_mismatch) {
-  uint8_t *zkproof;
+  uint8_t* zkproof;
   size_t proof_len;
   constexpr int num_attrs = 2;
-  const ZkSpecStruct &zk_spec_2 = kZkSpecs[1];
+  const ZkSpecStruct& zk_spec_2 = kZkSpecs[1];
   RequestedAttribute attrs[num_attrs] = {test::age_over_18, test::age_over_18};
-  const struct MdocTests *test = &mdoc_tests[0];
+  const struct MdocTests* test = &mdoc_tests[0];
 
   {
     MdocProverErrorCode ret = run_mdoc_prover(
         circuit2_, circuit_len2_, test->mdoc, test->mdoc_size,
         test->pkx.as_pointer, test->pky.as_pointer, test->transcript,
-        test->transcript_size, attrs, num_attrs, (const char *)test->now,
+        test->transcript_size, attrs, num_attrs, (const char*)test->now,
         &zkproof, &proof_len, &zk_spec_2);
     EXPECT_EQ(ret, MDOC_PROVER_SUCCESS);
   }
@@ -468,7 +507,7 @@ TEST_F(MdocZKTest, attr_mismatch) {
     MdocVerifierErrorCode ret = run_mdoc_verifier(
         circuit2_, circuit_len2_, test->pkx.as_pointer, test->pky.as_pointer,
         test->transcript, test->transcript_size, attrs, num_attrs - 1,
-        (const char *)test->now, zkproof, proof_len, kDefaultDocType,
+        (const char*)test->now, zkproof, proof_len, kDefaultDocType,
         &zk_spec_2);
     EXPECT_EQ(ret, MDOC_VERIFIER_ATTRIBUTE_NUMBER_MISMATCH);
   }
@@ -478,9 +517,9 @@ TEST_F(MdocZKTest, attr_mismatch) {
 TEST_F(MdocZKTest, bad_proofs) {
   set_log_level(ERROR);
   constexpr int num_attrs = 1;
-  const ZkSpecStruct &zk_spec_1 = kZkSpecs[0];
+  const ZkSpecStruct& zk_spec_1 = kZkSpecs[0];
   RequestedAttribute attrs[num_attrs] = {test::age_over_18};
-  const struct MdocTests *test = &mdoc_tests[0];
+  const struct MdocTests* test = &mdoc_tests[0];
 
   constexpr size_t kMaxProofLen = 100000;
   uint8_t zkproof[kMaxProofLen];
@@ -490,7 +529,7 @@ TEST_F(MdocZKTest, bad_proofs) {
     MdocVerifierErrorCode ret = run_mdoc_verifier(
         circuit1_, circuit_len1_, test->pkx.as_pointer, test->pky.as_pointer,
         test->transcript, test->transcript_size, attrs, num_attrs,
-        (const char *)test->now, zkproof, proof_len, kDefaultDocType,
+        (const char*)test->now, zkproof, proof_len, kDefaultDocType,
         &zk_spec_1);
     EXPECT_NE(ret, MDOC_VERIFIER_SUCCESS);
   }
@@ -502,7 +541,7 @@ TEST(CircuitGenerationTest, attempt_to_generate_old_circuit) {
 
   // Find the smallest version of the circuit for the given number of
   // attributes.
-  const ZkSpecStruct *old_zk_spec = nullptr;
+  const ZkSpecStruct* old_zk_spec = nullptr;
   int num_circuits = 0;
   for (int i = 0; i < kNumZkSpecs; ++i) {
     if (kZkSpecs[i].num_attributes == num_attrs) {
@@ -519,10 +558,94 @@ TEST(CircuitGenerationTest, attempt_to_generate_old_circuit) {
     return;  // No old circuit to test against, it's OK to skip this test.
   }
 
-  static uint8_t *circuit = nullptr;
+  static uint8_t* circuit = nullptr;
   static size_t circuit_len;
   EXPECT_EQ(generate_circuit(old_zk_spec, &circuit, &circuit_len),
             CIRCUIT_GENERATION_INVALID_ZK_SPEC_VERSION);
+}
+
+TEST(CborValidate, ValidInputs) {
+  // Integer 0
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x00}, 1));
+  // Integer 1
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x01}, 1));
+  // Integer -1
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x20}, 1));
+  // Boolean True
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0xF5}, 1));
+  // Boolean False
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0xF4}, 1));
+  // Empty String
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x60}, 1));
+  // String "a"
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x61, 'a'}, 2));
+  // Empty Bytes
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x40}, 1));
+  // Bytes 0x01
+  EXPECT_TRUE(proofs::cbor_validate((const uint8_t[]){0x41, 0x01}, 2));
+
+  // Fulldate: Tag 1004 (D9 03 EC) + String (6A) + 10 bytes -> 14 bytes
+  std::vector<uint8_t> fulldate = {0xD9, 0x03, 0xEC, 0x6A};
+  fulldate.insert(fulldate.end(), 10, '0');
+  EXPECT_EQ(fulldate.size(), 14);
+  EXPECT_TRUE(proofs::cbor_validate(fulldate.data(), fulldate.size()));
+
+  // Tdate: Tag 0 (C0) + String (74, len 20) + 20 bytes -> 22 bytes
+  std::vector<uint8_t> tdate = {0xC0, 0x74};
+  tdate.insert(tdate.end(), 20, '0');
+  EXPECT_EQ(tdate.size(), 22);
+  EXPECT_TRUE(proofs::cbor_validate(tdate.data(), tdate.size()));
+}
+
+TEST(CborValidate, InvalidInputs) {
+  // Null/Empty
+  EXPECT_FALSE(proofs::cbor_validate(nullptr, 0));
+
+  // Array (not allowed)
+  EXPECT_FALSE(proofs::cbor_validate((const uint8_t[]){0x80}, 1));
+  // Map (not allowed)
+  EXPECT_FALSE(proofs::cbor_validate((const uint8_t[]){0xA0}, 1));
+
+  // Malformed length (String len 1 but missing data)
+  EXPECT_FALSE(proofs::cbor_validate((const uint8_t[]){0x61}, 1));
+
+  // Boolean, wrong length
+  EXPECT_FALSE(proofs::cbor_validate((const uint8_t[]){0xF5, 0xF5}, 2));
+
+  // Wrong Tag (e.g. Tag 2)
+  EXPECT_FALSE(proofs::cbor_validate((const uint8_t[]){0xC2, 0x40},
+                                     2));  // Tag 2 + Bytes
+
+  // Fulldate wrong length
+  // 14 bytes expected. Try 13.
+  std::vector<uint8_t> fulldate_wrong = {0xD9, 0x03, 0xEC,
+                                         0x69};  // String len 9
+  fulldate_wrong.insert(fulldate_wrong.end(), 9, '0');
+  EXPECT_EQ(fulldate_wrong.size(), 13);
+  EXPECT_FALSE(
+      proofs::cbor_validate(fulldate_wrong.data(), fulldate_wrong.size()));
+  // Try 15 bytes
+  fulldate_wrong.insert(fulldate_wrong.end(), 2, '0');
+  EXPECT_FALSE(
+      proofs::cbor_validate(fulldate_wrong.data(), fulldate_wrong.size()));
+  // Try 22 bytes
+  fulldate_wrong.insert(fulldate_wrong.end(), 7, '0');
+  EXPECT_FALSE(
+      proofs::cbor_validate(fulldate_wrong.data(), fulldate_wrong.size()));
+
+  // Fulldate inner type mismatch (Tag 1004 + Integer)
+  EXPECT_FALSE(
+      proofs::cbor_validate((const uint8_t[]){0xD9, 0x03, 0xEC, 0x00}, 4));
+
+  // Tdate wrong length
+  // 22 bytes expected. Try 21.
+  std::vector<uint8_t> tdate_short = {0xC0, 0x73};  // String len 19
+  tdate_short.insert(tdate_short.end(), 19, '0');
+  EXPECT_EQ(tdate_short.size(), 21);
+  EXPECT_FALSE(proofs::cbor_validate(tdate_short.data(), tdate_short.size()));
+
+  // Tdate inner type mismatch (Tag 0 + Integer)
+  EXPECT_FALSE(proofs::cbor_validate((const uint8_t[]){0xC0, 0x00}, 2));
 }
 
 // ============================ Benchmarks ====================================
@@ -532,28 +655,28 @@ static const Claims benchmark_claim = {
     &mdoc_tests[0],
 };
 
-void BM_MdocProver(benchmark::State &state) {
+void BM_MdocProver(benchmark::State& state) {
   set_log_level(ERROR);
 
-  const ZkSpecStruct &zk_spec_1 = kZkSpecs[0];
+  const ZkSpecStruct& zk_spec_1 = kZkSpecs[0];
   size_t circuit_len;
-  uint8_t *circuit;
+  uint8_t* circuit;
   EXPECT_EQ(generate_circuit(&zk_spec_1, &circuit, &circuit_len),
             CIRCUIT_GENERATION_SUCCESS);
 
-  const RequestedAttribute *attrs = benchmark_claim.claims;
-  const MdocTests *test = benchmark_claim.mdoc;
+  const RequestedAttribute* attrs = benchmark_claim.claims;
+  const MdocTests* test = benchmark_claim.mdoc;
   size_t num_attrs = 1;
   const ZkSpecStruct zk_spec = kZkSpecs[0];
 
   for (auto _ : state) {
-    uint8_t *zkproof;
+    uint8_t* zkproof;
     size_t proof_len;
 
     MdocProverErrorCode ret = run_mdoc_prover(
         circuit, circuit_len, test->mdoc, test->mdoc_size, test->pkx.as_pointer,
         test->pky.as_pointer, test->transcript, test->transcript_size, attrs,
-        num_attrs, (const char *)test->now, &zkproof, &proof_len, &zk_spec);
+        num_attrs, (const char*)test->now, &zkproof, &proof_len, &zk_spec);
     EXPECT_EQ(ret, MDOC_PROVER_SUCCESS);
     free(zkproof);
   }
@@ -561,34 +684,34 @@ void BM_MdocProver(benchmark::State &state) {
 
 BENCHMARK(BM_MdocProver);
 
-void BM_MdocVerifier(benchmark::State &state) {
+void BM_MdocVerifier(benchmark::State& state) {
   set_log_level(ERROR);
 
-  const ZkSpecStruct &zk_spec_1 = kZkSpecs[0];
+  const ZkSpecStruct& zk_spec_1 = kZkSpecs[0];
   size_t circuit_len;
-  uint8_t *circuit;
+  uint8_t* circuit;
   EXPECT_EQ(generate_circuit(&zk_spec_1, &circuit, &circuit_len),
             CIRCUIT_GENERATION_SUCCESS);
 
-  const RequestedAttribute *attrs = benchmark_claim.claims;
-  const MdocTests *test = benchmark_claim.mdoc;
+  const RequestedAttribute* attrs = benchmark_claim.claims;
+  const MdocTests* test = benchmark_claim.mdoc;
   size_t num_attrs = 1;
   const ZkSpecStruct zk_spec = kZkSpecs[0];
 
-  uint8_t *zkproof;
+  uint8_t* zkproof;
   size_t proof_len;
 
   MdocProverErrorCode retp = run_mdoc_prover(
       circuit, circuit_len, test->mdoc, test->mdoc_size, test->pkx.as_pointer,
       test->pky.as_pointer, test->transcript, test->transcript_size, attrs,
-      num_attrs, (const char *)test->now, &zkproof, &proof_len, &zk_spec);
+      num_attrs, (const char*)test->now, &zkproof, &proof_len, &zk_spec);
   EXPECT_EQ(retp, MDOC_PROVER_SUCCESS);
 
   for (auto _ : state) {
     MdocVerifierErrorCode retv = run_mdoc_verifier(
         circuit, circuit_len, test->pkx.as_pointer, test->pky.as_pointer,
         test->transcript, test->transcript_size, attrs, num_attrs,
-        (const char *)test->now, zkproof, proof_len, test->doc_type, &zk_spec);
+        (const char*)test->now, zkproof, proof_len, test->doc_type, &zk_spec);
     EXPECT_EQ(retv, MDOC_VERIFIER_SUCCESS);
   }
 

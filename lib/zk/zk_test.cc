@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,8 @@
 #include "circuits/logic/compiler_backend.h"
 #include "circuits/logic/logic.h"
 #include "ec/p256.h"
-#include "proto/circuit.h"
+#include "proto/circuit_io.h"
+#include "proto/circuit_writer.h"
 #include "random/random.h"
 #include "random/transcript.h"
 #include "sumcheck/circuit.h"
@@ -62,8 +63,8 @@ class ZKTest : public testing::Test {
                                  "2fe38e6f58626767f9e75")),
         omega_x_(p256_base.of_string("0xf90d338ebd84f5665cfc85c67990e3379fc9563"
                                      "b382a4a4c985a65324b242562")),
-        omega_y_(p256_base.of_string("0x4617e1bc436833b35fb03d1dfef91cbf7b8c759"
-                                     "c8b2dcd39240be8b09f5bc153")),
+        omega_y_(p256_base.of_string("0xb9e81e42bc97cc4da04fc2e20106e34084738a6"
+                                     "474d232c6dbf4174f60a43eac")),
         e_("0x2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7a"
            "e"),
         r_("0xc71bcbfb28bbe06299a225f057797aaf5f22669e90475de5f64176b2612671"),
@@ -102,10 +103,10 @@ class ZKTest : public testing::Test {
 
       Verc verc(lc, p256, n256_order);
 
-      EltW pkx = Q.input(), pky = Q.input(), e = Q.input();
+      EltW pkx = lc.eltw_input(), pky = lc.eltw_input(), e = lc.eltw_input();
       Q.private_input();
       Verc::Witness vwc;
-      vwc.input(Q);
+      vwc.input(lc);
       verc.verify_signature3(pkx, pky, e, vwc);
       circuit1_ = Q.mkcircuit(1).release();
     }
@@ -259,26 +260,20 @@ TEST(ZK, Rfc_testvector1) {
     QuadCircuit<Fp128> Q(Fg);
     CompilerBackend cbk(&Q);
     const LogicCircuit LC(&cbk, Fg);
-    EltW n = Q.input();
+    EltW n = LC.eltw_input();
     Q.private_input();
-    EltW m = Q.input();
-    EltW s = Q.input();
-    EltW sm2 = LC.sub(&s, LC.konst(2));
-    EltW m2 = LC.mul(&m, m);
-    EltW sm2m2 = LC.mul(&sm2, m2);
-    EltW sm4 = LC.sub(&s, LC.konst(4));
-    EltW sm4m = LC.mul(&sm4, m);
-    EltW t = LC.sub(&sm2m2, sm4m);
-    EltW k2 = LC.konst(2);
-    EltW nn = LC.mul(&n, k2);
-    LC.assert_eq(&t, nn);
+    EltW m = LC.eltw_input();
+    EltW s = LC.eltw_input();
+    LC.assert_eq(LC.sub(LC.mul(LC.sub(s, LC.konst(2)), LC.mul(m, m)),
+                        LC.mul(LC.sub(s, LC.konst(4)), m)),
+                 LC.mul(n, LC.konst(2)));
     circuit = Q.mkcircuit(1);
     dump_info("rfc_sgonal", 1, Q);
   }
 
   // Serialize the circuit.
   std::vector<uint8_t> bytes;
-  CircuitRep<Fp128> cr(Fg, FP128_ID);
+  CircuitWriter<Fp128> cr(Fg, FP128_ID);
   cr.to_bytes(*circuit, bytes);
   dump("circuit", bytes);
 

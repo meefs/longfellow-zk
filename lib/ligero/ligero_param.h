@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -405,6 +405,9 @@ class LigeroCommon {
         // index into [_ , W] arrays
         size_t iw = j + i * p.w;
         const auto *l = &lqc[iw];
+        check(l->x < p.nw, "l->x < p.nw");
+        check(l->y < p.nw, "l->y < p.nw");
+        check(l->z < p.nw, "l->z < p.nw");
         F.add(Ax[iw], alphaq[iw][0]);
         F.sub(A[l->x], alphaq[iw][0]);
 

@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,8 +31,9 @@ class ReadBuffer {
   explicit ReadBuffer(const std::vector<uint8_t> &v)
       : ReadBuffer(v.data(), v.size()) {}
 
-  // no copies
+  // no copies or rvalue constructors
   ReadBuffer(const ReadBuffer &) = delete;
+  ReadBuffer(const ReadBuffer&&) = delete;
 
   // TRUE if at least N bytes remain
   bool have(size_t n) const { return remaining() >= n; }

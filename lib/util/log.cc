@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ void set_log_level(enum LogLevel l) { _LOG_LEVEL = l; }
 void log(enum LogLevel l, const char* format, ...) {
   va_list args;
   va_start(args, format);
-  char tmp[1024];
+  char tmp[1024] = {0};
   vsnprintf(tmp, sizeof(tmp), format, args);
   va_end(args);
 

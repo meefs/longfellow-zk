@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -48,11 +48,6 @@ class MACReference {
       gf2k m = gf_.of_bytes_field(tmp).value();
       mac[i] = gf_.mulf(gf_.addf(av, ap[i]), m);
     }
-  }
-
-  void to_bytes(gf2k mac[/*2*/], uint8_t buf[/* 32 */]) {
-    gf_.to_bytes(mac[0], buf);
-    gf_.to_bytes(mac[1], buf + GF::kBytes);
   }
 
  private:

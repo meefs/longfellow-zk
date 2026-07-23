@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,12 +34,12 @@ by running the prover or the verifier.
 */
 namespace proofs {
 template <class Field>
-void run_prover(const Circuit<Field> *C, std::unique_ptr<Dense<Field>> W,
-                Proof<Field> *proof, const Field& F) {
+void run_prover(const Circuit<Field>* C, std::unique_ptr<Dense<Field>> W,
+                Proof<Field>* proof, const Field& F) {
   typename Prover<Field>::inputs pin;
 
   Prover<Field> prover(F);
-  auto V = prover.eval_circuit(&pin, C, W->clone(), F);
+  auto V = prover.eval_circuit(&pin, C, std::move(W), F);
 
   check(V != nullptr, "eval_circuit failed.");
 
@@ -51,18 +51,17 @@ void run_prover(const Circuit<Field> *C, std::unique_ptr<Dense<Field>> W,
     check(V->v_[i] == F.zero(), "witness failed, non-zero output");
   }
 
-  Transcript tsp((uint8_t *)"testing", 7);
+  Transcript tsp((uint8_t*)"testing", 7);
   prover.prove(proof, nullptr, C, pin, tsp);
 }
 
 template <class Field>
-void run_verifier(const Circuit<Field> *C, std::unique_ptr<Dense<Field>> W,
-                  Proof<Field> &proof, const Field& F) {
-  const char *why = "ok";
+void run_verifier(const Circuit<Field>* C, std::unique_ptr<Dense<Field>> W,
+                  Proof<Field>& proof, const Field& F) {
+  const char* why = "ok";
   auto V = std::make_unique<Dense<Field>>(F);
-  Transcript tsv((uint8_t *)"testing", 7);
-  check(Verifier<Field>::verify(&why, C, &proof, std::move(V),
-                                     W->clone(), tsv, F), why);
+  Transcript tsv((uint8_t*)"testing", 7);
+  check(Verifier<Field>::verify(&why, C, &proof, std::move(W), tsv, F), why);
 }
 }  // namespace proofs
 

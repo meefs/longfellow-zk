@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,9 +35,9 @@
 
 namespace proofs {
 
-constexpr size_t kLigeroRate = 4;
-constexpr size_t kLigeroNreq = 189;
-constexpr size_t kVersion = 4;
+constexpr size_t kLigeroRate = 7;
+constexpr size_t kLigeroNreq = 132;
+constexpr size_t kVersion = 7;
 
 // Runs a zk prover and verifier for a field that requires a field extension
 // to perform the commitment.

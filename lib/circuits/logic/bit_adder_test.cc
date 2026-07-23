@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
 #include "circuits/logic/bit_adder.h"
 
 #include <stddef.h>
-
-#include <vector>
 
 #include "algebra/fp_p128.h"
 #include "circuits/logic/evaluation_backend.h"
@@ -47,9 +45,8 @@ void test_bit_adder() {
           BV ec = L.template vbit<w>(c);
           BV es = L.template vbit<w>(s);
 
-          std::vector<BV> terms = {ea, eb, ec};
           BitAdder<Logic, w> BA(L);
-          BA.assert_eqmod(es, BA.add(terms), 3);
+          BA.assert_eqmod(es, BA.add({ea, eb, ec}), 3);
           EXPECT_EQ(ebk.assertion_failed(), (((a + b + c) ^ s) & mask) != 0);
         }
       }

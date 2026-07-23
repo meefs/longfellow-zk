@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -48,6 +48,7 @@ class CborWitness {
   struct global_witness {
     Elt invprod_decode;
     CElt cc0_counter;
+    CElt neg_cc0_counter;
     Elt invprod_parse;
   };
 
@@ -141,6 +142,7 @@ class CborWitness {
         proofs::check(!overflow, "!overflow");
         if (i == 0) {
           gw.cc0_counter = F.as_counter(cc[0]);
+          gw.neg_cc0_counter = F.negf(gw.cc0_counter);
         }
         pw[i].cc_debug = cc;
 

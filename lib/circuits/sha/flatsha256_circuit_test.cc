@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,7 +47,6 @@
 #include "sumcheck/circuit.h"
 #include "sumcheck/testing.h"
 #include "util/log.h"
-#include "util/panic.h"
 #include "zk/zk_proof.h"
 #include "zk/zk_prover.h"
 #include "benchmark/benchmark.h"
@@ -59,6 +58,8 @@ namespace {
 using Field = Fp256Base;
 
 constexpr const Field& F = p256_base;
+constexpr size_t kZKRate = 7;
+constexpr size_t kZKQueries = 132;  // 109+ bits of security
 
 // =============================================================================
 // Evaluation tests verify the correctness of circuit construction by
@@ -245,74 +246,6 @@ TEST(FlatSHA256_Circuit, assert_message) {
   }
 }
 
-TEST(FlatSHA256_Circuit, assert_message_prefix) {
-  using EvalBackend = EvaluationBackend<Field>;
-  using Logic = Logic<Field, EvalBackend>;
-  using v8 = typename Logic::v8;
-  using v256 = typename Logic::v256;
-  using FlatSha = FlatSHA256Circuit<Logic, BitPlucker<Logic, kShaPluckerSize>>;
-  const EvalBackend ebk(F);
-  const Logic L(&ebk, F);
-  const FlatSha FSHA(L);
-  BitPluckerEncoder<Field, kShaPluckerSize> BPENC(F);
-
-  constexpr size_t max = 16;
-  std::vector<uint8_t> in(64 * max);
-  std::vector<FlatSHA256Witness::BlockWitness> bw(max);
-
-  std::vector<v8> inW(64 * max);
-  std::vector<FlatSha::BlockWitness> bwW(max);
-
-  for (size_t i = 0; i < sizeof(SHA256_TV) / sizeof(SHA256_TV[0]); ++i) {
-    size_t len = SHA256_TV[i].len;
-    check(len + 9 < 64 * max, "example too big for test");
-    if (len < 2) {
-      continue;  // skip small tests
-    }
-
-    uint8_t numb;
-    FlatSHA256Witness::transform_and_witness_message(
-        len, (const uint8_t*)SHA256_TV[i].str, max, numb, in.data(), bw.data());
-
-    // The last H1 must agree with the expected output
-    for (size_t j = 0; j < 8; ++j) {
-      uint32_t h1j = SHA256_ru32be(&SHA256_TV[i].hash[j * 4]);
-      EXPECT_EQ(bw[numb - 1].h1[j], h1j);
-    }
-
-    v256 target;
-    for (size_t j = 0; j < 256; ++j) {
-      target[j] = L.bit((SHA256_TV[i].hash[(255 - j) / 8] >> (j % 8)) & 0x1);
-    }
-
-    // fill input wires
-    v8 numbW = L.vbit8(numb);
-
-    size_t split = len / 2;
-    for (size_t j = 0; j + split < max * 64; j++) {
-      inW[j] = L.vbit8(in[j + split]);
-    }
-
-    for (size_t j = 0; j < max; j++) {
-      for (size_t k = 0; k < 48; ++k) {
-        bwW[j].outw[k] = L.konst(BPENC.mkpacked_v32(bw[j].outw[k]));
-      }
-      for (size_t k = 0; k < 64; ++k) {
-        bwW[j].oute[k] = L.konst(BPENC.mkpacked_v32(bw[j].oute[k]));
-        bwW[j].outa[k] = L.konst(BPENC.mkpacked_v32(bw[j].outa[k]));
-      }
-
-      for (size_t k = 0; k < 8; ++k) {
-        bwW[j].h1[k] = L.konst(BPENC.mkpacked_v32(bw[j].h1[k]));
-      }
-    }
-    const uint8_t* prefix = (const uint8_t*)SHA256_TV[i].str;
-
-    FSHA.assert_message_hash_with_prefix(max, numbW, inW.data(), prefix, split,
-                                         target, bwW.data());
-  }
-}
-
 // =============================================================================
 // Compiler tests are used to assess the circuit size and verify that the
 // circuit works in sumcheck or zk proof processes. These tests use different
@@ -357,15 +290,15 @@ std::unique_ptr<Circuit<Field>> test_block_circuit_size(const Field& f,
   } else {
     std::vector<packed_v32C> vH0(8), vH1(8), voutw(48), voute(64), vouta(64);
     for (size_t i = 0; i < 8; ++i) {
-      vH0[i] = FlatShaC::packed_input(Q);
-      vH1[i] = FlatShaC::packed_input(Q);
+      vH0[i] = FlatShaC::packed_input(LC);
+      vH1[i] = FlatShaC::packed_input(LC);
     }
     for (size_t i = 0; i < 48; ++i) {
-      voutw[i] = FlatShaC::packed_input(Q);
+      voutw[i] = FlatShaC::packed_input(LC);
     }
     for (size_t i = 0; i < 64; ++i) {
-      voute[i] = FlatShaC::packed_input(Q);
-      vouta[i] = FlatShaC::packed_input(Q);
+      voute[i] = FlatShaC::packed_input(LC);
+      vouta[i] = FlatShaC::packed_input(LC);
     }
     FSHAC.assert_transform_block(vin.data(), vH0.data(), voutw.data(),
                                  voute.data(), vouta.data(), vH1.data());
@@ -374,21 +307,12 @@ std::unique_ptr<Circuit<Field>> test_block_circuit_size(const Field& f,
   auto CIRCUIT = Q.mkcircuit(1);
   dump_info(test_name, Q);
 
-  ZkProof<Field> zkpr(*CIRCUIT, 4, 138);
+  ZkProof<Field> zkpr(*CIRCUIT, kZKRate, kZKQueries);
   log(INFO, "SHA: nw:%zd nq:%zd r:%zd w:%zd bl:%zd bl_enc:%zd nrow:%zd\n",
       zkpr.param.nw, zkpr.param.nq, zkpr.param.r, zkpr.param.w,
       zkpr.param.block, zkpr.param.block_enc, zkpr.param.nrow);
 
   return CIRCUIT;
-}
-
-template <typename T>
-T packed_input(QuadCircuit<Field>& Q) {
-  T r;
-  for (size_t i = 0; i < r.size(); ++i) {
-    r[i] = Q.input();
-  }
-  return r;
 }
 
 TEST(FlatSHA256_Circuit, block_size_p256) {
@@ -466,7 +390,7 @@ std::unique_ptr<Circuit<Field>> make_circuit(size_t numBlocks, size_t numCopies,
 
   std::vector<ShaBlockWitness> bw(numBlocks);
   for (size_t j = 0; j < numBlocks; j++) {
-    bw[j].input(Q);
+    bw[j].input(lc);
   }
 
   sha.assert_message_hash(numBlocks, nb, &in[0], target, &bw[0]);
@@ -602,7 +526,7 @@ void BM_ShaZK_fp2_128(benchmark::State& state) {
   SecureRandomEngine rng;
 
   for (auto s : state) {
-    ZkProof<f_128> zkpr(*CIRCUIT, 4, 128);
+    ZkProof<f_128> zkpr(*CIRCUIT, kZKRate, kZKQueries);
     ZkProver<f_128, RSFactory> prover(*CIRCUIT, Fs, rsf);
     prover.commit(zkpr, W, tp, rng);
     prover.prove(zkpr, W, tp);
@@ -641,7 +565,7 @@ void BM_ShaZK_Fp64_2(benchmark::State& state) {
   SecureRandomEngine rng;
 
   for (auto s : state) {
-    ZkProof<Field2> zkpr(*CIRCUIT, 4, 138);
+    ZkProof<Field2> zkpr(*CIRCUIT, kZKRate, kZKQueries);
     ZkProver<Field2, RSFactory> prover(*CIRCUIT, base_2, rsf);
     prover.commit(zkpr, W, tp, rng);
     prover.prove(zkpr, W, tp);
@@ -674,8 +598,7 @@ void BM_ShaZK_quadbind_fp2_128(benchmark::State& state) {
   for (auto s : state) {
     size_t logv = CIRCUIT->logv;
     for (size_t ly = 0; ly < CIRCUIT->nl; ++ly) {
-      auto QUAD = CIRCUIT->l[ly].quad->clone();
-      QUAD->bind_g(logv, g0, g1, alpha, beta, Fs);
+      auto HQUAD = CIRCUIT->l[ly].quad->bind_g(logv, g0, g1, alpha, beta, Fs);
       logv = CIRCUIT->l[ly].logw;
     }
   }

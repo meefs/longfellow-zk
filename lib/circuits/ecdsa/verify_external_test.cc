@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@
 #include "ec/p256.h"
 #include "util/log.h"
 #include "gtest/gtest.h"
-
+#include "openssl/evp.h"
 #include "openssl/bn.h"
 #include "openssl/ec.h"
 

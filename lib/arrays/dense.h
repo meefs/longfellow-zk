@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -49,14 +49,6 @@ class Dense {
   // make0 replacement
   explicit Dense(const Field& F) : n0_(1), n1_(1), v_(1) { v_[0] = F.zero(); }
 
-  // initialize dense array from P[i1*ldp+i0]
-  explicit Dense(corner_t n0, corner_t n1, const Elt p[], size_t ldp)
-      : n0_(n0), n1_(n1), v_(n0 * n1) {
-    for (corner_t i1 = 0; i1 < n1; ++i1) {
-      Blas<Field>::copy(n0, v_[i1 * n0], 1, &p[i1 * ldp], 1);
-    }
-  }
-
   Dense(const Dense& y) = delete;
   Dense(const Dense&& y) = delete;
   Dense operator=(const Dense& y) = delete;
@@ -72,24 +64,29 @@ class Dense {
   void clear(const Field& F) { Blas<Field>::clear(n0_ * n1_, &v_[0], 1, F); }
 
   // For a given random number r, the binding operation computes
-  //   v[i] = (1 - r) * v[2 * i] + r * v[2 * i + 1]
-  //        = v[2 * i] + r * (v[2 * i + 1] - v[2 * i])
-  // and shrinks the array v by half.
-  void bind(const Elt& r, const Field& F) {
+  //   this[i] = (1 - r) * in[2 * i] + r * in[2 * i + 1]
+  //           = in[2 * i] + r * (in[2 * i + 1] - in[2 * i])
+  // This method works even in-place, i.e., if &in == this.
+  void bind(const Elt& r, const Dense& in, const Field& F) {
+    const corner_t n0_out = (in.n0_ + 1u) / 2u;
+    check(n1_ == in.n1_, "n1_ == in.n1_");
+    check(n0_ >= n0_out, "n0_ >= n0_out");
     corner_t rd = 0, wr = 0;
     for (corner_t i1 = 0; i1 < n1_; ++i1) {
       corner_t i0 = 0;
-      while (2 * i0 + 1 < n0_) {
-        v_[wr] = affine_interpolation(r, v_[rd], v_[rd + 1], F);
+      while (2 * i0 + 1 < in.n0_) {
+        v_[wr] = affine_interpolation(r, in.v_[rd], in.v_[rd + 1], F);
         i0++, rd += 2, wr += 1;
       }
-      if (2 * i0 < n0_) {
-        v_[wr] = affine_interpolation(r, v_[rd], F.zero(), F);
+      if (2 * i0 < in.n0_) {
+        v_[wr] = affine_interpolation_nz_z(r, in.v_[rd], F);
         i0++, rd++, wr++;
       }
     }
-    n0_ = (n0_ + 1u) / 2u;
+    n0_ = n0_out;
   }
+
+  void bind(const Elt& r, const Field& F) { bind(r, *this, F); }
 
   void bind_all(size_t logv, const Elt r[/*logv*/], const Field& F) {
     for (size_t v = 0; v < logv; ++v) {
@@ -113,18 +110,6 @@ class Dense {
         F.mul(v_[ndx++], x_last);
       }
     }
-  }
-
-  Elt at_corners(corner_t p0, corner_t p1, const Field& F) const {
-    if (p0 < n0_) {
-      return v_[p1 * n0_ + p0];
-    } else {
-      return F.zero();
-    }
-  }
-
-  T2 t2_at_corners(corner_t p0, corner_t p1, const Field& F) const {
-    return T2{at_corners(p0, p1, F), at_corners(p0 + 1, p1, F)};
   }
 
   // The precondition for reshaping is that the first dimension must be
@@ -152,6 +137,7 @@ class Dense {
 template <class Field>
 class DenseFiller {
   using Elt = typename Field::Elt;
+  using CElt = typename Field::CElt;
 
  public:
   // Caller must ensure that W remains valid.
@@ -165,6 +151,8 @@ class DenseFiller {
     w_.v_[pos_++] = x;
     return *this;
   }
+
+  DenseFiller& push_back(const CElt& x) { return push_back(x.e); }
 
   template <size_t N>
   DenseFiller& push_back(const std::array<Elt, N>& a) {

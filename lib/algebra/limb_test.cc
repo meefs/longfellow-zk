@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstdlib>
 
+#include "algebra/sysdep.h"
 #include "gtest/gtest.h"
 
 namespace proofs {
@@ -69,6 +70,25 @@ TEST(Limb, Array) {
     EXPECT_EQ(bytes[i], i + 1);
   }
   EXPECT_EQ(bytes[31], 0u);
+}
+
+TEST(Limb, Bit) {
+  constexpr size_t W = 4;
+  std::array<uint64_t, W> k = {1, 0, 0, 0};
+  Limb<W> kk(k);
+  EXPECT_EQ(kk.bit(0), 1);
+  EXPECT_EQ(kk.bit(1), 0);
+  EXPECT_EQ(kk.bit(256), 0);
+}
+
+TEST(Limb, cmovnz) {
+  using limb_t = Limb<1>::limb_t;
+  limb_t a[1] = {1};
+  limb_t b[1] = {2};
+  cmovnz(1, a, limb_t(0), b);
+  EXPECT_EQ(a[0], 1);
+  cmovnz(1, a, limb_t(1), b);
+  EXPECT_EQ(a[0], 2);
 }
 
 }  // namespace

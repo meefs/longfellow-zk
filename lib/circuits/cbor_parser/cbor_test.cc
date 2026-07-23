@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -146,11 +146,12 @@ TEST(CBOR, VerifyParseSize) {
 
     for (size_t j = 0; j < n; ++j) {
       inC[j] = LC.vinput<8>();
-      pwC[j].encoded_sel_header = Q.input();
+      pwC[j].encoded_sel_header = LC.eltw_input();
     }
-    gwC.invprod_decode = Q.input();
+    gwC.invprod_decode = LC.eltw_input();
     gwC.cc0_counter = CTRC.input();
-    gwC.invprod_parse = Q.input();
+    gwC.neg_cc0_counter = CTRC.input();
+    gwC.invprod_parse = LC.eltw_input();
 
     std::vector<CborC::decode> dsC(n);
     std::vector<CborC::parse_output> psC(n);
@@ -162,7 +163,7 @@ TEST(CBOR, VerifyParseSize) {
     size_t nout = 0;
     for (size_t j = 0; j < n; ++j) {
       for (size_t l = 0; l < kNCounters; ++l) {
-        Q.output(psC[j].c[l].e, nout++);
+        LC.output(psC[j].c[l].e, nout++);
       }
     }
 

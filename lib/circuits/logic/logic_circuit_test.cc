@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 #include <memory>
 #include <vector>
 
-#include "algebra/bogorng.h"
 #include "arrays/dense.h"
 #include "circuits/compiler/circuit_dump.h"
 #include "circuits/compiler/compiler.h"
@@ -50,10 +49,10 @@ std::unique_ptr<Circuit<Field>> mk_add_circuit(size_t w, size_t nc,
   std::vector<BitWC> b(w);
   std::vector<BitWC> c(w + 1);
   for (size_t i = 0; i < w; ++i) {
-    a[i] = BitWC(Q.input(), F);
+    a[i] = LC.input();
   }
   for (size_t i = 0; i < w; ++i) {
-    b[i] = BitWC(Q.input(), F);
+    b[i] = LC.input();
   }
   BitWC carry;
   const char* name;
@@ -76,9 +75,9 @@ std::unique_ptr<Circuit<Field>> mk_add_circuit(size_t w, size_t nc,
       break;
   }
   for (size_t i = 0; i < w; ++i) {
-    Q.output(LC.eval(c[i]), i);
+    LC.output(c[i], i);
   }
-  Q.output(LC.eval(carry), w);
+  LC.output(carry, w);
 
   auto CIRCUIT = Q.mkcircuit(nc);
   dump_info<Field>(name, w, Q);
@@ -148,14 +147,14 @@ std::unique_ptr<Circuit<Field>> mk_multiplier_circuit(size_t w, size_t nc) {
   std::vector<BitWC> b(w);
   std::vector<BitWC> c(2 * w);
   for (size_t i = 0; i < w; ++i) {
-    a[i] = BitWC(Q.input(), F);
+    a[i] = LC.input();
   }
   for (size_t i = 0; i < w; ++i) {
-    b[i] = BitWC(Q.input(), F);
+    b[i] = LC.input();
   }
   LC.multiplier(w, c.data(), a.data(), b.data());
   for (size_t i = 0; i < 2 * w; ++i) {
-    Q.output(LC.eval(c[i]), i);
+    LC.output(c[i], i);
   }
   auto CIRCUIT = Q.mkcircuit(nc);
   dump_info<Field>("multiplier", w, Q);
@@ -172,8 +171,11 @@ TEST(Logic_Circuit, Multiplier) {
   set_log_level(INFO);
   constexpr size_t nc = 1;
 
+  BitW ab[64], bb[64], cb[128];
+
   // for all widths w x w -> 2w
   for (size_t w = 1; w <= 8; ++w) {
+    log(INFO, "w: %zu", w);
     auto CIRCUIT = mk_multiplier_circuit(w, nc);
 
     // Test 1: verify the circuit for all w-bit boolean inputs
@@ -186,44 +188,23 @@ TEST(Logic_Circuit, Multiplier) {
         for (size_t i = 0; i < w; ++i) {
           W->v_[1 + i] = L.eval(L.bit((a >> i) & 1)).elt();
           W->v_[w + 1 + i] = L.eval(L.bit((b >> i) & 1)).elt();
+          ab[i] = BitW(L.konst((a >> i) & 1), F);
+          bb[i] = BitW(L.konst((b >> i) & 1), F);
         }
 
         Prover<Field>::inputs in;
         Prover<Field> prover(F);
         auto V = prover.eval_circuit(&in, CIRCUIT.get(), W->clone(), F);
+        L.multiplier(w, cb, ab, bb);
 
         size_t c = a * b;
         size_t outputw = (w == 1) ? 1 : 2 * w;
-        EXPECT_EQ(outputw, V->n1_);
+        // For the special case of w == 1, the assert_bit checks add outputs.
+        if (w > 1) { EXPECT_EQ(outputw, V->n1_); }
         for (size_t i = 0; i < outputw; ++i) {
           EXPECT_EQ(V->v_[i], L.eval(L.bit((c >> i) & 1)).elt());
+          EXPECT_EQ(V->v_[i], L.eval(cb[i]).elt());
         }
-      }
-    }
-
-    // Test 2: compare against the reference implementation for
-    // random field elements, to verify that the arithmetization
-    // is the same.
-    Bogorng<Field> rng(&F);
-    BitW a[64], b[64], c[128];
-    auto W = std::make_unique<Dense<Field>>(
-        nc, /*constant one*/ 1 + /*a*/ w + /*b*/ w);
-    for (size_t round = 0; round < 10; ++round) {
-      W->v_[0] = F.one();
-      for (size_t i = 0; i < w; ++i) {
-        a[i] = BitW(L.konst(W->v_[1 + i] = rng.next()), F);
-        b[i] = BitW(L.konst(W->v_[w + 1 + i] = rng.next()), F);
-      }
-
-      Prover<Field>::inputs in;
-      Prover<Field> prover(F);
-      auto V = prover.eval_circuit(&in, CIRCUIT.get(), W->clone(), F);
-
-      L.multiplier(w, c, a, b);
-      size_t outputw = (w == 1) ? 1 : 2 * w;
-      EXPECT_EQ(outputw, V->n1_);
-      for (size_t i = 0; i < outputw; ++i) {
-        EXPECT_EQ(V->v_[i], L.eval(c[i]).elt());
       }
     }
   }
@@ -244,8 +225,8 @@ TEST(Logic_Circuit, Comparison) {
       std::vector<BitWC> a(n), b(n);
 
       for (size_t i = 0; i < n; ++i) {
-        a[i] = BitWC(Q.input(), F);
-        b[i] = BitWC(Q.input(), F);
+        a[i] = LC.input();
+        b[i] = LC.input();
       }
 
       BitWC r;
@@ -265,7 +246,7 @@ TEST(Logic_Circuit, Comparison) {
           break;
       }
 
-      Q.output(LC.eval(r), 0);
+      LC.output(r, 0);
 
       auto CIRCUIT = Q.mkcircuit(/*nc=*/1);
       dump_info<Field>(name, n, Q);
@@ -287,7 +268,7 @@ void mk_gf2_polymul(size_t w, const Field& f) {
   }
   LC.gf2_polynomial_multiplier_karat(w, c2.data(), a.data(), b.data());
   for (size_t i = 0; i < 2 * w; ++i) {
-    Q.output(LC.eval(c2[i]), i);
+    LC.output(c2[i], i);
   }
   auto CIRCUIT = Q.mkcircuit(1);
   dump_info<Field>("GF2^k mul", w, Q);

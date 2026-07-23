@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,8 @@
 #include "circuits/mdoc/mdoc_zk.h"
 #include "ec/p256.h"
 #include "gf2k/gf2_128.h"
-#include "proto/circuit.h"
+#include "proto/circuit_io.h"
+#include "proto/circuit_writer.h"
 #include "sumcheck/circuit_id.h"
 #include "util/crypto.h"
 #include "util/log.h"
@@ -90,7 +91,7 @@ CircuitGenerationErrorCode generate_circuit(const ZkSpecStruct* zk_spec,
     const LogicCircuit lc(&cbk, p256_base);
     MdocSignature mdoc_s(lc, p256, n256_order);
 
-    EltW pkX = Q.input(), pkY = Q.input(), htr = Q.input();
+    EltW pkX = lc.eltw_input(), pkY = lc.eltw_input(), htr = lc.eltw_input();
     MACTag mac[7]; /* 3 macs + av */
     for (size_t i = 0; i < 7; ++i) {
       mac[i] = lc.vinput<128>();
@@ -99,13 +100,13 @@ CircuitGenerationErrorCode generate_circuit(const ZkSpecStruct* zk_spec,
 
     // Allocate this large object on heap.
     auto w = std::make_unique<MdocSignature::Witness>();
-    w->input(Q, lc);
+    w->input(lc);
     mdoc_s.assert_signatures(pkX, pkY, htr, &mac[0], &mac[2], &mac[4], mac[6],
                              *w);
 
     auto circ = Q.mkcircuit(/*nc=*/1);
     dump_info("sig", Q);
-    CircuitRep<Fp256Base> cr(p256_base, P256_ID);
+    CircuitWriter<Fp256Base> cr(p256_base, P256_ID);
     cr.to_bytes(*circ, bytes);
     uint8_t id[kSHA256DigestSize];
     char buf[100];
@@ -143,7 +144,7 @@ CircuitGenerationErrorCode generate_circuit(const ZkSpecStruct* zk_spec,
 
     MACTag mac[7]; /* 3 macs + av */
     for (size_t i = 0; i < 7; ++i) {
-      mac[i] = Q.input();
+      mac[i] = lc.eltw_input();
     }
 
     Q.private_input();
@@ -153,12 +154,12 @@ CircuitGenerationErrorCode generate_circuit(const ZkSpecStruct* zk_spec,
 
     // Allocate this large object on heap.
     auto w = std::make_unique<MdocHash::Witness>(number_of_attributes);
-    w->input(Q, lc);
+    w->input(lc);
 
     Q.begin_full_field();
     MACWitness macw[3]; /* MACs for e, dpkx, dpky */
     for (size_t i = 0; i < 3; ++i) {
-      macw[i].input(lc, Q);
+      macw[i].input(lc);
     }
 
     mdoc_h.assert_valid_hash_mdoc(oa.data(), now, e, dpkx, dpky, *w);
@@ -170,7 +171,7 @@ CircuitGenerationErrorCode generate_circuit(const ZkSpecStruct* zk_spec,
 
     auto circ = Q.mkcircuit(/*nc=*/1);
     dump_info("hash", Q);
-    CircuitRep<f_128> cr(Fs, GF2_128_ID);
+    CircuitWriter<f_128> cr(Fs, GF2_128_ID);
     cr.to_bytes(*circ, bytes);
     uint8_t id[kSHA256DigestSize];
     char buf[100];
@@ -188,6 +189,11 @@ CircuitGenerationErrorCode generate_circuit(const ZkSpecStruct* zk_spec,
   uint8_t* buf = (uint8_t*)malloc(buf_size);
 
   size_t zl = ZSTD_compress(buf, buf_size, src, sz, 16);
+  if (ZSTD_isError(zl)) {
+    log(ERROR, "ZSTD_compress failed: %s", ZSTD_getErrorName(zl));
+    free(buf);
+    return CIRCUIT_GENERATION_ZLIB_FAILURE;
+  }
   log(INFO, "zstd from %zu --> %zu", sz, zl);
   *clen = zl;
   *cb = buf;

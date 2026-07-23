@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
 #include <string>
 
 #include "gtest/gtest.h"
@@ -34,6 +35,50 @@ TEST(Nat, Lt) {
       }
     }
   }
+}
+
+TEST(Nat, Equality) {
+  constexpr size_t W = 4;
+  std::array<uint64_t, W> a64_1 = {1, 2, 3, 4};
+  std::array<uint64_t, W> a64_2 = {1, 2, 3, 4};
+  std::array<uint64_t, W> a64_3 = {5, 2, 3, 4};
+  std::array<uint64_t, W> a64_4 = {1, 2, 3, 5};
+  std::array<uint64_t, W> a64_5 = {1, 5, 3, 4};
+
+  Nat<W> a1(a64_1);
+  Nat<W> a2(a64_2);
+  Nat<W> a3(a64_3);
+  Nat<W> a4(a64_4);
+  Nat<W> a5(a64_5);
+
+  EXPECT_TRUE(a1 == a2);
+  EXPECT_FALSE(a1 != a2);
+
+  EXPECT_FALSE(a1 == a3);
+  EXPECT_TRUE(a1 != a3);
+
+  EXPECT_FALSE(a1 == a4);
+  EXPECT_TRUE(a1 != a4);
+
+  EXPECT_FALSE(a1 == a5);
+  EXPECT_TRUE(a1 != a5);
+}
+
+TEST(Nat, Cmovnz) {
+  constexpr size_t W = 4;
+  std::array<uint64_t, W> a64_1 = {1, 2, 3, 4};
+  std::array<uint64_t, W> a64_2 = {5, 6, 7, 8};
+
+  Nat<W> a1(a64_1);
+  Nat<W> a2(a64_2);
+
+  // nz = 0, should not move
+  a1.cmovnz(0, a2);
+  EXPECT_EQ(a1, Nat<W>(a64_1));
+
+  // nz != 0, should move
+  a1.cmovnz(1, a2);
+  EXPECT_EQ(a1, Nat<W>(a64_2));
 }
 
 void oneTestInvModB64(uint64_t i) {
@@ -97,6 +142,38 @@ TEST(Nat, Parsing) {
   }
 }
 
+TEST(Nat, OfBytesMasking) {
+  uint8_t buf[32] = {
+      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+  };
+
+  Nat<4> a0 = Nat<4>::of_bytes(buf, 0);
+  std::array<uint64_t, 4> expected_0 = {0, 0, 0, 0};
+  EXPECT_EQ(a0, Nat<4>(expected_0));
+
+  Nat<4> a10 = Nat<4>::of_bytes(buf, 10);
+  std::array<uint64_t, 4> expected_10 = {0x3ff, 0, 0, 0};
+  EXPECT_EQ(a10, Nat<4>(expected_10));
+
+  Nat<4> a64 = Nat<4>::of_bytes(buf, 64);
+  std::array<uint64_t, 4> expected_64 = {~0ull, 0, 0, 0};
+  EXPECT_EQ(a64, Nat<4>(expected_64));
+
+  Nat<4> a65 = Nat<4>::of_bytes(buf, 65);
+  std::array<uint64_t, 4> expected_65 = {~0ull, 1ull, 0, 0};
+  EXPECT_EQ(a65, Nat<4>(expected_65));
+
+  Nat<4> a256 = Nat<4>::of_bytes(buf, 256);
+  std::array<uint64_t, 4> expected_256 = {~0ull, ~0ull, ~0ull, ~0ull};
+  EXPECT_EQ(a256, Nat<4>(expected_256));
+
+  Nat<4> a250 = Nat<4>::of_bytes(buf, 250);
+  std::array<uint64_t, 4> expected_250 = {~0ull, ~0ull, ~0ull, (~0ull) >> 6};
+  EXPECT_EQ(a250, Nat<4>(expected_250));
+}
+
 TEST(Nat, BadStrings) {
   const char* bad_strings[] = {
       "123456789abcdef",
@@ -111,21 +188,66 @@ TEST(Nat, BadStrings) {
       "559743559744",
       "0x40000000000000000001230000000000000000000000000000000000000000000",
       "000000000000000000000000000000000000000000000000000000000000000000000000"
+      "000000000000",
+      "000000000000000000000000000000000000000000000000000000000000000000000000"
+      "000000000000000000000000000000000000000000000000000000000000000000000000"
+      "000000000000000000000000000000000000000000000000000000000000000000000000"
+      "000000000000000000000000000000000000000000000000000000000000000000000000"
       "000000000000"};
 
   for (auto s : bad_strings) {
     EXPECT_FALSE(Nat<4>::of_untrusted_string(s).has_value());
   }
 }
-
-TEST(Nat, BadDigits) {
-  std::string ok = "0123456789abcdefABCDEF";
-  for (uint8_t i = 0; i < (uint8_t)256; ++i) {
-    if (ok.find((char)i) == std::string::npos) {  // bad char
-      EXPECT_DEATH(digit((char)i), "bad char");
-    }
-  }
+TEST(Nat, OfUntrustedStringValid) {
+  EXPECT_TRUE(Nat<4>::of_untrusted_string("123").has_value());
+  EXPECT_TRUE(Nat<4>::of_untrusted_string("0x123").has_value());
 }
 
+TEST(Nat, BadDigits) {
+#if GTEST_HAS_DEATH_TEST
+  std::string ok = "0123456789abcdefABCDEF";
+  for (int i = 0; i < 256; ++i) {
+    if (ok.find((char)i) == std::string::npos) {  // bad char
+      EXPECT_DEATH(digit((char)i, 16), "malformed numeral in digit()");
+    }
+  }
+#endif
+}
+
+TEST(Nat, HexConstructor) {
+  Nat<4> a("0x123");
+  EXPECT_EQ(a, Nat<4>(0x123));
+}
+
+TEST(Nat, SafeDigit) {
+  EXPECT_EQ(Nat<4>::safe_digit('a', 16), 10);
+  EXPECT_EQ(Nat<4>::safe_digit('f', 16), 15);
+  EXPECT_EQ(Nat<4>::safe_digit('A', 16), 10);
+  EXPECT_EQ(Nat<4>::safe_digit('F', 16), 15);
+  EXPECT_EQ(Nat<4>::safe_digit('g', 16), std::nullopt);
+  EXPECT_EQ(Nat<4>::safe_digit('a', 10), std::nullopt);
+}
+
+TEST(Nat, Mac) {
+  Nat<7> x0(
+      "517835747231732571055700242267476699445599991014293874043770673009736418"
+      "319355426800783126426313250794243736876478687882834552785274424");
+  Nat<7> x1(
+      "265698378596752409274468775526417991472098440170551824073481871778386722"
+      "913209609236036186716023225657042079764866802434203826683658971");
+  Nat<3> y0("1382671749894535144010909422662533056521765121622895501208");
+  Nat<3> y1("1377946747250438726825241758610770705393803865916727756166");
+
+  Nat<11> A{};
+  A.mac(x0, y0);
+  A.mac(y1, x1);
+
+  Nat<11> want(
+      "108211507531995442782525523396986013069402523058333784214531918085827642"
+      "970472166166463862496282223644760866705319365358260683968893875643430362"
+      "8461357634762598004381688257001613709322889969378");
+  EXPECT_EQ(A, want);
+}
 }  // namespace
 }  // namespace proofs

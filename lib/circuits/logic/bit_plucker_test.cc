@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,14 +30,13 @@
 namespace proofs {
 namespace {
 
-template <class Field>
-void test_plucker(const Field &F) {
+template <size_t LOGN, class Field>
+void test_plucker(const Field& F) {
   using EvalBackend = EvaluationBackend<Field>;
   using Logic = Logic<Field, EvalBackend>;
 
   const EvalBackend ebk(F);
   const Logic L(&ebk, F);
-  constexpr size_t LOGN = 5;
   constexpr size_t N = 1 << LOGN;
   const BitPluckerEncoder<Field, LOGN> PE(F);
   const BitPlucker<Logic, LOGN> P(L);
@@ -52,10 +51,22 @@ void test_plucker(const Field &F) {
 }
 
 TEST(BitPlucker, PluckPrimeField) {
-  test_plucker(Fp<1>("18446744073709551557"));
+  const Fp<1> F("18446744073709551557");
+  test_plucker<1>(F);
+  test_plucker<2>(F);
+  test_plucker<3>(F);
+  test_plucker<4>(F);
+  test_plucker<5>(F);
 }
 
-TEST(BitPlucker, PluckBinaryField) { test_plucker(GF2_128<>()); }
+TEST(BitPlucker, PluckBinaryField) {
+  const GF2_128<> F;
+  test_plucker<1>(F);
+  test_plucker<2>(F);
+  test_plucker<3>(F);
+  test_plucker<4>(F);
+  test_plucker<5>(F);
+}
 
 template <size_t LOGN, class Field>
 void pluck_size(const char *name, const Field &F) {
@@ -71,10 +82,10 @@ void pluck_size(const char *name, const Field &F) {
   const LogicCircuit LC(&cbk, F);
   const BitPlucker<LogicCircuit, LOGN> PC(LC);
 
-  auto eC = Q.input();
+  auto eC = LC.eltw_input();
   auto r = PC.pluck(eC);
   for (size_t k = 0; k < LOGN; ++k) {
-    Q.output(LC.eval(r[k]), k);
+    LC.output(r[k], k);
   }
   auto CIRCUIT = Q.mkcircuit(/*nc=*/1);
   dump_info(name, LOGN, Q);
@@ -133,17 +144,10 @@ TEST(BitPlucker, EltMuxer) {
   for (size_t i = 0; i < 8; ++i) {
     auto enc = bit_plucker_point<Field, 8>()(i, F);
 
-    EltW range = em_z.mux(L.konst(enc));
-    L.assert_eq(&range, arr_z[i]);
-
-    range = em_e.mux(L.konst(enc));
-    L.assert_eq(&range, arr_e[i]);
-
-    range = em_r.mux(L.konst(enc));
-    L.assert_eq(&range, arr_r[i]);
-
-    range = em_s.mux(L.konst(enc));
-    L.assert_eq(&range, arr_s[i]);
+    L.assert_eq(em_z.mux(L.konst(enc)), arr_z[i]);
+    L.assert_eq(em_e.mux(L.konst(enc)), arr_e[i]);
+    L.assert_eq(em_r.mux(L.konst(enc)), arr_r[i]);
+    L.assert_eq(em_s.mux(L.konst(enc)), arr_s[i]);
   }
 }
 
@@ -167,12 +171,10 @@ TEST(BitPlucker, EltMuxer9) {
   const EltMuxer<Logic, 9, 8> em2(L, arr_v);
   for (size_t i = 0; i < 128 + /*intentional extra element*/ 1; ++i) {
     auto enc = bit_plucker_point<Field, 8>()(i, F);
-    EltW range = em2.mux(L.konst(enc));
     if (i < 9) {
-      L.assert_eq(&range, arr_v[i]);
+      L.assert_eq(em2.mux(L.konst(enc)), arr_v[i]);
     } else {
-      auto ee = range.elt();
-      EXPECT_NE(ee, F.zero());
+      EXPECT_NE(em2.mux(L.konst(enc)).elt(), F.zero());
     }
   }
 }

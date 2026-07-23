@@ -19,27 +19,29 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
+#include <absl/cleanup/cleanup.h>
+#include <absl/flags/flag.h>
+#include <absl/flags/parse.h>
 
-#include "base/init_google.h"
-#include "file/base/path.h"
 #include "circuits/mdoc/mdoc_zk.h"
+#include "util/log.h"
 #include "util/panic.h"
 #include "util/readbuffer.h"
 #include "zk/zk_common.h"
-#include "third_party/absl/cleanup/cleanup.h"
-#include "third_party/absl/flags/flag.h"
-#include "third_party/absl/flags/parse.h"
 #include "circuits/mdoc/mdoc_decompress.h"
 #include "ec/p256.h"
 #include "gf2k/gf2_128.h"
 #include "ligero/ligero_param.h"
-#include "proto/circuit.h"
+#include "proto/circuit_io.h"
+#include "proto/circuit_reader.h"
+
 
 
 ABSL_FLAG(std::string, output_dir, "circuits",
@@ -88,12 +90,12 @@ void optimize_params(const uint8_t* circuit_bytes, size_t circuit_len,
   proofs::check(full_size > 0, "Circuit decompression failed");
   proofs::ReadBuffer rb_circuit(bytes.data(), full_size);
 
-  proofs::CircuitRep<proofs::Fp256Base> cr_s(proofs::p256_base,
+  proofs::CircuitReader<proofs::Fp256Base> cr_s(proofs::p256_base,
                                              proofs::P256_ID);
   auto c_sig = cr_s.from_bytes(rb_circuit, false);
   proofs::check(c_sig != nullptr, "Signature circuit could not be parsed");
 
-  proofs::CircuitRep<f_128> cr_h(Fs, proofs::GF2_128_ID);
+  proofs::CircuitReader<f_128> cr_h(Fs, proofs::GF2_128_ID);
   auto c_hash = cr_h.from_bytes(rb_circuit, false);
   proofs::check(c_hash != nullptr, "Hash circuit could not be parsed");
 
@@ -130,7 +132,7 @@ void optimize_params(const uint8_t* circuit_bytes, size_t circuit_len,
   std::cout << "   sig   best parameters: be:" << sig_best_block_enc
             << " sz:" << min_proof_size << std::endl;
 
-  std::cout << "{" << zk_spec->system << "\"" << circuit_id_hex << "\", "
+  std::cout << "{\"" << zk_spec->system << "\", \"" << circuit_id_hex << "\", "
             << zk_spec->num_attributes << ", " << zk_spec->version << ", "
             << best_block_enc << ", " << sig_best_block_enc << "},"
             << std::endl;
@@ -149,8 +151,8 @@ const ZkSpecStruct* FindZkSpecByNumAttributes(int n_attrs) {
 }
 
 int main(int argc, char* argv[]) {
-  InitGoogle(argv[0], &argc, &argv, true);
   absl::ParseCommandLine(argc, argv);
+  proofs::set_log_level(proofs::ERROR);
 
   std::string output_dir_path = absl::GetFlag(FLAGS_output_dir);
   int n_attributes_requested = absl::GetFlag(FLAGS_num_attributes);
@@ -215,8 +217,8 @@ int main(int argc, char* argv[]) {
   std::cout << "Circuit ID (hex): " << circuit_id_hex << std::endl;
 
   // Write circuit bytes to file.
-  std::string output_file_path =
-      file::JoinPath(output_dir_path, circuit_id_hex);
+  namespace fs = std::filesystem;
+  std::string output_file_path = (fs::path(output_dir_path) / fs::path(circuit_id_hex)).string();
   std::cout << "Writing circuit to: " << output_file_path << std::endl;
   std::ofstream out_file(output_file_path, std::ios::binary | std::ios::trunc);
   if (!out_file.is_open()) {

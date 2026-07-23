@@ -87,13 +87,13 @@ This section describes operations on and associated with polynomials
 that are used in the main protocol.
 
 
-### Extend method in Field F_p
+### Extend method in Field F_p 
 
 The `extend(f, n, m)` method interprets the array `f[0..n]` as the evaluations of a polynomial `P` of degree less than `n` at the points `0,...,n-1`, and returns the evaluations of the same `P` at the points `0,...,m-1`.  For sufficiently large fields `|F_p| = p >= m`, polynomial `P` is uniquely determined by the input, and thus `extend` is well defined.
 
 As there are several algorithms for efficiently performing the extend operation, the implementor can choose a suitable one.  In some cases, the brute force method of using Lagrange interpolation formulas to compute each output point independently may suffice.  One can employ a convolution to implement the `extend` operation, and in some cases, either the Number Theoretic Transform or Nussbaumer's algorithm can be used to efficiently compute a convolution.
 
-### Extend method in Field GF 2^k
+### Extend method in Field GF 2^k {#gf2k}
 
 The previous section described an extend method that applies to odd prime-order finite fields which contain the elements 0,1,2...,m.  In the special case of GF(2^k), the extend operator is defined in an opinionated way inspired by the Additive FFT algorithm by Lin et al [@additivefft].
 Lin et al. define a novel polynomial basis for polynomials as an alternative to the usual monomial
@@ -134,7 +134,7 @@ erasure codes</title>
 </reference>
 
 # Fiat-Shamir primitives
-A ZK protocol must in general be interactive whereby the Prover and Verifier engage in multiple rounds of communication.  However, in practice, it is often more convenient to deploy so-called ``non-interactive" protocols that only require a single message from Prover to Verifier.  It is possible to apply the Fiat-Shamir heuristic to transform a special class of interactive protocols into single-message protocols from Prover to Verifier.
+A ZK protocol may in general be interactive whereby the Prover and Verifier engage in multiple rounds of communication.  However, in practice, it is often more convenient to deploy a so-called non-interactive or single-message protocol that only requires a single message from Prover to Verifier.  It is possible to apply the Fiat-Shamir heuristic to transform a special class of interactive protocols into single-message protocols.
 
 The Fiat-Shamir transform is a method for generating a verifier's public coin challenges by processing the concatenation of all of the Prover's messages.   The transform can be proven to be sound when applied to an interactive protocol that is round-by-round sound and when the oracle is implemented with a hash function that satisfies a correlation-intractability property with respect to the state function implied by the round-by-round soundness.  See Theorem 5.8 of [@rbr] for details.
 
@@ -161,78 +161,81 @@ As an additional property, each query to the random oracle should be able to be 
     </front>
 </reference>
 
-## Implementation
-Let `H` be a collision-resistant hash function.
-A protocol consists of multiple rounds in which a Prover sends a message, and a verifier responds with a public-coin or random challenge. The Fiat-Shamir transform for such a protocol is implemented by maintaining a `transcript` object.
+## Implementation of a random oracle
+The Fiat-Shamir transform makes use of an ideal random oracle that maps an arbitrarily long string to a random element sampled from a specific domain. 
+A protocol consists of multiple rounds in which a Prover sends a message, and a verifier responds with a public-coin or random challenge. The Fiat-Shamir transform for such a protocol is implemented by maintaining a `transcript` object. The `transcript` object is parameterized by a collision-resistant hash function `H` that is specified externally. For example, the SHA-256 function is a suitable choice.
+
+The `transcript` object maintains an internal string `tr` that begins as the empty string.
 
 ### Initialization
 At the beginning of the protocol, the transcript object must be initialized.
 
 *  `transcript.init(session_id)`: The initialization begins by
    selecting an oracle, which concretely consists of selecting a fresh
-   session identifier. This process is handled by the encapsulating
+   session identifier nonce. This process is handled by the encapsulating
    protocol---for example, the transcript that is used for key
    exchange for a session can be used as the session identifier as it
    is guaranteed to be unique.
-
+   The `session_id` byte string is appended to the end of `tr` following the append conventions.
+   This method must be called exactly once before any other method on the `transcript` object is invoked.
+   
 ### Writing to the transcript
 The transcript object supports a `write` method that is used to record
-the Prover's messages.  To produce the verifier's challenge message, the transcript object internally maintains a Fiat-Shamir Pseudo-random Function (FSPRF) object that
-generates a stream of pseudo-random bytes.  Each invocation of
-`write` creates a new FSPRF object, which we denote by `fs`.
+the Prover's messages.
 
 *  `transcript.write(msg)`: appends the Prover's next message to
-the transcript.
+the end of the `tr` string that is maintained by the transcript.
 
-There are three types of messages that can be appended to the transcript: a field element, an array of bytes, or an array of field elements.  
+There are three types of messages that can be appended to the transcript: a field element, an array of bytes, or an array of field elements.
 
-* To append a field element, first the byte designator `0x1` is appended, and then the canonical byte serialization of the field element is appended.  
+* To append a field element, first the byte designator `0x1` is appended to `tr`, and then the canonical byte serialization of the field element is appended to `tr`.  
 
 * To append an array of bytes, first the byte designator `0x2` is
 appended, an 8-byte little-endian encoding of the number of bytes in
-the array is appended, and then the bytes of the array are appended.
+the array is appended, and then the bytes of the array are appended to `tr`.
 
 * To append an array of field elements, the byte designator `0x3` is
-added, an 8-byte little-endian encoding of the number of field
+appended, an 8-byte little-endian encoding of the number of field
 elements is appended, and finally, all of the field elements in array
-order are serialized and appended.
+order are serialized and appended to `tr`.
 
 ### Special rules for the first message
-The `write` method for the first prover message incorporates
-additional steps that enhance the correlation-intractability property
-of the oracle.  To process the Prover's first message (which is usually a
-commitment):
+When used in the Longfellow system, the `write` method for the first prover message incorporates
+additional steps that enhance the correlation-intractability property of the oracle.  To process the Prover's first message:
 
-1.  The Prover message is appended to the transcript. Specifically, the length of the message, as per the above convention, is appended, and then the bytes of the message are appended.
+1.  The Prover message is appended to `tr`. Specifically, the length of the message, as per the above convention, is appended, and then the bytes of the message are appended.
 2.  Next, an encoding of the statement to be proven, which consists of
     the circuit identifier, and a serialization of the input and
     output of the statement is appended. Each of these three message are added as
-    byte sequences, with their length appended as per convention.
+    byte sequences, with their length appended first as per convention.
 3.  Finally, the transcript is augmented by the byte-array 0^|C|^,
     which consists of |C| bytes of zeroes. 
 
-One might at first think of performing steps 2 and 3 first so as to
+One might think of performing steps 2 and 3 first so as to
 simplify the description of the protocol, and moreover step 3 may
 appear to be unnecessary.  Performing the steps in the indicated order
 protects against the attack described in [@krs], under the assumption
-that it is infeasible for a circuit C that contains |C| arithmetic
-gates to compute the hash of a string of length |C|.
+that it is infeasible for a circuit `C` that contains `|C|` arithmetic
+gates to compute the hash of a string (with a random prefix) of length 
+greater than `|C|`.
 
 Subsequent calls to the `write` method are used to record the Prover's
 response messages `msg`. In this case, the message is appended
 following the conventions described above.
 
 ## The FSPRF object
-Each `write` internally creates an FSPRF object `fs` that is seeded
-with the hash digest of the transcript at the end of the write
-operation.
+To produce the verifier's challenge message, the transcript object internally maintains a Fiat-Shamir Pseudo-random Function (FSPRF) object that generates a stream of pseudo-random bytes.
+
+Each invocation of `write` defines an FSPRF object `fs` as follows.
+First, the append operations described above for each type of `write` are performed, resulting in a new `tr` string.
+Next, a seed is generated by applying the function `H` to the (entire) string `tr`. This seed is then used to define the FSPRF object.
 
 The FSPRF object is defined to produce an infinite stream of bytes that can be used to sample all of the verifier's challenges in this round. The stream is organized in blocks of 16 bytes each,
 numbered consecutively starting at 0.  Block `i` contains
 ```
-    AES256(KEY, ID(i))
+    AES256(SEED, ID(i))
 ```
-where `KEY` is the seed of the FSPRF object, and `ID(i)` is the
+where `SEED` is the seed of the FSPRF object, and `ID(i)` is the
 16-byte little-endian representation of integer `i`.
 
 The FSPRF object supports a `bytes` method:
@@ -246,29 +249,54 @@ pseudo-random bytes from the same stream.
 ## Generating challenges
 
 When the prover has finished sending messages for a round in the interactive
-protocol, it can make a sequence of calls to `transcript.generate_{nat,field_element,challenge}` to obtain the Verifier's random challenges.   
+protocol, it can make a sequence of calls to `transcript.generate_{nat,nats_wo_replacement,field_element,challenge}` to obtain the Verifier's random challenges.   
 
 The `bytes` method of the FSPRF is used by the transcript object to sample pseudo-random field elements and
 pseudo-random integers via rejection sampling as follows:
 
 * `transcript.generate_nat(m)` generates a random natural between `0` and
-  `m-1` inclusive, as follows.
+  `m-1` inclusive, as follows. This method is defined when `m > 1`.
   
-  Let `l` be minimal such that `2^l >= m`.  Let `nbytes = ceil(l / 8)`.
-  Let `b = fs.bytes(nbytes)`.  Interpret bytes `b` as a little-endian
-  integer `k`.  Let `r = k mod 2^l`, i.e., mask off the high `8 * nbytes - l`
-  bits of `k`.  If `r < m` return `r`, otherwise start over.
+	Let `l` be minimal such that `2^l > m`.  Let `nbytes = ceil(l / 8)`.
+	Let `b = fs.bytes(nbytes)`.  Interpret bytes `b` as a little-endian integer `k`.  
+  Pick `mask` to be the minimal bitmask such that `(n & mask) == n` and set `r = k & mask`.
+  If `r < m` return `r`, otherwise start over.
+
+```
+    def generate_nat(self, m: int) -> int:
+        assert m > 0, "m must be > 0"
+
+        l = m.bit_length()
+        nbytes = math.ceil(l / 8)        
+        mask = (1 << l) - 1
+        fs = self._get_fs()
+        while True:
+            b = fs.bytes(nbytes)            
+            k = int.from_bytes(b, 'little')            
+            r = k & mask            
+            if r < m:
+                return r
+```
+
+* `transcript.generate_nats_wo_replacement(m, n)` generates a list of `n` different, random natural numbers between `0` and `m - 1` inclusive.  There are many equivalent algorithms to perform this step.  The following approach requires only `n` calls to the `generate_nat` method.
+
+```
+def generate_nats_wo_replacement(m: int, n: int) -> list[int]:
+    # assert(m > n)
+    A = list(range(0, m))
+    for i in range(0, n):
+        j = i + generate_nat(m - i)
+        A[i], A[j] = A[j], A[i]
+    return A[:n]
+``` 
     
 * `transcript.generate_field_element(F)` generates a field element.
 
-  If the field `F` is `Z / (p)`, return `generate_nat(fs, p)` interpreted
-  as a field element.
+	If the field `F` is `Z / (p)`, return `generate_nat(fs, p)` interpreted as a field element.
 
-  If the field is `GF(2)[X] / (X^128 + X^7 + X^2 + X + 1)` obtain 
-  `b = fs.bytes(16)` and interpret the 128 bits of `b` as a little-endian
-  polynomial.  This document does not specify the generation of
-  a field element for other binary fields, but extensions SHOULD follow
-  a similar pattern.
+	If the field is `GF(2)[X] / (X^128 + X^7 + X^2 + X + 1)`, obtain `b = fs.bytes(16)` and interpret the 128 bits of `b` as a little-endian polynomial.  If the field is the sub-field of the above generated by the element `g=x^{(2^{128}-1) / (2^{16}-1)}`, then obtain `b = fs.bytes(2)`. Let `b_i` represent the `i`th bit of `b` in little-endian and return the element `\sum_i b_i * \beta_i` where `\beta_i = g^i` as defined above in (#gf2k).
+
+  This document does not specify the generation of a field element for other binary fields, but extensions SHOULD follow a similar pattern.
 
 * `a = transcript.generate_challenge(F, n)` generates an array of `n`
   field elements in the straightforward way: for `0 <= i < n`
@@ -291,49 +319,40 @@ pseudo-random integers via rejection sampling as follows:
     </front>
 </reference>
 
+### Optimizations
+As described, the hash function `H` is applied to progressively longer and longer `tr` strings as the protocol evolves from round to round. In practice, most implementations of cryptographic hash functions provide a data-structure which allows incremental update of the state of the hash function while also allowing a digest to be computed at any intermediate point.
+
 {{ligero.md}}
 
 
-# Overview of the Longfellow protocol
+# Overview of the Longfellow protocol {#overview}
 
-The Longfellow ZK protocol utilizes two primitive operations. The first is a variant of the sumcheck protocol, modified to support zero knowledge. Informally, the non-padded sumcheck prover takes the description of a circuit and the concrete values of all the wires in the circuit, and produces a proof that all wires have been computed correctly.  The proof itself is a sequence of field elements.  The padded-variant of the sumcheck prover used in this document also takes as input a random and secret one-time pad and it outputs a "padded" proof such that each element in the padded proof is the difference of the element in the non-padded proof and of the element in the pad.  (The choice of "difference" instead of "sum" is a matter of convention.)
+The Longfellow ZK protocol uses two protocol components. The first is a variant of the sumcheck protocol, modified to support zero knowledge. Informally, the standard sumcheck prover takes the description of a circuit and the concrete values of all the wires in the circuit, and produces a proof that all wires have been computed correctly.  The proof itself is a sequence of field elements.  Longfellow uses an encrypted-variant of the sumcheck prover that also takes as input a random and secret one-time pad and outputs an "encrypted" proof such that each element in this proof is the difference of the element in the standard sumcheck proof and its corresponding element in the pad.  (The choice of "difference" instead of "sum" is a matter of convention.)
 
-In this padded sumcheck variant, the verifier cannot check the proof
-directly, because it cannot access the pad.  Instead of running the
+In this encrypted sumcheck variant, the verifier cannot check the proof
+directly because it cannot access the one-time pad.  Instead of running the
 sumcheck verifier directly, a commitment scheme is used to hide the
-pad, and the sumcheck verifier is translated into a sequence of linear and
-quadratic constraints on the inputs and the pad.  The commitment
-scheme then produces a proof that the constraints are satisfied.
+one-time pad, and the sumcheck verifier is translated into a sequence of linear and
+quadratic constraints on the inputs and the one-time pad.  A secondary proof system
+is then used to produce a proof with respect to the commitment that the constraints are satisfied.
 
-Some of the wires of the circuit are *inputs*, i.e., set outside the
-circuit and not computed by the circuit itself.  Some of the inputs
-are *public*, i.e., known to both parties, and some are *private*,
-i.e., known only to the prover.  Sumcheck does not use the distinction
-between public and private inputs, but this document distinguishes inputs
-from the pad.  On the contrary, the commitment scheme does not use
-public inputs at all, but it does treat private inputs and the pad
+Some of the wires of the circuit are *inputs*, i.e., set outside the circuit and not computed by the circuit itself.  Some of the inputs are *public*, i.e., known to both parties, and some are *private*, i.e., known only to the prover.  Sumcheck does not use the distinction between public and private inputs. This document distinguishes private inputs from the one-time pad.  The commitment scheme does not use public inputs at all, but it does treat private inputs and the one-time pad elements
 equally.  These constraints motivate the following terminology.
 
-* *public inputs*: inputs to the circuit known to both
-  parties.
-* *private inputs*: inputs to the circuit known to the
-  prover but not to the verifier.
-* *inputs*: both public and private inputs.  When forming
-  an array of all inputs, the public inputs come first, followed
+* *public inputs*: inputs to the circuit known to both parties.
+* *private inputs*: inputs to the circuit known to the prover but not to the verifier.
+* *inputs*: both public and private inputs.  When forming an array of all inputs, the public inputs come first, followed
   by the private inputs.
-* *witnesses*: the private inputs and the pad.  When forming
-  an array of all witnesses, the private inputs come first, followed
-  by the pad.
+* *witnesses*: the private inputs and the elements in the one-time pad.  When forming an array of all witnesses, the private inputs come first, followed by the one-time pad.
 
-Thus, at a high level, the sequence of operations in the ZK
-protocol is the following:
+Thus, at a high level, the sequence of operations in the ZK protocol is the following:
 
 1. The prover commits to all witness values.
 
-2. The prover runs the padded sumcheck prover on the witness values to producing a padded proof, and sends the padded proof to the verifier.
+2. The prover runs the encrypted sumcheck prover on the witness values to producing an encrypted proof, all-the-while sending the encrypted proof to the verifier.
 
 3. Both the prover and the verifier take the public inputs and the
-   padded proof and produce a sequence of constraints.
+   encrypted proof and produce a sequence of constraints.
 
 4. Using the commitment scheme and the witnesses, the prover generates
    a proof that the constraints from step 3 are satisfied.
@@ -342,6 +361,13 @@ protocol is the following:
    step 3 to check the constraints.
 
 Steps 2 and 3 are referred to as "sumcheck", and the rest as "commitment scheme".  While the classification of step 3 as "sumcheck" is  arbitrary, there are situations where one might want to use a commitment scheme other than the Ligero protocol specified in this document.  In this case, the "commitment scheme" can change while the "sumcheck" remains unaffected.
+
+
+## Parameters needed to define Longfellow
+Longfellow is parameterized by a sumcheck protocol, a commitment protocol, and a Fiat-Shamir instantiation.
+A selection of all three defines a `Longfellow profile`. This document introduces one opinionated profile that
+uses (a) The longfellow sumcheck described below, (b) the Ligero commitment described above, (c) the Fiat-Shamir instantiation defined
+above and using SHA-256 as the function `H`.
 
 {{sumcheck.md}}
 
@@ -374,7 +400,7 @@ GF(2^16^)                     |   0x05
 2^64 - 59                     |   0x07
 2^64 - 2^32 + 1               |   0x08
 F_{2^64 - 59}^2^              |   0x09
-secp256                       |   0x0a
+secp256k1                     |   0x0a
 F_{2^{0--15}^-byte prime}^2^  |   0xe{0--f}
 F_{2^{0--15}^-byte prime}     |   0xf{0--f}
 Table: Finite field identifiers.
@@ -432,7 +458,8 @@ def write_runs(columns, N, F2, F) {
       size_t runlen = 0
       while (ci + runlen < N &&
              runlen < kMaxRunLen &&
-             columns[ci + runlen].is_in_subfield(F2) == subfield_run) {
+             columns[ci + runlen].is_in_subfield(F2) == subfield_run
+             ) {
         ++runlen;
       }
       write_size(runlen, buf);
@@ -487,12 +514,12 @@ struct {
   Version version;     // 1-byte identifier, 0x1.
   FieldID field;       // identifies the field
   FieldID subfield;    // identifies the subfield
-  size nv;             // number of outputs
-	size pub_in;         // number of public inputs
-	size ninputs;        // number of inputs, including witnesses
-	size nl;             // number of layers
-	Elt const_table[];   // array of constants used by the quads
-	CircuitLayer layers[]; 	// array of layers of size nl
+  size num_outputs;    // number of outputs
+  size pub_in;         // number of public inputs
+  size ninputs;        // number of inputs, including witnesses
+  size num_layers;     // number of layers
+  Elt const_table[];   // array of constants used by the quads
+  CircuitLayer layers[]; 	// array of layers of size num_layers
 } Circuit;
 ```
 
@@ -500,9 +527,9 @@ The `const_table` structure contains an array of `Elt` constants that can be ref
 
 ```
 struct {
-  size logw;     // log of number of wires
-  size nw;       // number of wires
-  Quads quads[];  // array of nw Quads
+  size log_num_input_wires;  // log of number of wires
+  size num_input_wires;      // number of wires
+  Quads quads[];             // array of Quads
 } CircuitLayer;
 ```
 

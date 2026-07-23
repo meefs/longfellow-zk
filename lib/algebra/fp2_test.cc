@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@
 #include "algebra/fft.h"
 #include "algebra/fp.h"
 #include "algebra/fp_p256.h"
+#include "benchmark/benchmark.h"
 #include "gtest/gtest.h"
 
 namespace proofs {
@@ -166,6 +167,18 @@ struct tests {
     EXPECT_FALSE(x.has_value());
     auto sx = F.of_bytes_subfield(bad_bytes.data());
     EXPECT_FALSE(sx.has_value());
+
+    // First half valid (0), second half invalid (0xff)
+    std::array<uint8_t, Field::kBytes> partial_bad_bytes;
+    partial_bad_bytes.fill(0);
+    for (size_t i = Field::kSubFieldBytes; i < Field::kBytes; ++i) {
+      partial_bad_bytes[i] = 0xff;
+    }
+    auto y = F.of_bytes_field(partial_bad_bytes.data());
+    EXPECT_FALSE(y.has_value());
+
+    auto string_elt = F.of_string("123");
+    EXPECT_EQ(string_elt, F.of_scalar(123));
   }
 
   static void poly_evaluation_points(const Field& F) {
@@ -227,12 +240,53 @@ TEST(Fp2, All) {
         "1126492241464102818735004576096902583730188404304894087292237141715826"
         "64680802";
     static constexpr char kRootY[] =
-        "3170409485181534106695698552158891296990397441810793544622061305441663"
-        "7641043";
+        "8408799435854090769574046142781866056018216899718237874931301825445046"
+        "0212908";
     const auto omega = F.of_string(kRootX, kRootY);
     const uint64_t omega_order = 1ull << 31;
     tests<Field>::all(omega, omega_order, F);
   }
 }
+
+// ==================== Benchmarking ====================
+void BM_p2562_add(benchmark::State& state) {
+  const Fp256<true> F0;
+  using Field = Fp2<Fp256<true>>;
+  const Field F(F0);
+  static constexpr char kRootX[] =
+      "1126492241464102818735004576096902583730188404304894087292237141715826"
+      "64680802";
+  static constexpr char kRootY[] =
+      "840879943585409076957404614278186605601821689971823787493130182544504602"
+      "12908";
+  auto omega = F.of_string(kRootX, kRootY);
+
+  for (auto _ : state) {
+    auto t = F.addf(omega, omega);
+    benchmark::DoNotOptimize(t);
+  }
+}
+
+BENCHMARK(BM_p2562_add);
+
+void BM_p2562_mul(benchmark::State& state) {
+  const Fp256<true> F0;
+  using Field = Fp2<Fp256<true>>;
+  const Field F(F0);
+  static constexpr char kRootX[] =
+      "1126492241464102818735004576096902583730188404304894087292237141715826"
+      "64680802";
+  static constexpr char kRootY[] =
+      "840879943585409076957404614278186605601821689971823787493130182544504602"
+      "12908";
+  auto a = F.of_string(kRootX, kRootY);
+  for (auto _ : state) {
+    auto b = F.mulf(a, a);
+    benchmark::DoNotOptimize(b);
+  }
+}
+
+BENCHMARK(BM_p2562_mul);
+
 }  // namespace
 }  // namespace proofs
