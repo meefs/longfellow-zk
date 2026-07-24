@@ -58,9 +58,8 @@ fn test_precious_sum_behavior() {
         let precious_sum = l.precious(&l.add(&w1, &w2));
         let expr = l.add(&precious_sum, &w3);
         let assert_expr = l.assert0("test_case_1", &expr);
-        let items: Vec<_> = assert_expr.item_refs.iter().map(|r| r.to_item()).collect();
-        let items_ref = arena.alloc_slice(&items);
-        let rewritten = compile_compiler::assertion::rewrite(&arena, &f, items_ref);
+        let items_ref = arena.alloc_slice(&assert_expr.items);
+        let rewritten = compile_compiler::assertion::rewrite(&arena, &f, items_ref, &l.tracker);
         assert_eq!(rewritten.len(), 1);
         let rewritten_node = rewritten[0].expr;
 
@@ -105,9 +104,8 @@ fn test_precious_sum_behavior() {
         let precious_sum = l.precious(&l.add(&w1, &w2));
         let expr = l.mul(&w3, &precious_sum);
         let assert_expr = l.assert0("test_case_2", &expr);
-        let items: Vec<_> = assert_expr.item_refs.iter().map(|r| r.to_item()).collect();
-        let items_ref = arena.alloc_slice(&items);
-        let rewritten = compile_compiler::assertion::rewrite(&arena, &f, items_ref);
+        let items_ref = arena.alloc_slice(&assert_expr.items);
+        let rewritten = compile_compiler::assertion::rewrite(&arena, &f, items_ref, &l.tracker);
         assert_eq!(rewritten.len(), 1);
         let rewritten_node = rewritten[0].expr;
 
@@ -147,9 +145,8 @@ fn test_precious_sum_behavior() {
     {
         let precious_val = l.precious(&w1);
         let assert_expr = l.assert0("test_case_3", &precious_val);
-        let items: Vec<_> = assert_expr.item_refs.iter().map(|r| r.to_item()).collect();
-        let items_ref = arena.alloc_slice(&items);
-        let rewritten = compile_compiler::assertion::rewrite(&arena, &f, items_ref);
+        let items_ref = arena.alloc_slice(&assert_expr.items);
+        let rewritten = compile_compiler::assertion::rewrite(&arena, &f, items_ref, &l.tracker);
         assert_eq!(rewritten.len(), 1);
         let rewritten_node = rewritten[0].expr;
         match &rewritten_node.v {
@@ -174,20 +171,45 @@ fn test_compiler_assertion_path_and_simplification() {
     let inner = l.assert_all("trivial_checks", &[leaf1]);
     let root = l.assert_all("root_block", &[inner, leaf2]);
 
-    let items: Vec<_> = root.item_refs.iter().map(|r| r.to_item()).collect();
-    assert_eq!(items.len(), 2);
-    assert_eq!(
-        items[0].path,
-        vec!["root_block", "trivial_checks", "check_input2_zero"]
-    );
-    assert_eq!(items[1].path, vec!["root_block", "check_input1_zero"]);
+    assert_eq!(root.items.len(), 2);
 
-    let items_ref = arena.alloc_slice(&items);
-    let simplified = compile_compiler::assertion::rewrite(&arena, &f, items_ref);
+    let items_ref = arena.alloc_slice(&root.items);
+    let simplified = compile_compiler::assertion::rewrite(&arena, &f, items_ref, &l.tracker);
     assert_eq!(simplified.len(), 2);
-    assert_eq!(
-        simplified[0].path,
-        vec!["root_block", "trivial_checks", "check_input2_zero"]
-    );
-    assert_eq!(simplified[1].path, vec!["root_block", "check_input1_zero"]);
+}
+
+#[test]
+fn test_assertion_paths_do_not_expand_through_shared_groups() {
+    let f = P256Field::new();
+    let arena = CompilerArena::new();
+    let l = CompilerLogic::new(&arena, &f);
+    let x = l.input(1);
+
+    let mut assertion = l.assert0("leaf", &x);
+    for _ in 0..32 {
+        assertion = l.assert_all("shared", &[assertion, assertion]);
+        assert_eq!(assertion.items.len(), 1);
+    }
+
+    let (_, info, symbols) = compile_compiler::top::compile(&arena, &f, assertion, l.tracker, 1, 0);
+    assert_eq!(info.nassertions, 1);
+    assert_eq!(symbols.symbols.len(), 1);
+}
+
+#[test]
+fn test_duplicate_assertion_paths_keep_first_path() {
+    let f = P256Field::new();
+    let arena = CompilerArena::new();
+    let l = CompilerLogic::new(&arena, &f);
+    let x = l.input(1);
+
+    let first = l.assert0("first", &x);
+    let second = l.assert0("second", &x);
+    let root = l.assert_all("root", &[first, second]);
+
+    assert_eq!(root.items.len(), 2);
+
+    let (_, info, symbols) = compile_compiler::top::compile(&arena, &f, root, l.tracker, 1, 0);
+    assert_eq!(info.nassertions, 1);
+    assert_eq!(symbols.symbols.len(), 1);
 }

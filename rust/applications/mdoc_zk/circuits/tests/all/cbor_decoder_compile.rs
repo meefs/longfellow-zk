@@ -49,7 +49,7 @@ fn test_compile_cbor_decoder_for_field<
     let full_assertion = iologic.assert_all("cbor_decoder_assert", &[add_assertion, not_invalid]);
 
     let (circuit, stats, symbols) =
-        compile_compiler::top::compile(&arena, fc, full_assertion, 0, 0);
+        compile_compiler::top::compile(&arena, fc, full_assertion, iologic.tracker, 1, 0);
 
     compile_compiler::top::dump_stats(name, &circuit, &stats);
 
@@ -77,10 +77,7 @@ fn test_compile_cbor_decoder_for_field<
         }
         let eval_res =
             compile_eval::eval_circuit_fc(fc, fr, &circuit, &symbols, &inputs, field_id).unwrap();
-        assert!(
-            eval_res.is_err(),
-            "Invalid CBOR byte 31 failed to cause circuit error"
-        );
+        eval_res.assert_any_failed_at("cbor_decoder_assert/valid_cbor_byte");
     }
 }
 

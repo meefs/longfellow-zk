@@ -188,18 +188,10 @@ where NEXT: RewriteT<'a, F>
     }
     fn with_assertions(
         &self,
-        _assertions: &crate::ir::RawAssertions<'a, F>,
+        _assertions: &crate::ir::Assertions<'a, F>,
         _x: &ExprNode<'a, F>,
     ) -> ExprNode<'a, F> {
         panic!("UnexpectedWithAssertion")
-    }
-
-    fn empty_scope(&self) -> crate::ir::ScopeRef<'a> {
-        self.next.empty_scope()
-    }
-
-    fn push(&self, name: &'a str, parent: crate::ir::ScopeRef<'a>) -> crate::ir::ScopeRef<'a> {
-        self.next.push(name, parent)
     }
 }
 

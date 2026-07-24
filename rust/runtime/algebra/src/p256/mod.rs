@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    field::{RuntimeSerializableField, SupportsFFT},
+    field::{RuntimeSerializableField, SupportsFFT, SupportsQuadraticExtension},
     fp_generic::{FpGenericAccum, FpGenericElement, FpGenericField},
     Subfield,
 };
@@ -67,13 +67,13 @@ impl Default for P256Field {
 impl P256Field {
     #[must_use]
     pub fn new() -> Self {
-        Self::new_generic(
-            P256_MODULUS,
-            1,
-            "Fp(115792089210356248762697446949407573530086143415290314195533631308867097853951)",
-        )
+        Self::new_generic(P256_MODULUS)
     }
 }
+
+// The P-256 modulus is 3 modulo 4, so -1 is a quadratic nonresidue and
+// `x^2 + 1` defines a genuine quadratic extension.
+impl SupportsQuadraticExtension<4> for P256Field {}
 
 const P256_ROOT_OF_UNITY_RE: [u64; 4] = [
     0x985a65324b242562,
@@ -88,7 +88,7 @@ const P256_ROOT_OF_UNITY_IM: [u64; 4] = [
     0xb9e81e42bc97cc4d,
 ];
 
-impl SupportsFFT<8> for crate::fp2::Fp2Field<'_, 4, 8, P256Field> {
+impl SupportsFFT<4> for crate::fp2::Fp2Field<'_, 4, P256Field> {
     fn omega(&self) -> Self::E {
         crate::fp2::Fp2Element {
             re: self

@@ -55,12 +55,12 @@ fn test_compile_ecmul_generic<
     let assertion = circuit.assert_scalar_mul(&given, &derived);
 
     let (compiled_circuit, stats, symbols) =
-        compile_compiler::top::compile(&arena, fc, assertion, 0, 0);
+        compile_compiler::top::compile(&arena, fc, assertion, iologic.tracker, 1, 0);
 
     compile_compiler::top::dump_stats("ecmul", &compiled_circuit, &stats);
 
     assert_eq!(stats.ninput, 1030);
-    assert_eq!(stats.npublic_input, 0);
+    assert_eq!(stats.npublic_input, 1);
     assert_eq!(stats.noutput, 765);
     assert_eq!(stats.nlayers, 4);
     assert_eq!(stats.nwires, 11503);
@@ -68,10 +68,10 @@ fn test_compile_ecmul_generic<
 
     // Verify compiled circuit evaluation
     let tv = testvec::get_testvec();
-    let ax_val = fr.nat_to_element(&FR::N::from_bytes_le(&tv.ax.to_bytes_le()));
-    let ay_val = fr.nat_to_element(&FR::N::from_bytes_le(&tv.ay.to_bytes_le()));
-    let bx_val = fr.nat_to_element(&FR::N::from_bytes_le(&tv.bx.to_bytes_le()));
-    let by_val = fr.nat_to_element(&FR::N::from_bytes_le(&tv.by.to_bytes_le()));
+    let ax_val = fr.reduce_nat(&FR::N::from_bytes_le(&tv.ax.to_bytes_le()));
+    let ay_val = fr.reduce_nat(&FR::N::from_bytes_le(&tv.ay.to_bytes_le()));
+    let bx_val = fr.reduce_nat(&FR::N::from_bytes_le(&tv.bx.to_bytes_le()));
+    let by_val = fr.reduce_nat(&FR::N::from_bytes_le(&tv.by.to_bytes_le()));
 
     let concrete_given = ConcreteGiven {
         exp: tv.exp.clone(),

@@ -44,14 +44,14 @@ pub(crate) fn sign_and_generate_given_derived<
     let rx = field.to_nat(&r_normalized.0);
 
     // Convert rx to scalar field to get r = rx mod order
-    let rx_scalar = scalar_field.nat_to_element(&rx);
+    let rx_scalar = scalar_field.reduce_nat(&rx);
     let r = scalar_field.to_nat(&rx_scalar);
 
     // s = k^-1 * (e + r * d)
-    let e_scalar = scalar_field.nat_to_element(e);
+    let e_scalar = scalar_field.reduce_nat(e);
     let r_scalar = rx_scalar;
-    let d_scalar = scalar_field.nat_to_element(d);
-    let k_scalar = scalar_field.nat_to_element(k);
+    let d_scalar = scalar_field.reduce_nat(d);
+    let k_scalar = scalar_field.reduce_nat(k);
     let rd = scalar_field.mulf(&r_scalar, &d_scalar);
     let e_rd = scalar_field.addf(&e_scalar, &rd);
     let k_inv = scalar_field.invert(&k_scalar);
@@ -89,7 +89,7 @@ pub fn all_ecdsa_corruptors<
         },
         EcdsaCorruptor {
             name: "out_of_range_ers0",
-            expected_path: "ecdsa/range_check/range_check.0",
+            expected_path: "ecdsa/range_check/range_check.0/valid_index",
             corrupt: Box::new({
                 let fr = fr.clone();
                 move |g, _d| {
@@ -239,7 +239,7 @@ pub fn all_ecdsa_corruptors<
         },
         EcdsaCorruptor {
             name: "round255_0",
-            expected_path: "ecdsa/ax_zero",
+            expected_path: "ecdsa/slice_wx",
             corrupt: Box::new({
                 let fr = fr.clone();
                 move |_g, d| {
@@ -249,7 +249,7 @@ pub fn all_ecdsa_corruptors<
         },
         EcdsaCorruptor {
             name: "round255_2",
-            expected_path: "ecdsa/az_zero",
+            expected_path: "ecdsa/slice_wz",
             corrupt: Box::new({
                 let fr = fr.clone();
                 move |_g, d| {

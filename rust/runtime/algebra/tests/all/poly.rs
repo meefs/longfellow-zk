@@ -12,19 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "testonly")]
-pub mod concrete;
-pub mod eval;
-pub mod logic;
-pub mod scope;
-#[cfg(feature = "testonly")]
-pub use concrete::*;
+use runtime_algebra::{field::AlgebraicField, gf2_128::Gf2_128RuntimeField, Poly};
 
-pub use crate::{
-    logic::{Eltw, Logic, LogicIO, K_FIRST_WIRE_POSITION},
-    scope::AssertionScope,
-};
+#[test]
+fn test_zero_length_polynomial_rejects_evaluation() {
+    let f = Gf2_128RuntimeField::new();
+    let p = Poly::<0, 2, _>::zero(&f);
+    let x = f.zero();
 
-pub mod tracker {
-    pub use crate::scope::AssertionScope as AssertionTracker;
+    assert!(
+        std::panic::catch_unwind(|| p.eval_monomial(&x, &f)).is_err(),
+        "accepted monomial evaluation of a zero-length polynomial"
+    );
+    assert!(
+        std::panic::catch_unwind(|| p.eval_newton(&x, &f)).is_err(),
+        "accepted Newton evaluation of a zero-length polynomial"
+    );
 }

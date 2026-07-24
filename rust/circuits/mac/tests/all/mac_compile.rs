@@ -71,7 +71,8 @@ fn test_compile_mac_for_field<
 
     let assertion = mac_circuit.assert_mac(&given_wires);
 
-    let (circuit, stats, symbols) = compile_compiler::top::compile(&arena, fc, assertion, 0, 0);
+    let (circuit, stats, symbols) =
+        compile_compiler::top::compile(&arena, fc, assertion, iologic.tracker, 1, 0);
 
     compile_compiler::top::dump_stats(name, &circuit, &stats);
 
@@ -102,6 +103,13 @@ fn test_compile_mac_for_field<
             eval_res.is_err(),
             "Corruptor '{}' failed to cause circuit evaluation error",
             c.name
+        );
+        let failed = eval_res.failed_paths();
+        assert!(
+            failed.iter().any(|path| path == &c.expected_path),
+            "Corruptor '{}' expected exact compiled failure path '{}', actual failures: {failed:?}",
+            c.name,
+            c.expected_path
         );
     }
 }
