@@ -1,10 +1,11 @@
 import examples.Ligero
 
-/-! Compile-time checks at all four corners of the generated grid. -/
+/-! Compile-time checks at all four corners of the canonical grid data. -/
 
-open Ligero.Examples.Grid.Generated
-
-#check N1024_R7_V1_F128_S120_conditions
-#check N1024_R7_V1_F128_S120_soundness_le_envelope
-#check N1024_R7_V1_F128_S120_minimum
-#check N8192_R15_V1_F128_S125_minimum
+#guard_msgs (drop info) in #check Ligero.Examples.Grid.Data.N1024_R7_V1_F128_S120
+#guard_msgs (drop info) in #check Ligero.Examples.Grid.Data.N8192_R15_V1_F128_S125
+#guard_msgs (drop info) in #check Ligero.Examples.Grid.Tight.v1_result_count
+#guard_msgs (drop info) in #check Ligero.Examples.Grid.Tight.changed_v1_count
+#guard_msgs (drop info) in #check Ligero.Examples.Grid.Tight.result_table_valid
+#guard_msgs (drop info) in #check Ligero.Examples.Grid.Tight.v1_results_valid
+#guard_msgs (drop info) in #check Ligero.Examples.Grid.Tight.changed_v1_valid

@@ -1,5 +1,4 @@
 import AffineAgreement.Moments
-import Mathlib.Algebra.Order.Field.Rat
 
 /-!
 # Audited parameters for general selected agreement

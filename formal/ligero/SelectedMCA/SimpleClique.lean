@@ -1,9 +1,6 @@
 import SelectedMCA.Parameters
 import AffineAgreement.TripleCounting
-import Mathlib.Algebra.BigOperators.Ring.Finset
-import Mathlib.Algebra.Order.Field.Rat
 import Mathlib.Tactic.FieldSimp
-import Mathlib.Tactic.Linarith
 
 /-!
 # Simple selected-clique counting

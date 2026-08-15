@@ -1,1 +1,1 @@
-import examples.Ligero.Grid.Generated.All
+import examples.Ligero.Grid.Tight

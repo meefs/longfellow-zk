@@ -1,8 +1,5 @@
-import Mathlib.Algebra.BigOperators.Ring.Finset
-import Mathlib.Algebra.Order.BigOperators.Group.Finset
-import Mathlib.Algebra.Order.Field.Rat
-import CodingTheory.Proximity
 import CodingTheory.AffineCounting
+import Mathlib.Algebra.Order.Field.Rat
 
 /-!
 # Finite double averaging

@@ -1,6 +1,5 @@
 import AffineAgreement.Basic
 import CodingTheory.AffineCounting
-import CodingTheory.Proximity
 
 /-!
 # Affine-decoder globalization

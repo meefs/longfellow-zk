@@ -1,6 +1,6 @@
 name = "udr"
 version = "0.1.0"
-defaultTargets = ["Ligero.API"]
+defaultTargets = ["Ligero.APITest"]
 
 [leanOptions]
 autoImplicit = false
@@ -26,6 +26,9 @@ name = "CorrelatedAgreement"
 
 [[lean_lib]]
 name = "SelectedMCA"
+
+[[lean_lib]]
+name = "LigeroFamily"
 
 [[lean_lib]]
 name = "Ligero"

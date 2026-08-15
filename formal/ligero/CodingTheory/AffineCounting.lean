@@ -1,8 +1,3 @@
-import Mathlib.Algebra.BigOperators.Ring.Finset
-import Mathlib.Algebra.Order.BigOperators.Group.Finset
-import Mathlib.Algebra.Order.Field.Rat
-import Mathlib.Tactic.FieldSimp
-import Mathlib.Tactic.LinearCombination
 import CodingTheory.Proximity
 
 /-! Counting points on parallel affine lines in a finite vector space. -/

@@ -1,4 +1,3 @@
-import Mathlib.Data.Nat.Choose.Basic
 import Mathlib.Data.Fintype.Fin
 import Mathlib.Algebra.BigOperators.Ring.Finset
 import Mathlib.Algebra.Order.Field.Rat

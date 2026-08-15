@@ -1,7 +1,5 @@
 import AffineAgreement.Moments
-import Mathlib.Algebra.Order.Field.Rat
 import Mathlib.Tactic.Ring
-import Lean.Elab.Tactic.Omega
 
 /-!
 # Correlated-agreement extraction parameters
