@@ -1,5 +1,6 @@
 import LigeroFamily.Protocol.IPCP
 import LigeroFamily.ZeroKnowledge.Distribution
+import LigeroFamily.ZeroKnowledge.Witness
 
 /-!
 # Response-adaptive finite verifier views
@@ -13,23 +14,6 @@ coordinates depend on earlier openings.
 namespace LigeroFamily.ZeroKnowledge
 
 open LigeroFamily
-
-variable {F Equations : Type*} [CommSemiring F] [Fintype Equations]
-variable {nw nq w : ℕ}
-
-/-- Canonical satisfying witness chosen from the public statement. -/
-noncomputable def referenceMessages
-    (statement : ConstraintSystem F nw nq w Equations) : CoreMessages F nw nq w := by
-  classical
-  exact if hlanguage : statement.Language then Classical.choose hlanguage else 0
-
-omit [Fintype Equations] in
-theorem referenceMessages_satisfies
-    (statement : ConstraintSystem F nw nq w Equations) (hlanguage : statement.Language) :
-    statement.Satisfies (referenceMessages statement) := by
-  classical
-  simp only [referenceMessages, hlanguage, dite_true]
-  exact Classical.choose_spec hlanguage
 
 /-- A verifier whose single second-stage bounded batch query may depend on the
 complete prover response. -/
