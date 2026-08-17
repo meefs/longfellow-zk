@@ -86,17 +86,20 @@ namespace ConstraintSystem
 variable {F Equations : Type*} [Field F]
 variable {nw nq w : ℕ}
 
-/-- A false constraint system has either a nonzero linear residual vector or
-a nonzero quadratic residual vector. -/
-theorem false_residual
+/-- **One message vector that fails the system has a nonzero residual.**
+
+The per-vector form.  Note what it does *not* need: that the system is unsatisfiable.  Only the
+vector in hand has to fail, which is what lets the soundness stack be driven by the hypothesis
+"no member of the oracle's lift list satisfies the statement" rather than by
+`¬statement.Language`.  Contraposing the former produces a witness *inside a type indexed by the
+oracle alone*; contraposing the latter produces only an abstract existence claim. -/
+theorem residual_of_not_satisfies
     (statement : ConstraintSystem F nw nq w Equations)
-    (messages : CoreMessages F nw nq w) (hfalse : ¬statement.Language) :
+    (messages : CoreMessages F nw nq w) (hnotSatisfies : ¬statement.Satisfies messages) :
     (fun equation ↦ statement.linearValue messages equation -
       statement.target equation) ≠ 0 ∨
       ∃ i, (fun row ↦ messages .left row i * messages .right row i -
         messages .output row i) ≠ 0 := by
-  have hnotSatisfies : ¬statement.Satisfies messages :=
-    fun hsatisfies ↦ hfalse ⟨messages, hsatisfies⟩
   rcases not_and_or.mp hnotSatisfies with hlinear | hquadratic
   · left
     intro hzero
@@ -109,6 +112,17 @@ theorem false_residual
     refine ⟨i, ?_⟩
     intro hzero
     exact hnonzero (sub_eq_zero.mp (congrFun hzero row))
+
+/-- A false constraint system has either a nonzero linear residual vector or
+a nonzero quadratic residual vector.  Now a corollary of the per-vector form. -/
+theorem false_residual
+    (statement : ConstraintSystem F nw nq w Equations)
+    (messages : CoreMessages F nw nq w) (hfalse : ¬statement.Language) :
+    (fun equation ↦ statement.linearValue messages equation -
+      statement.target equation) ≠ 0 ∨
+      ∃ i, (fun row ↦ messages .left row i * messages .right row i -
+        messages .output row i) ≠ 0 :=
+  statement.residual_of_not_satisfies messages fun hsatisfies ↦ hfalse ⟨messages, hsatisfies⟩
 
 end ConstraintSystem
 

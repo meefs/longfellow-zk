@@ -27,12 +27,12 @@ theorem v1_ligero_soundness_selectedMCA
     (hrows : CoreRowsNonempty nw nq)
     (C : MultiplicativeCode F r w n)
     (statement : ConstraintSystem F nw nq w Equations)
-    (hfalse : ¬statement.Language)
     (prover : IPCPProver
       (ConstraintSystem F nw nq w Equations)
       (Oracle F nw nq n 1)
       (Challenge F nw nq 1 Equations)
       (Response F r w n 1))
+    (hfalse : NoDecodedSolution C (prover.commit statement) (e + g) statement)
     (hmin : HasMinimumDistanceAtLeast C.baseCode d)
     (conditions : LigeroFamily.SelectedMCAParameterConditions
       (Fintype.card F) n e g d m)

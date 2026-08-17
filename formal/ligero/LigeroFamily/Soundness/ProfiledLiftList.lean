@@ -106,12 +106,24 @@ def quadraticResidual (candidate : SchemeLiftCandidate C oracle radius)
 
 omit [Fintype F] [Fintype Equations] [DecidableEq Equations]
     [DecidableEq CheckedMask] in
+theorem residual_of_not_satisfies (candidate : SchemeLiftCandidate C oracle radius)
+    (statement : ConstraintSystem F nw nq w Equations)
+    (hns : ¬statement.Satisfies candidate.decodedMessages) :
+    candidate.linearResidual statement ≠ 0 ∨
+      ∃ i, (fun row ↦ candidate.quadraticResidual row i) ≠ 0 := by
+  exact statement.residual_of_not_satisfies candidate.decodedMessages hns
+
+/- A candidate decoded from a false statement has a nonzero linear or
+quadratic residual. -/
+omit [Fintype F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] in
 theorem false_residual (candidate : SchemeLiftCandidate C oracle radius)
     (statement : ConstraintSystem F nw nq w Equations)
     (hfalse : ¬statement.Language) :
     candidate.linearResidual statement ≠ 0 ∨
-      ∃ i, (fun row ↦ candidate.quadraticResidual row i) ≠ 0 := by
-  exact statement.false_residual candidate.decodedMessages hfalse
+      ∃ i, (fun row ↦ candidate.quadraticResidual row i) ≠ 0 :=
+  candidate.residual_of_not_satisfies statement
+    fun hsat ↦ hfalse ⟨candidate.decodedMessages, hsat⟩
 
 noncomputable def badColumns (candidate : SchemeLiftCandidate C oracle radius) :
     Finset (Fin n) :=
@@ -308,5 +320,82 @@ theorem query_bad_subset_remaining
       SchemeOracle.testedRow, schemeProximityObserved] using hagree)
 
 end SchemeLiftCandidate
+
+/-- **The falsity hypothesis the soundness stack actually uses.**
+
+Strictly weaker than `¬statement.Language`: it asks only that no *decodable* message vector — no
+member of the radius-`radius` lift list of this oracle — satisfies the statement.  Every
+unsatisfiable statement qualifies (`NoDecodedSolution.of_not_language`), so nothing that used the
+old hypothesis is lost.
+
+The point is the contrapositive.  Negating `¬statement.Language` yields `∃ messages, Satisfies` —
+an abstract existence claim with no handle on where the messages came from.  Negating this yields
+`∃ candidate : SchemeLiftCandidate C oracle radius, statement.Satisfies candidate.decodedMessages`,
+and `SchemeLiftCandidate C oracle radius` is a `Fintype` **indexed by the oracle alone**, whose
+cardinality is bounded by `SchemeLiftCandidate.univ_card_le_listBound` from the oracle alone.  That
+is an extractor: a list of candidate witnesses named before any challenge is drawn. -/
+def NoDecodedSolution (C : MultiplicativeCode F r w n)
+    (oracle : SchemeOracle F CheckedMask DirectMask nw nq n 1) (radius : ℕ)
+    (statement : ConstraintSystem F nw nq w Equations) : Prop :=
+  ∀ candidate : SchemeLiftCandidate C oracle radius,
+    ¬statement.Satisfies candidate.decodedMessages
+
+omit [Fintype F] [Fintype Equations] [DecidableEq Equations] [DecidableEq CheckedMask] in
+/-- An unsatisfiable statement has no decodable solution either. -/
+theorem NoDecodedSolution.of_not_language
+    {C : MultiplicativeCode F r w n}
+    {oracle : SchemeOracle F CheckedMask DirectMask nw nq n 1}
+    {statement : ConstraintSystem F nw nq w Equations}
+    (hfalse : ¬statement.Language) : NoDecodedSolution C oracle radius statement :=
+  fun candidate hsat ↦ hfalse ⟨candidate.decodedMessages, hsat⟩
+
+/-! ## The lift list as a function of the oracle
+
+`SchemeLiftCandidate C oracle radius` is a `Fintype` indexed by the oracle alone, and
+`SchemeLiftCandidate.univ_card_le_listBound` bounds its cardinality — also from the oracle alone.
+Enumerating it therefore gives a genuine extractor: a length-`L` tuple of candidate witnesses
+named before any challenge is drawn.  The two declarations below are that enumeration and the
+only fact about it anyone needs. -/
+
+/-- Padding for an extractor's index range, used past the end of the lift list.  Any value would
+do; nothing is claimed about the indices the list does not reach. -/
+def zeroMessages (F : Type*) [Field F] (nw nq width : ℕ) : CoreMessages F nw nq width :=
+  fun _ _ _ ↦ 0
+
+/-- The oracle's lift list, decoded by `decode` and indexed by `Fin L`, padding with `pad` past
+the end.  Nothing here depends on a statement, a challenge, a response, or a query set — only on
+`C`, `oracle` and `radius`. -/
+noncomputable def liftListIndex {α : Type*}
+    (C : MultiplicativeCode F r w n)
+    (oracle : SchemeOracle F CheckedMask DirectMask nw nq n 1) (radius L : ℕ)
+    (decode : SchemeLiftCandidate C oracle radius → α) (pad : α) (i : Fin L) : α :=
+  match (Finset.univ : Finset (SchemeLiftCandidate C oracle radius)).toList[i.val]? with
+  | some candidate => decode candidate
+  | none => pad
+
+omit [DecidableEq CheckedMask] in
+/-- **Anything true of some list member is true at some index.**
+
+The bridge from `∃ candidate, P (decode candidate)` — which is what contraposing the counting
+theorem gives — to `∃ i : Fin L, P (liftListIndex … i)`, which is what a fixed-arity extractor
+needs.  The hypothesis is exactly `univ_card_le_listBound`. -/
+theorem exists_liftListIndex {α : Type*}
+    {C : MultiplicativeCode F r w n}
+    {oracle : SchemeOracle F CheckedMask DirectMask nw nq n 1} {radius L : ℕ}
+    {decode : SchemeLiftCandidate C oracle radius → α} {pad : α} {P : α → Prop}
+    (hcard : (Finset.univ : Finset (SchemeLiftCandidate C oracle radius)).card ≤ L)
+    (h : ∃ candidate : SchemeLiftCandidate C oracle radius, P (decode candidate)) :
+    ∃ i : Fin L, P (liftListIndex C oracle radius L decode pad i) := by
+  classical
+  obtain ⟨candidate, hP⟩ := h
+  have hmem : candidate ∈ (Finset.univ : Finset (SchemeLiftCandidate C oracle radius)).toList :=
+    Finset.mem_toList.mpr (Finset.mem_univ candidate)
+  obtain ⟨j, hj, hget⟩ := List.mem_iff_getElem.mp hmem
+  have hlen : (Finset.univ : Finset (SchemeLiftCandidate C oracle radius)).toList.length ≤ L := by
+    rwa [Finset.length_toList]
+  refine ⟨⟨j, lt_of_lt_of_le hj hlen⟩, ?_⟩
+  rw [liftListIndex]
+  rw [List.getElem?_eq_getElem hj]
+  simpa [hget] using hP
 
 end LigeroFamily

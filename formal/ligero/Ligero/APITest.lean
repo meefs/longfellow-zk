@@ -43,7 +43,25 @@ import CodingTheory.ListDecoding
 #guard_msgs (drop info) in #check Ligero.V1.EndToEndGuarantee
 #guard_msgs (drop info) in #check Ligero.V1.EndToEndGuarantee.perfectCompleteness
 #guard_msgs (drop info) in #check Ligero.V1.EndToEndGuarantee.soundness
+#guard_msgs (drop info) in #check Ligero.V1.EndToEndGuarantee.extraction
 #guard_msgs (drop info) in #check Ligero.V1.EndToEndGuarantee.zeroKnowledge
+#guard_msgs (drop info) in #check LigeroFamily.ConstraintSystem.residual_of_not_satisfies
+#guard_msgs (drop info) in #check LigeroFamily.SchemeLiftCandidate.residual_of_not_satisfies
+#guard_msgs (drop info) in #check LigeroFamily.NoDecodedSolution
+#guard_msgs (drop info) in #check LigeroFamily.NoDecodedSolution.of_not_language
+#guard_msgs (drop info) in #check LigeroFamily.liftListIndex
+#guard_msgs (drop info) in #check LigeroFamily.exists_liftListIndex
+#guard_msgs (drop info) in #check LigeroFamily.SchemeLiftCandidate.univ_card_le_listBound
+#guard_msgs (drop info) in #check Ligero.V1.candidate_of_acceptance
+#guard_msgs (drop info) in #check Ligero.V1.witness_extractor
+#guard_msgs (drop info) in
+  #check LigeroFamily.PolicyDoublyProfiledSoundnessClassifier.DoomedAfter
+#guard_msgs (drop info) in
+  #check LigeroFamily.PolicyDoublyProfiledSoundnessClassifier.escaping
+#guard_msgs (drop info) in
+  #check LigeroFamily.PolicyDoublyProfiledSoundnessClassifier.query_density_le_of_doomedAfter
+#guard_msgs (drop info) in
+  #check LigeroFamily.PolicyDoublyProfiledSoundnessClassifier.escaping_density_le
 #guard_msgs (drop info) in #check Ligero.V1.Mask
 #guard_msgs (drop info) in #check Ligero.V1.Scheme
 #guard_msgs (drop info) in #check Ligero.V1.Oracle
@@ -59,3 +77,9 @@ import CodingTheory.ListDecoding
 
 -- New Ligero: four checked base-code mask kinds.
 #guard_msgs (drop info) in #check Ligero.V1.ReedSolomon.end_to_end_selectedMCA
+#guard_msgs (drop info) in #print axioms LigeroFamily.ConstraintSystem.residual_of_not_satisfies
+#guard_msgs (drop info) in #print axioms LigeroFamily.NoDecodedSolution.of_not_language
+#guard_msgs (drop info) in #print axioms LigeroFamily.exists_liftListIndex
+#guard_msgs (drop info) in #print axioms LigeroFamily.SchemeLiftCandidate.univ_card_le_listBound
+#guard_msgs (drop info) in #print axioms Ligero.V1.witness_extractor
+#guard_msgs (drop info) in #print axioms Ligero.V1.end_to_end_selectedMCA

@@ -52,9 +52,9 @@ namespace V1Violation
 omit [Fintype F] [Fintype Equations] [DecidableEq Equations] in
 theorem nonempty_of_false
     (candidate : SchemeLiftCandidate C oracle radius)
-    (hfalse : ¬statement.Language) :
+    (hns : ¬statement.Satisfies candidate.decodedMessages) :
     Nonempty (V1Violation candidate statement) := by
-  rcases candidate.false_residual statement hfalse with
+  rcases candidate.residual_of_not_satisfies statement hns with
     hlinear | ⟨i, hquadratic⟩
   · exact ⟨⟨.linear, hlinear⟩⟩
   · exact ⟨⟨.quadratic i, hquadratic⟩⟩
@@ -383,7 +383,7 @@ variable {e failureDenominator L threshold : ℕ}
 theorem v1ArithmeticCertificate_nonempty
     (certificate : PolicyLiftListCertificate v1Policy oracle respond
       e g radius L)
-    (hfalse : ¬statement.Language)
+    (hfalse : NoDecodedSolution C oracle radius statement)
     (johnson : V1JohnsonRange C threshold) :
     Nonempty (PolicyArithmeticCertificate v1Policy oracle statement respond
       certificate
@@ -391,7 +391,7 @@ theorem v1ArithmeticCertificate_nonempty
       (Fintype.card F)) := by
   classical
   let violation := fun candidate : SchemeLiftCandidate C oracle radius ↦
-    Classical.choice (V1Violation.nonempty_of_false candidate hfalse)
+    Classical.choice (V1Violation.nonempty_of_false candidate (hfalse candidate))
   let agreement := fun challenge ↦ certificate.candidates.sup fun candidate ↦
     v1Agreement candidate (violation candidate) respond challenge
   have hagreementLe : ∀ challenge, agreement challenge ≤ n := by
@@ -528,7 +528,7 @@ theorem v1_ligero_soundness_of_profiledFailure
                 ((respond challenge).proximity 0)).card) a).card ≤
         failureProfile.labelsAtLeast a *
           Fintype.card (SchemeChallenge F NoMask nw nq 1 Equations))
-    (hfalse : ¬statement.Language)
+    (hfalse : NoDecodedSolution C oracle radius statement)
     (johnson : V1JohnsonRange C threshold)
     (prover : IPCPProver
       (ConstraintSystem F nw nq w Equations)

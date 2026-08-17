@@ -35,6 +35,65 @@ def selectedMCASoundnessBound (C : MultiplicativeCode F r w n)
     (CodingTheory.InterleavedJohnson.listBound n d (e + g))
     threshold).contribution (Fintype.card F) n e g r
 
+
+
+
+
+
+/-- **V1 extraction, sharp form.** -/
+theorem candidate_of_acceptance
+    (hrows : CoreRowsNonempty nw nq)
+    (C : MultiplicativeCode F r w n)
+    (oracle : Oracle F nw nq n 1)
+    (statement : ConstraintSystem F nw nq w Equations)
+    (prover : IPCPProver
+      (ConstraintSystem F nw nq w Equations) (Oracle F nw nq n 1)
+      (Challenge F nw nq 1 Equations) (Response F r w n 1))
+    (horacle : prover.commit statement = oracle)
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : SelectedMCAParameterConditions (Fintype.card F) n e g d m)
+    (johnson : V1JohnsonRange C threshold)
+    (hrate : selectedMCASoundnessBound C e g d m threshold
+      < (SchemeVerifier.protocol C scheme).acceptanceRate prover statement) :
+    ∃ candidate : SchemeLiftCandidate C oracle (e + g),
+      statement.Satisfies candidate.decodedMessages := by
+  subst horacle
+  by_contra hcon
+  exact absurd (v1_ligero_soundness_selectedMCA hrows C statement prover
+    (fun candidate hsat ↦ hcon ⟨candidate, hsat⟩) hmin conditions johnson)
+    (not_le.mpr hrate)
+
+/-- **V1 extraction, packaged.** -/
+theorem witness_extractor
+    (hrows : CoreRowsNonempty nw nq)
+    (C : MultiplicativeCode F r w n)
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : SelectedMCAParameterConditions (Fintype.card F) n e g d m)
+    (johnson : V1JohnsonRange C threshold) :
+    ∃ Ext : Oracle F nw nq n 1 →
+        Fin (CodingTheory.InterleavedJohnson.listBound n d (e + g)) →
+        CoreMessages F nw nq w,
+      ∀ (oracle : Oracle F nw nq n 1)
+        (statement : ConstraintSystem F nw nq w Equations)
+        (prover : IPCPProver
+          (ConstraintSystem F nw nq w Equations) (Oracle F nw nq n 1)
+          (Challenge F nw nq 1 Equations) (Response F r w n 1)),
+        prover.commit statement = oracle →
+        selectedMCASoundnessBound C e g d m threshold
+          < (SchemeVerifier.protocol C scheme).acceptanceRate prover statement →
+        ∃ i, statement.Satisfies (Ext oracle i) := by
+  refine ⟨fun oracle ↦ liftListIndex C oracle (e + g) _
+      SchemeLiftCandidate.decodedMessages (zeroMessages F nw nq w), ?_⟩
+  intro oracle statement prover horacle hrate
+  refine exists_liftListIndex ?_
+    (candidate_of_acceptance hrows C oracle statement prover horacle hmin
+      conditions johnson hrate)
+  have hdist : e + g < d := by
+    have := conditions.punctured.punctured_three_radius; omega
+  exact SchemeLiftCandidate.univ_card_le_listBound C oracle hmin
+    (le_trans (le_of_lt hdist) hmin.distance_le_length) hdist
+    conditions.johnson.list_denominator_positive
+
 /-- Completeness, malicious-prover soundness, and exact response-adaptive
 zero knowledge for one V1 protocol. -/
 structure EndToEndGuarantee [Fintype VerifierCoins]
@@ -53,6 +112,19 @@ structure EndToEndGuarantee [Fintype VerifierCoins]
         (Challenge F nw nq 1 Equations) (Response F r w n 1),
       (SchemeVerifier.protocol C scheme).acceptanceRate prover statement ≤
         selectedMCASoundnessBound C e g d m threshold
+  
+  extraction : ∃ Ext : Oracle F nw nq n 1 →
+      Fin (CodingTheory.InterleavedJohnson.listBound n d (e + g)) →
+      CoreMessages F nw nq w,
+    ∀ (oracle : Oracle F nw nq n 1)
+      (statement : ConstraintSystem F nw nq w Equations)
+      (prover : IPCPProver
+        (ConstraintSystem F nw nq w Equations) (Oracle F nw nq n 1)
+        (Challenge F nw nq 1 Equations) (Response F r w n 1)),
+      prover.commit statement = oracle →
+      selectedMCASoundnessBound C e g d m threshold
+        < (SchemeVerifier.protocol C scheme).acceptanceRate prover statement →
+      ∃ i, statement.Satisfies (Ext oracle i)
   zeroKnowledge :
     LigeroFamily.ZeroKnowledge.UnboundedPerfectResponseAdaptiveZeroKnowledge
       (SchemeVerifier.protocol (nw := nw) (nq := nq) (repetitions := 1)
@@ -80,12 +152,13 @@ theorem end_to_end_selectedMCA
   refine {
     perfectCompleteness := ?_
     soundness := ?_
+    extraction := witness_extractor hrows C hmin conditions johnson
     zeroKnowledge :=
       ZeroKnowledge.v1_unbounded_perfect_response_adaptive_zero_knowledge }
   · intro statement messages hsatisfies seed coins
     exact v1_ligero_perfect_completeness messages hsatisfies seed coins
   · intro statement hfalse prover
-    exact v1_ligero_soundness_selectedMCA hrows C statement hfalse prover hmin
-      conditions johnson
+    exact v1_ligero_soundness_selectedMCA hrows C statement prover
+      (NoDecodedSolution.of_not_language hfalse) hmin conditions johnson
 
 end Ligero.V1

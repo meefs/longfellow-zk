@@ -127,7 +127,8 @@ theorem V1Certificate.v1_protocol_soundness
       statement ≤
       c.v1Soundness c.openings := by
   have hmaster := Ligero.V1.v1_ligero_soundness_selectedMCA
-    hrows C statement hfalse prover hmin (by
+    hrows C statement prover (LigeroFamily.NoDecodedSolution.of_not_language hfalse)
+    hmin (by
       simpa [Certificate.conditions, hfield] using hconditions)
       (c.v1JohnsonRange hkpos hresponse C hk)
   simpa [V1Certificate.v1Soundness, Certificate.failureContribution,
