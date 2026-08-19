@@ -1,0 +1,52 @@
+
+name = "proofs"
+version = "0.1.0"
+defaultTargets = ["Ligero.APITest"]
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+path = "../../mathlib4"
+
+
+[[lean_lib]]
+name = "ReedSolomon"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "CodingTheory"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "AffineAgreement"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "CorrelatedAgreement"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "SelectedMCA"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "LigeroFamily"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "Ligero"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "examples"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+
