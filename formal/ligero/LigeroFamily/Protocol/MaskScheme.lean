@@ -87,7 +87,52 @@ def column {F CheckedMask DirectMask : Type*}
   directMask h kind := oracle.directMask h kind j
   proximityBlind h := oracle.proximityBlind h j
 
+@[ext] theorem ext
+    {F CheckedMask DirectMask : Type*} {nw nq n repetitions : ℕ}
+    {first second : SchemeOracle F CheckedMask DirectMask nw nq n repetitions}
+    (hcore : first.core = second.core)
+    (hchecked : first.checkedMask = second.checkedMask)
+    (hdirect : first.directMask = second.directMask)
+    (hproximity : first.proximityBlind = second.proximityBlind) :
+    first = second := by
+  cases first
+  cases second
+  simp_all
+
+/-- The commitment whose `j`-th column is `col j`.  Inverse to `column`: a
+committed oracle carries no data beyond its columns, which is what lets a
+column-wise commitment scheme commit to one. -/
+def ofColumns {F CheckedMask DirectMask : Type*}
+    {nw nq n repetitions : ℕ}
+    (col : Fin n → SchemeColumn F CheckedMask DirectMask nw nq repetitions) :
+    SchemeOracle F CheckedMask DirectMask nw nq n repetitions where
+  core block row j := (col j).core block row
+  checkedMask h kind j := (col j).checkedMask h kind
+  directMask h kind j := (col j).directMask h kind
+  proximityBlind h j := (col j).proximityBlind h
+
+@[simp] theorem column_ofColumns {F CheckedMask DirectMask : Type*}
+    {nw nq n repetitions : ℕ}
+    (col : Fin n → SchemeColumn F CheckedMask DirectMask nw nq repetitions)
+    (j : Fin n) : (ofColumns col).column j = col j := rfl
+
+@[simp] theorem ofColumns_column {F CheckedMask DirectMask : Type*}
+    {nw nq n repetitions : ℕ}
+    (oracle : SchemeOracle F CheckedMask DirectMask nw nq n repetitions) :
+    ofColumns oracle.column = oracle := rfl
+
 end SchemeOracle
+
+/-- **A commitment is exactly its columns.**  The forward map is
+`SchemeOracle.column` and the inverse is `SchemeOracle.ofColumns`. -/
+def schemeOracleEquivColumns (F CheckedMask DirectMask : Type*)
+    (nw nq n repetitions : ℕ) :
+    SchemeOracle F CheckedMask DirectMask nw nq n repetitions ≃
+      (Fin n → SchemeColumn F CheckedMask DirectMask nw nq repetitions) where
+  toFun := SchemeOracle.column
+  invFun := SchemeOracle.ofColumns
+  left_inv oracle := SchemeOracle.ofColumns_column oracle
+  right_inv col := funext fun j ↦ SchemeOracle.column_ofColumns col j
 
 abbrev SchemeOpening (F CheckedMask DirectMask : Type*)
     (nw nq repetitions n r : ℕ) (query : QuerySet n r) :=
@@ -100,6 +145,26 @@ def openSchemeOracle {F CheckedMask DirectMask : Type*}
     (query : QuerySet n r) :
     SchemeOpening F CheckedMask DirectMask nw nq repetitions n r query :=
   fun j ↦ oracle.column j.1
+
+@[simp] theorem openSchemeOracle_ofColumns {F CheckedMask DirectMask : Type*}
+    {nw nq n repetitions r : ℕ}
+    (col : Fin n → SchemeColumn F CheckedMask DirectMask nw nq repetitions)
+    (query : QuerySet n r) :
+    openSchemeOracle (SchemeOracle.ofColumns col) query = fun j ↦ col j.1 := by
+  funext j
+  exact SchemeOracle.column_ofColumns col j.1
+
+/-- What the verifier reads depends only on the queried columns.  Two
+commitments agreeing on `query.coordinates` are opened identically, so any
+predicate on the opening cannot separate them. -/
+theorem openSchemeOracle_congr {F CheckedMask DirectMask : Type*}
+    {nw nq n repetitions r : ℕ}
+    {first second : SchemeOracle F CheckedMask DirectMask nw nq n repetitions}
+    (query : QuerySet n r)
+    (hagree : ∀ j ∈ query.coordinates, first.column j = second.column j) :
+    openSchemeOracle first query = openSchemeOracle second query := by
+  funext j
+  exact hagree j.1 j.2
 
 
 

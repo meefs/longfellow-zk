@@ -362,6 +362,43 @@ do; nothing is claimed about the indices the list does not reach. -/
 def zeroMessages (F : Type*) [Field F] (nw nq width : ℕ) : CoreMessages F nw nq width :=
   fun _ _ _ ↦ 0
 
+
+
+
+
+
+
+
+
+
+noncomputable def finListIndex {Cand α : Type*} [Fintype Cand] (L : ℕ)
+    (decode : Cand → α) (pad : α) (i : Fin L) : α :=
+  match (Finset.univ : Finset Cand).toList[i.val]? with
+  | some candidate => decode candidate
+  | none => pad
+
+/-- **Anything true of some candidate is true at some index.**
+
+The bridge from `∃ candidate, P (decode candidate)` — which is what contraposing a counting
+theorem gives — to `∃ i : Fin L, P (finListIndex … i)`, which is what a fixed-arity extractor
+needs.  The hypothesis is a cardinality bound on the candidate type, supplied at each use by that
+protocol's `univ_card_le_listBound`. -/
+theorem exists_finListIndex {Cand α : Type*} [Fintype Cand] {L : ℕ}
+    {decode : Cand → α} {pad : α} {P : α → Prop}
+    (hcard : (Finset.univ : Finset Cand).card ≤ L)
+    (h : ∃ candidate : Cand, P (decode candidate)) :
+    ∃ i : Fin L, P (finListIndex L decode pad i) := by
+  classical
+  obtain ⟨candidate, hP⟩ := h
+  have hmem : candidate ∈ (Finset.univ : Finset Cand).toList :=
+    Finset.mem_toList.mpr (Finset.mem_univ candidate)
+  obtain ⟨j, hj, hget⟩ := List.mem_iff_getElem.mp hmem
+  have hlen : (Finset.univ : Finset Cand).toList.length ≤ L := by
+    rwa [Finset.length_toList]
+  refine ⟨⟨j, lt_of_lt_of_le hj hlen⟩, ?_⟩
+  rw [finListIndex, List.getElem?_eq_getElem hj]
+  simpa [hget] using hP
+
 /-- The oracle's lift list, decoded by `decode` and indexed by `Fin L`, padding with `pad` past
 the end.  Nothing here depends on a statement, a challenge, a response, or a query set — only on
 `C`, `oracle` and `radius`. -/
@@ -369,9 +406,7 @@ noncomputable def liftListIndex {α : Type*}
     (C : MultiplicativeCode F r w n)
     (oracle : SchemeOracle F CheckedMask DirectMask nw nq n 1) (radius L : ℕ)
     (decode : SchemeLiftCandidate C oracle radius → α) (pad : α) (i : Fin L) : α :=
-  match (Finset.univ : Finset (SchemeLiftCandidate C oracle radius)).toList[i.val]? with
-  | some candidate => decode candidate
-  | none => pad
+  finListIndex L decode pad i
 
 omit [DecidableEq CheckedMask] in
 /-- **Anything true of some list member is true at some index.**
@@ -385,17 +420,7 @@ theorem exists_liftListIndex {α : Type*}
     {decode : SchemeLiftCandidate C oracle radius → α} {pad : α} {P : α → Prop}
     (hcard : (Finset.univ : Finset (SchemeLiftCandidate C oracle radius)).card ≤ L)
     (h : ∃ candidate : SchemeLiftCandidate C oracle radius, P (decode candidate)) :
-    ∃ i : Fin L, P (liftListIndex C oracle radius L decode pad i) := by
-  classical
-  obtain ⟨candidate, hP⟩ := h
-  have hmem : candidate ∈ (Finset.univ : Finset (SchemeLiftCandidate C oracle radius)).toList :=
-    Finset.mem_toList.mpr (Finset.mem_univ candidate)
-  obtain ⟨j, hj, hget⟩ := List.mem_iff_getElem.mp hmem
-  have hlen : (Finset.univ : Finset (SchemeLiftCandidate C oracle radius)).toList.length ≤ L := by
-    rwa [Finset.length_toList]
-  refine ⟨⟨j, lt_of_lt_of_le hj hlen⟩, ?_⟩
-  rw [liftListIndex]
-  rw [List.getElem?_eq_getElem hj]
-  simpa [hget] using hP
+    ∃ i : Fin L, P (liftListIndex C oracle radius L decode pad i) :=
+  exists_finListIndex hcard h
 
 end LigeroFamily
