@@ -164,6 +164,146 @@ theorem escaping_density_le (θ : ℕ) (hθ : θ + 1 ≤ n)
             / Fintype.card Challenge := by ring
     _ ≤ _ := add_le_add h1 h2
 
+/-! ## Profiled doom
+
+The one-threshold state above treats every lift failure as an escaped first-round
+challenge.  That is convenient, but it discards the failure-agreement profile which
+the flat proof already established.  The profiled state keeps a failure challenge
+doomed whenever its own accepting-query cover is small. -/
+
+/-- A challenge is doomed when the applicable cover certificate is below its own
+threshold: `failureThreshold` on selected-MCA failures and `arithmeticThreshold`
+on the ordinary arithmetic branch. -/
+def ProfiledDoomedAfter (failureThreshold arithmeticThreshold : ℕ)
+    (challenge : Challenge) : Prop :=
+  if challenge ∈ classifier.failure then
+    classifier.failureAgreement challenge ≤ failureThreshold
+  else
+    classifier.agreement challenge ≤ arithmeticThreshold
+
+/-- Challenges escaping the profiled doom state are precisely covered by the two
+agreement tails. -/
+noncomputable def profiledEscaping (failureThreshold arithmeticThreshold : ℕ) :
+    Finset Challenge := by
+  classical
+  exact AgreementProfile.restrictedTailSet classifier.failure
+      classifier.failureAgreement (failureThreshold + 1) ∪
+    AgreementProfile.tailSet classifier.agreement (arithmeticThreshold + 1)
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] [Nonempty Challenge] in
+theorem not_profiledDoomedAfter_mem_profiledEscaping
+    {failureThreshold arithmeticThreshold : ℕ} {challenge : Challenge}
+    (h : ¬ classifier.ProfiledDoomedAfter failureThreshold arithmeticThreshold challenge) :
+    challenge ∈ classifier.profiledEscaping failureThreshold arithmeticThreshold := by
+  classical
+  unfold ProfiledDoomedAfter at h
+  split at h
+  next hfailure =>
+    apply Finset.mem_union_left
+    simp only [AgreementProfile.restrictedTailSet, Finset.mem_filter]
+    exact ⟨hfailure, Nat.lt_of_not_le h⟩
+  next hfailure =>
+    apply Finset.mem_union_right
+    simpa [AgreementProfile.tailSet] using Nat.lt_of_not_le h
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] [Nonempty Challenge] in
+/-- Query-round preservation for the profiled state.  The cover is the larger of
+the selected-MCA failure cover and the ordinary arithmetic cover. -/
+theorem query_density_le_of_profiledDoomedAfter
+    (failureThreshold arithmeticThreshold : ℕ) (challenge : Challenge)
+    (hdoom : classifier.ProfiledDoomedAfter
+      failureThreshold arithmeticThreshold challenge) :
+    ((classifier.acceptingQueries challenge).card : ℚ) / (n.choose r) ≤
+      hypergeometricRatio
+        (max failureThreshold
+          (max (n - e - 1) (min n (g + arithmeticThreshold)))) n r := by
+  classical
+  have hcard := classifier.acceptingQueries_card_le challenge
+  unfold ProfiledDoomedAfter at hdoom
+  by_cases hfailure : challenge ∈ classifier.failure
+  · simp only [hfailure, ↓reduceIte] at hcard hdoom
+    have hchoose : (classifier.acceptingQueries challenge).card ≤
+        (max failureThreshold
+          (max (n - e - 1) (min n (g + arithmeticThreshold)))).choose r :=
+      hcard.trans (Nat.choose_le_choose r
+        (hdoom.trans (le_max_left _ _)))
+    unfold hypergeometricRatio
+    exact div_le_div_of_nonneg_right (by exact_mod_cast hchoose) (by positivity)
+  · simp only [hfailure, ↓reduceIte] at hcard hdoom
+    have hmono : max (n - e - 1) (min n (g + classifier.agreement challenge)) ≤
+        max (n - e - 1) (min n (g + arithmeticThreshold)) := by
+      apply max_le_max (le_refl _)
+      exact min_le_min (le_refl _) (by omega)
+    have hchoose : (classifier.acceptingQueries challenge).card ≤
+        (max failureThreshold
+          (max (n - e - 1) (min n (g + arithmeticThreshold)))).choose r :=
+      hcard.trans (Nat.choose_le_choose r
+        (hmono.trans (le_max_right _ _)))
+    unfold hypergeometricRatio
+    exact div_le_div_of_nonneg_right (by exact_mod_cast hchoose) (by positivity)
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] in
+/-- Challenge-round preservation retaining both proved agreement tails. -/
+theorem profiledEscaping_density_le
+    (failureThreshold arithmeticThreshold : ℕ)
+    (hfailureThreshold : failureThreshold + 1 ≤ n)
+    (harithmeticThreshold : arithmeticThreshold + 1 ≤ n)
+    (hfd : 0 < failureDenominator) (hpd : 0 < profileDenominator) :
+    ((classifier.profiledEscaping failureThreshold arithmeticThreshold).card : ℚ) /
+        Fintype.card Challenge ≤
+      (failureProfile.labelsAtLeast (failureThreshold + 1) : ℚ) /
+          failureDenominator +
+        (arithmeticProfile.labelsAtLeast (arithmeticThreshold + 1) : ℚ) /
+          profileDenominator := by
+  classical
+  have hchal : (0 : ℚ) < Fintype.card Challenge := by
+    exact_mod_cast Fintype.card_pos
+  let failureTail := AgreementProfile.restrictedTailSet classifier.failure
+    classifier.failureAgreement (failureThreshold + 1)
+  let arithmeticTail := AgreementProfile.tailSet classifier.agreement
+    (arithmeticThreshold + 1)
+  have hfailCard : (failureDenominator : ℚ) * (failureTail.card : ℚ) ≤
+      (failureProfile.labelsAtLeast (failureThreshold + 1) : ℚ) *
+        Fintype.card Challenge := by
+    have := classifier.failureAgreement_density
+      (failureThreshold + 1) hfailureThreshold
+    exact_mod_cast this
+  have harithmeticCard : (profileDenominator : ℚ) * (arithmeticTail.card : ℚ) ≤
+      (arithmeticProfile.labelsAtLeast (arithmeticThreshold + 1) : ℚ) *
+        Fintype.card Challenge := by
+    have := classifier.agreement_density
+      (arithmeticThreshold + 1) harithmeticThreshold
+    exact_mod_cast this
+  have hunion :
+      ((classifier.profiledEscaping failureThreshold arithmeticThreshold).card : ℚ) ≤
+        (failureTail.card : ℚ) + (arithmeticTail.card : ℚ) := by
+    have := Finset.card_union_le failureTail arithmeticTail
+    exact_mod_cast this
+  have hfdQ : (0 : ℚ) < failureDenominator := by exact_mod_cast hfd
+  have hpdQ : (0 : ℚ) < profileDenominator := by exact_mod_cast hpd
+  have h1 : (failureTail.card : ℚ) / Fintype.card Challenge ≤
+      (failureProfile.labelsAtLeast (failureThreshold + 1) : ℚ) /
+        failureDenominator := by
+    rw [div_le_div_iff₀ hchal hfdQ]
+    nlinarith [hfailCard]
+  have h2 : (arithmeticTail.card : ℚ) / Fintype.card Challenge ≤
+      (arithmeticProfile.labelsAtLeast (arithmeticThreshold + 1) : ℚ) /
+        profileDenominator := by
+    rw [div_le_div_iff₀ hchal hpdQ]
+    nlinarith [harithmeticCard]
+  calc
+    ((classifier.profiledEscaping failureThreshold arithmeticThreshold).card : ℚ) /
+          Fintype.card Challenge ≤
+        ((failureTail.card : ℚ) + (arithmeticTail.card : ℚ)) /
+          Fintype.card Challenge :=
+      div_le_div_of_nonneg_right hunion (le_of_lt hchal)
+    _ = (failureTail.card : ℚ) / Fintype.card Challenge +
+          (arithmeticTail.card : ℚ) / Fintype.card Challenge := by ring
+    _ ≤ _ := add_le_add h1 h2
+
 end PolicyDoublyProfiledSoundnessClassifier
 
 end LigeroFamily
