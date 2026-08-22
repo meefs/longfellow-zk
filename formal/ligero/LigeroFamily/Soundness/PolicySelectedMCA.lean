@@ -119,6 +119,54 @@ theorem badChallengesAtAgreement_eq_restrictedTailSet (a : ℕ) :
   rw [extractor.weights_eq]
 
 omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+private theorem badChallenges_agreement_density_of_fibers
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    (profile : AgreementProfile n) (a : ℕ)
+    (hfiber : ∀ tail : Tail,
+      (Fintype.card F - (g + 1)) *
+          (SchemeSelectedMCA.badWeightsAtAgreement
+            (C := C) (oracle := oracle) (e := e) (g := g)
+            (extractor.responseAtTail (respond := respond) tail) a).card ≤
+        profile.labelsAtLeast a *
+          Fintype.card (SchemeSelectedMCA.Weights F CheckedMask nw nq)) :
+    (Fintype.card F - (g + 1)) *
+        (AgreementProfile.restrictedTailSet
+          (extractor.badChallenges (oracle := oracle)
+            (respond := respond) (e := e) (g := g))
+          (failureAgreement (policy := policy) (oracle := oracle)
+            (respond := respond)) a).card ≤
+      profile.labelsAtLeast a * Fintype.card Challenge := by
+  classical
+  have hpairDensity :
+      (Fintype.card F - (g + 1)) *
+          (extractor.badChallengePairsAtAgreement (oracle := oracle)
+            (respond := respond) (e := e) (g := g) a).card ≤
+        profile.labelsAtLeast a *
+          Fintype.card
+            (Tail × SchemeSelectedMCA.Weights F CheckedMask nw nq) := by
+    rw [extractor.badChallengePairsAtAgreement_card_eq_sum]
+    simpa [Fintype.card_prod, Nat.mul_comm] using
+      SelectedMCA.fiberwise_density_sum
+        (fun tail : Tail =>
+          SchemeSelectedMCA.badWeightsAtAgreement
+            (C := C) (oracle := oracle) (e := e) (g := g)
+            (extractor.responseAtTail (respond := respond) tail) a)
+        (profile.labelsAtLeast a) (Fintype.card F - (g + 1)) hfiber
+  rw [← extractor.badChallengesAtAgreement_eq_restrictedTailSet
+    (oracle := oracle) (respond := respond) (e := e) (g := g) a]
+  have hcard :
+      (extractor.badChallengesAtAgreement (oracle := oracle)
+        (respond := respond) (e := e) (g := g) a).card =
+      (extractor.badChallengePairsAtAgreement (oracle := oracle)
+        (respond := respond) (e := e) (g := g) a).card := by
+    simp [badChallengesAtAgreement]
+  rw [hcard]
+  rw [show Fintype.card Challenge =
+      Fintype.card (Tail × SchemeSelectedMCA.Weights F CheckedMask nw nq) from
+    Fintype.card_congr extractor.challengeProductEquiv]
+  exact hpairDensity
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
 theorem badChallenges_agreement_density
     [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
     (hmin : HasMinimumDistanceAtLeast C.baseCode d)
@@ -134,45 +182,47 @@ theorem badChallenges_agreement_density
       (SchemeSelectedMCA.selectedMCAFailureProfile n g d
         (SelectedMCA.directLineFailureBound threshold)).labelsAtLeast a *
         Fintype.card Challenge := by
-  classical
-  have hfiber (tail : Tail) :=
+  apply extractor.badChallenges_agreement_density_of_fibers
+    (SchemeSelectedMCA.selectedMCAFailureProfile n g d
+      (SelectedMCA.directLineFailureBound threshold)) a
+  intro tail
+  exact
     SchemeSelectedMCA.badWeightsAtAgreement_density
       (C := C) (oracle := oracle)
       (extractor.responseAtTail (respond := respond) tail) hmin
       conditions.direct.directClique
       conditions.punctured.punctured_three_radius
       conditions.punctured.field_large a
-  have hpairDensity :
-      (Fintype.card F - (g + 1)) *
-          (extractor.badChallengePairsAtAgreement (oracle := oracle)
-            (respond := respond) (e := e) (g := g) a).card ≤
-        (SchemeSelectedMCA.selectedMCAFailureProfile n g d
-          (SelectedMCA.directLineFailureBound threshold)).labelsAtLeast a *
-          Fintype.card
-            (Tail × SchemeSelectedMCA.Weights F CheckedMask nw nq) := by
-    rw [extractor.badChallengePairsAtAgreement_card_eq_sum]
-    simpa [Fintype.card_prod, Nat.mul_comm] using
-      SelectedMCA.fiberwise_density_sum
-        (fun tail : Tail =>
-          SchemeSelectedMCA.badWeightsAtAgreement
-            (C := C) (oracle := oracle) (e := e) (g := g)
-            (extractor.responseAtTail (respond := respond) tail) a)
-        ((SchemeSelectedMCA.selectedMCAFailureProfile n g d
-          (SelectedMCA.directLineFailureBound threshold)).labelsAtLeast a)
-        (Fintype.card F - (g + 1)) hfiber
-  rw [← extractor.badChallengesAtAgreement_eq_restrictedTailSet
-    (oracle := oracle) (respond := respond) (e := e) (g := g) a]
-  have hcard :
-      (extractor.badChallengesAtAgreement (oracle := oracle)
-        (respond := respond) (e := e) (g := g) a).card =
-      (extractor.badChallengePairsAtAgreement (oracle := oracle)
-        (respond := respond) (e := e) (g := g) a).card := by
-    simp [badChallengesAtAgreement]
-  rw [hcard]
-  rw [show Fintype.card Challenge =
-      Fintype.card (Tail × SchemeSelectedMCA.Weights F CheckedMask nw nq) from
-    Fintype.card_congr extractor.challengeProductEquiv]
-  exact hpairDensity
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- Policy-level density theorem for the agreement-local selected-MCA
+profile. -/
+theorem badChallenges_agreement_density_refined
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    {localThreshold cutoff : ℕ}
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : RefinedSelectedMCAParameterConditions
+      (Fintype.card F) n e g d threshold cutoff localThreshold)
+    (a : ℕ) :
+    (Fintype.card F - (g + 1)) *
+        (AgreementProfile.restrictedTailSet
+          (extractor.badChallenges (oracle := oracle)
+            (respond := respond) (e := e) (g := g))
+          (failureAgreement (policy := policy) (oracle := oracle)
+            (respond := respond)) a).card ≤
+      (SchemeSelectedMCA.selectedMCARefinedFailureProfile n g d
+        (SelectedMCA.directLineFailureBound threshold) cutoff
+        (SelectedMCA.directLineFailureBound localThreshold)).labelsAtLeast a *
+        Fintype.card Challenge := by
+  apply extractor.badChallenges_agreement_density_of_fibers
+    (SchemeSelectedMCA.selectedMCARefinedFailureProfile n g d
+      (SelectedMCA.directLineFailureBound threshold) cutoff
+      (SelectedMCA.directLineFailureBound localThreshold)) a
+  intro tail
+  exact
+    SchemeSelectedMCA.badWeightsAtAgreement_density_refined
+      (C := C) (oracle := oracle)
+      (extractor.responseAtTail (respond := respond) tail) hmin conditions a
 
 omit [Fintype Equations] [DecidableEq Equations] [Fintype Challenge]
     [DecidableEq Challenge] [DecidableEq Tail] in
@@ -264,6 +314,41 @@ theorem exists_profiledPolicyLiftList_of_selectedMCA
   intro a _ha
   rw [hfailure]
   exact extractor.badChallenges_agreement_density
+    (oracle := oracle) (respond := respond) hmin conditions a
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- Construct the fixed lift list with the agreement-local failure profile. -/
+theorem exists_profiledPolicyLiftList_of_refinedSelectedMCA
+    (extractor : SchemeExtractorPolicy policy Tail)
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    {localThreshold cutoff : ℕ}
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : RefinedSelectedMCAParameterConditions
+      (Fintype.card F) n e g d threshold cutoff localThreshold) :
+    ∃ certificate : PolicyLiftListCertificate policy oracle respond e g (e + g)
+        (CodingTheory.InterleavedJohnson.listBound n d (e + g)),
+      ∀ a ≤ n,
+        (Fintype.card F - (g + 1)) *
+            (AgreementProfile.restrictedTailSet certificate.failure
+              (fun challenge =>
+                (schemeProximityAgreement oracle
+                  (policy.proximityWeights challenge 0)
+                  (policy.proximityResponse (respond challenge) 0)).card) a).card ≤
+          (SchemeSelectedMCA.selectedMCARefinedFailureProfile n g d
+            (SelectedMCA.directLineFailureBound threshold) cutoff
+            (SelectedMCA.directLineFailureBound localThreshold)).labelsAtLeast a *
+            Fintype.card Challenge := by
+  obtain ⟨certificate, hfailure⟩ :=
+    exists_policyLiftList_of_selectedMCA (extractor := extractor)
+      (oracle := oracle) (respond := respond) hmin
+      (by
+        have := conditions.toSelectedMCAParameterConditions.punctured.punctured_three_radius
+        omega)
+      conditions.toSelectedMCAParameterConditions.johnson.list_denominator_positive
+  refine ⟨certificate, ?_⟩
+  intro a _ha
+  rw [hfailure]
+  exact extractor.badChallenges_agreement_density_refined
     (oracle := oracle) (respond := respond) hmin conditions a
 
 end SchemeExtractorPolicy

@@ -1,6 +1,7 @@
 import SelectedMCA.DirectLineExtraction
 import LigeroFamily.Soundness.SchemeLiftBridge
 import LigeroFamily.Soundness.AgreementProfile
+import LigeroFamily.Soundness.SelectedMCAParameters
 
 /-!
 # Mask-scheme-generic selected-response lift density
@@ -88,6 +89,19 @@ def selectedMCAFailureProfile
     if n < a then 0
     else if 3 * (n - a) < d then 1 + (n - a) / (g + 1)
     else lineBound
+
+/-- Agreement-local selected-MCA profile.  At and above `cutoff`, actual
+agreement forces decoding radius at most `n - cutoff`, so a second clique
+certificate at that radius can replace the outer-radius line bound.  Taking
+the minimum preserves the sharper three-radius tail. -/
+def selectedMCARefinedFailureProfile
+    (n g d outerLineBound cutoff localLineBound : ℕ) : AgreementProfile n where
+  labelsAtLeast a :=
+    if cutoff ≤ a then
+      min ((selectedMCAFailureProfile n g d outerLineBound).labelsAtLeast a)
+        ((selectedMCAFailureProfile n g d localLineBound).labelsAtLeast a)
+    else
+      (selectedMCAFailureProfile n g d outerLineBound).labelsAtLeast a
 
 /-- The selected-MCA failure profile has an exact three-band envelope: the
 global line bound, the largest sharp one-line value, and the final value one. -/
@@ -569,6 +583,80 @@ theorem badWeightsAtAgreement_density
         ring
   have hresult := (Nat.le_of_mul_le_mul_right hcanceled) hpowerpos
   simpa [q, selected, profileBound] using hresult
+
+omit [Nonempty (SchemeTestedRow CheckedMask nw nq 1)] in
+/-- Once actual agreement reaches `cutoff`, the outer radius in the bad-weight
+set can be replaced by the forced local radius `n - cutoff`. -/
+theorem badWeightsAtAgreement_eq_localRadius
+    (respond : Weights F CheckedMask nw nq → EvaluationRow F r w n)
+    (cutoff a : ℕ) (hradius : n - e ≤ cutoff) (hcutoff : cutoff ≤ a) :
+    badWeightsAtAgreement (C := C) (oracle := oracle)
+        (e := e) (g := g) respond a =
+      badWeightsAtAgreement (C := C) (oracle := oracle)
+        (e := n - cutoff) (g := g) respond a := by
+  classical
+  ext weights
+  simp only [badWeightsAtAgreement, Finset.mem_filter]
+  constructor
+  · rintro ⟨hbad, hagreement⟩
+    have hparts := Finset.mem_filter.mp hbad
+    have hpartition := schemeProximity_partition oracle weights (respond weights)
+    apply And.intro
+    · apply Finset.mem_filter.mpr
+      refine ⟨hparts.1, hparts.2.1, ?_, hparts.2.2.2⟩
+      omega
+    · exact hagreement
+  · rintro ⟨hbad, hagreement⟩
+    have hparts := Finset.mem_filter.mp hbad
+    apply And.intro
+    · apply Finset.mem_filter.mpr
+      refine ⟨hparts.1, hparts.2.1, ?_, hparts.2.2.2⟩
+      omega
+    · exact hagreement
+
+/-- Density bound for the agreement-local profile.  Above `cutoff`, the same
+bad responses are viewed at radius `n - cutoff` and both the outer and local
+clique bounds are available; below it this is the existing profile theorem. -/
+theorem badWeightsAtAgreement_density_refined
+    {cutoff localThreshold : ℕ}
+    (respond : Weights F CheckedMask nw nq → EvaluationRow F r w n)
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : LigeroFamily.RefinedSelectedMCAParameterConditions
+      (Fintype.card F) n e g d threshold cutoff localThreshold)
+    (a : ℕ) :
+    (Fintype.card F - (g + 1)) *
+        (badWeightsAtAgreement (C := C) (oracle := oracle)
+          (e := e) (g := g) respond a).card ≤
+      (selectedMCARefinedFailureProfile n g d
+        (SelectedMCA.directLineFailureBound threshold) cutoff
+        (SelectedMCA.directLineFailureBound localThreshold)).labelsAtLeast a *
+        Fintype.card (Weights F CheckedMask nw nq) := by
+  have houter := badWeightsAtAgreement_density
+    (C := C) (oracle := oracle) respond hmin
+      conditions.toSelectedMCAParameterConditions.direct.directClique
+      conditions.toSelectedMCAParameterConditions.punctured.punctured_three_radius
+      conditions.toSelectedMCAParameterConditions.punctured.field_large a
+  by_cases hcutoff : cutoff ≤ a
+  · have heq := badWeightsAtAgreement_eq_localRadius
+      (C := C) (oracle := oracle) (e := e) (g := g) respond cutoff a
+      conditions.radius_le_cutoff hcutoff
+    have hlocal := badWeightsAtAgreement_density
+      (C := C) (oracle := oracle) (e := n - cutoff) (g := g)
+      respond hmin conditions.localDirect conditions.local_three_radius
+      conditions.toSelectedMCAParameterConditions.punctured.field_large a
+    rw [← heq] at hlocal
+    simp only [selectedMCARefinedFailureProfile, hcutoff, ↓reduceIte]
+    by_cases hle :
+        (selectedMCAFailureProfile n g d
+          (SelectedMCA.directLineFailureBound threshold)).labelsAtLeast a ≤
+        (selectedMCAFailureProfile n g d
+          (SelectedMCA.directLineFailureBound localThreshold)).labelsAtLeast a
+    · rw [min_eq_left hle]
+      exact houter
+    · rw [min_eq_right (Nat.le_of_not_ge hle)]
+      exact hlocal
+  · simp only [selectedMCARefinedFailureProfile, hcutoff, ↓reduceIte]
+    exact houter
 
 /-- The unprofiled density bound is the zero-agreement specialization of the
 profiled theorem. -/

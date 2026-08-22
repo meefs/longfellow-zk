@@ -32,4 +32,17 @@ structure SelectedMCAParameterConditions
   punctured : PuncturedGlobalizationConditions q e g d
   johnson : JohnsonListConditions n e g d
 
+/-- Parameters for the agreement-local selected-MCA refinement.  The outer
+certificate still constructs the lift list.  The local certificate is applied
+only to selected responses whose actual agreement is at least `cutoff`, where
+their decoding radius is at most `n - cutoff`. -/
+structure RefinedSelectedMCAParameterConditions
+    (q n e g d threshold cutoff localThreshold : ℕ) : Prop extends
+    SelectedMCAParameterConditions q n e g d threshold where
+  radius_le_cutoff : n - e ≤ cutoff
+  cutoff_le_length : cutoff ≤ n
+  localDirect : SelectedMCA.DirectCliqueCondition
+    n (n - cutoff) g d localThreshold
+  local_three_radius : 3 * g < d - (n - cutoff)
+
 end LigeroFamily
