@@ -1,4 +1,5 @@
 import examples.Ligero.Grid
+import examples.Ligero.Grid.Rigid
 namespace Ligero.Examples.Grid.Comparison
 
 open LigeroFamily
@@ -245,9 +246,48 @@ theorem flatUDRNumerics_valid :
     flatUDRNumerics.all UDRNumericResult.flatValidBool = true := by
   native_decide
 
+structure RigidNumericResult where
+  targetBits : ℕ
+  openings : ℕ
+
+def RigidNumericResult.gridResult (result : RigidNumericResult) :
+    Ligero.Examples.Grid.Rigid.Result :=
+  { certificate := result.certificate
+    g := 1037
+    m := 168846
+    openings := result.openings }
+
+def RigidNumericResult.Valid (result : RigidNumericResult) : Prop :=
+  result.gridResult.NumericValid
+
+def RigidNumericResult.validBool (result : RigidNumericResult) : Bool :=
+  @decide result.Valid (by
+    unfold Valid Ligero.Examples.Grid.Rigid.Result.NumericValid
+      Ligero.Examples.Grid.Rigid.Result.ParametersValid
+    infer_instance)
+
+def rigidNumerics : List RigidNumericResult := [
+  { targetBits := 115, openings := 126 },
+  { targetBits := 116, openings := 127 },
+  { targetBits := 117, openings := 129 },
+  { targetBits := 118, openings := 130 },
+  { targetBits := 119, openings := 131 },
+  { targetBits := 120, openings := 132 },
+  { targetBits := 121, openings := 133 },
+  { targetBits := 122, openings := 134 },
+  { targetBits := 123, openings := 135 },
+  { targetBits := 124, openings := 136 },
+  { targetBits := 125, openings := 138 }
+]
+
+theorem rigidNumerics_valid :
+    rigidNumerics.all RigidNumericResult.validBool = true := by
+  native_decide
+
 inductive Regime where
   | selectedMCA
   | refinedMCA
+  | rigid
   | udr
 deriving DecidableEq, Repr
 
@@ -255,42 +295,44 @@ structure SideBySide where
   targetBits : ℕ
   flatRegime : Regime
   flatOpenings : ℕ
+  rigidOpenings : ℕ
   rbrRegime : Regime
   rbrOpenings : ℕ
 deriving DecidableEq, Repr
 
-/-- Search-optimized comparison, conditional on the UDR interface for rows
-marked `udr`.  UDR first wins the RBR column at 122 bits; ordinary selected
-MCA with reoptimized radius and residual size wins at 120 and 121 bits. -/
+/-- Search-optimized comparison.  Rows marked `udr` and the rigid column have
+the implementation-boundary status described above.  At the 122-bit point the
+audited rigid coefficient needs 134 openings instead of the conditional
+RBR/UDR interface's 150. -/
 def sideBySide : List SideBySide := [
-  ⟨115, .selectedMCA, 122, .selectedMCA, 122⟩,
-  ⟨116, .selectedMCA, 123, .selectedMCA, 123⟩,
-  ⟨117, .selectedMCA, 124, .selectedMCA, 125⟩,
-  ⟨118, .selectedMCA, 125, .selectedMCA, 126⟩,
-  ⟨119, .selectedMCA, 126, .selectedMCA, 128⟩,
-  ⟨120, .selectedMCA, 127, .selectedMCA, 132⟩,
-  ⟨121, .selectedMCA, 128, .selectedMCA, 138⟩,
-  ⟨122, .refinedMCA, 129, .udr, 150⟩,
-  ⟨123, .refinedMCA, 131, .udr, 151⟩,
-  ⟨124, .refinedMCA, 132, .udr, 152⟩,
-  ⟨125, .refinedMCA, 133, .udr, 153⟩
+  ⟨115, .selectedMCA, 122, 126, .selectedMCA, 122⟩,
+  ⟨116, .selectedMCA, 123, 127, .selectedMCA, 123⟩,
+  ⟨117, .selectedMCA, 124, 129, .selectedMCA, 125⟩,
+  ⟨118, .selectedMCA, 125, 130, .selectedMCA, 126⟩,
+  ⟨119, .selectedMCA, 126, 131, .selectedMCA, 128⟩,
+  ⟨120, .selectedMCA, 127, 132, .selectedMCA, 132⟩,
+  ⟨121, .selectedMCA, 128, 133, .selectedMCA, 138⟩,
+  ⟨122, .refinedMCA, 129, 134, .udr, 150⟩,
+  ⟨123, .refinedMCA, 131, 135, .udr, 151⟩,
+  ⟨124, .refinedMCA, 132, 136, .udr, 152⟩,
+  ⟨125, .refinedMCA, 133, 138, .udr, 153⟩
 ]
 
 /-- UDR in isolation.  RBR uses a maximum of the singleton field term and the
 query term, whereas flat soundness adds them; at two boundary rows that saves
 one opening. -/
 def udrSideBySide : List SideBySide := [
-  ⟨115, .udr, 141, .udr, 141⟩,
-  ⟨116, .udr, 142, .udr, 142⟩,
-  ⟨117, .udr, 144, .udr, 144⟩,
-  ⟨118, .udr, 145, .udr, 145⟩,
-  ⟨119, .udr, 146, .udr, 146⟩,
-  ⟨120, .udr, 147, .udr, 147⟩,
-  ⟨121, .udr, 149, .udr, 148⟩,
-  ⟨122, .udr, 150, .udr, 150⟩,
-  ⟨123, .udr, 151, .udr, 151⟩,
-  ⟨124, .udr, 152, .udr, 152⟩,
-  ⟨125, .udr, 154, .udr, 153⟩
+  ⟨115, .udr, 141, 126, .udr, 141⟩,
+  ⟨116, .udr, 142, 127, .udr, 142⟩,
+  ⟨117, .udr, 144, 129, .udr, 144⟩,
+  ⟨118, .udr, 145, 130, .udr, 145⟩,
+  ⟨119, .udr, 146, 131, .udr, 146⟩,
+  ⟨120, .udr, 147, 132, .udr, 147⟩,
+  ⟨121, .udr, 149, 133, .udr, 148⟩,
+  ⟨122, .udr, 150, 134, .udr, 150⟩,
+  ⟨123, .udr, 151, 135, .udr, 151⟩,
+  ⟨124, .udr, 152, 136, .udr, 152⟩,
+  ⟨125, .udr, 154, 138, .udr, 153⟩
 ]
 
 theorem sideBySide_count : sideBySide.length = 11 := by native_decide

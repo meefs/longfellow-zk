@@ -1,7 +1,7 @@
 
 name = "proofs"
 version = "0.1.0"
-defaultTargets = ["Ligero.APITest"]
+defaultTargets = ["Merkle", "Bcs", "Ligero.APITest", "Sumcheck"]
 
 [[require]]
 name = "mathlib"
@@ -47,6 +47,23 @@ leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsErro
 [[lean_lib]]
 name = "examples"
 srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+
+[[lean_lib]]
+name = "Sumcheck"
+srcDir = "sumcheck"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false }
+
+
+[[lean_lib]]
+name = "Merkle"
+srcDir = "merkle"
+
+
+[[lean_lib]]
+name = "Bcs"
+srcDir = "bcs"
 leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
 
 
