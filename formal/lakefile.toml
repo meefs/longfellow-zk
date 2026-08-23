@@ -1,7 +1,7 @@
 
 name = "proofs"
 version = "0.1.0"
-defaultTargets = ["Merkle", "Bcs", "Ligero.APITest", "Sumcheck"]
+defaultTargets = ["JBAgreement", "Merkle", "Bcs", "Ligero.APITest", "Sumcheck"]
 
 [[require]]
 name = "mathlib"
@@ -42,6 +42,12 @@ leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsErro
 [[lean_lib]]
 name = "Ligero"
 srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "JBAgreement"
+srcDir = "ligero"
+globs = ["JBAgreement", "JBAgreement.+"]
 leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
 
 [[lean_lib]]
