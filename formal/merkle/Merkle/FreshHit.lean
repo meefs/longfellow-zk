@@ -164,6 +164,37 @@ theorem answerTape_slot_determined_card_le [Fintype D] [DecidableEq D] (T : ℕ)
     · exact hoff i hi
   · rw [Finset.card_univ, Fintype.card_fun, hcard]
 
+/--
+**A fresh slot is uniform.**
+
+The tapes on which slot `j` takes a given value number exactly `|D|^(T-1)` — the same count for every
+value.  `answerTape_slot_determined_card_le` gives only `≤`, which is all a bad-event bound needs;
+*uniformity* needs the equality, and it is what makes a freshly queried oracle answer a uniform coin
+the simulator may sample instead.
+-/
+theorem answerTape_slot_eq_card [Fintype D] [DecidableEq D] (T : ℕ) (j : Fin T) (y : D) :
+    (Finset.filter (fun a : Fin T → D => a j = y) Finset.univ).card
+      = (Fintype.card D) ^ (T - 1) := by
+  classical
+  have hcard : Fintype.card {i : Fin T // i ≠ j} = T - 1 := by
+    rw [Fintype.card_subtype_compl]; simp
+  have e : {a : Fin T → D // a j = y} ≃ ({i : Fin T // i ≠ j} → D) :=
+    { toFun := fun a i => a.1 i.val
+      invFun := fun b => ⟨fun i => if h : i = j then y else b ⟨i, h⟩, by simp⟩
+      left_inv := by
+        intro a
+        refine Subtype.ext ?_
+        funext i
+        by_cases h : i = j
+        · subst h; simp [a.2]
+        · simp [h]
+      right_inv := by
+        intro b
+        funext i
+        simp [i.property] }
+  rw [← Fintype.card_subtype (p := fun a : Fin T → D => a j = y), Fintype.card_congr e,
+    Fintype.card_fun, hcard]
+
 /-- Union bound over a fixed family of slot-determining conditions.  As always the *family* is fixed
 in advance and only the values are adaptive. -/
 theorem answerTape_determinedFamily_card_le {ι : Type*} [Fintype D] [DecidableEq D]

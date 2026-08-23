@@ -60,7 +60,7 @@ theorem candidate_of_acceptance
   subst horacle
   by_contra hcon
   exact absurd (v1_ligero_soundness_selectedMCA hrows C statement prover
-    (fun candidate hsat ↦ hcon ⟨candidate, hsat⟩) hmin conditions johnson)
+    (fun candidate hsat ↦ hcon ⟨candidate, hsat⟩) hmin (conditions.lineConditions hmin) johnson)
     (not_le.mpr hrate)
 
 /-- **V1 extraction, packaged.** -/
@@ -159,6 +159,6 @@ theorem end_to_end_selectedMCA
     exact v1_ligero_perfect_completeness messages hsatisfies seed coins
   · intro statement hfalse prover
     exact v1_ligero_soundness_selectedMCA hrows C statement prover
-      (NoDecodedSolution.of_not_language hfalse) hmin conditions johnson
+      (NoDecodedSolution.of_not_language hfalse) hmin (conditions.lineConditions hmin) johnson
 
 end Ligero.V1

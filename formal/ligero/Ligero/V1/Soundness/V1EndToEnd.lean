@@ -17,7 +17,7 @@ open CodingTheory
 
 variable {F Equations : Type*} [Field F] [Fintype F] [DecidableEq F]
 variable [Fintype Equations] [DecidableEq Equations]
-variable {r w n nw nq e g d m threshold : ℕ}
+variable {r w n nw nq e g d bound threshold : ℕ}
 
 
 
@@ -34,12 +34,12 @@ theorem v1_ligero_soundness_selectedMCA
       (Response F r w n 1))
     (hfalse : NoDecodedSolution C (prover.commit statement) (e + g) statement)
     (hmin : HasMinimumDistanceAtLeast C.baseCode d)
-    (conditions : LigeroFamily.SelectedMCAParameterConditions
-      (Fintype.card F) n e g d m)
+    (conditions : LigeroFamily.SelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d bound)
     (johnson : V1JohnsonRange C threshold) :
     (SchemeVerifier.protocol C scheme).acceptanceRate prover statement ≤
       (SchemeSelectedMCA.selectedMCAFailureProfile n g d
-        (SelectedMCA.directLineFailureBound m)).contribution
+        (bound)).contribution
           (Fintype.card F - (g + 1)) n n 0 r +
       (uncheckedAgreementProfile (Fintype.card F) n (2 * C.k - 1)
         (CodingTheory.InterleavedJohnson.listBound n d (e + g))
@@ -56,7 +56,7 @@ theorem v1_ligero_soundness_selectedMCA
       hmin conditions
   exact v1_ligero_soundness_of_profiledFailure certificate
     (SchemeSelectedMCA.selectedMCAFailureProfile n g d
-      (SelectedMCA.directLineFailureBound m)) hdensity hfalse johnson
+      (bound)) hdensity hfalse johnson
     prover rfl (fun _ ↦ rfl)
       (Nat.sub_pos_of_lt conditions.punctured.field_large)
 

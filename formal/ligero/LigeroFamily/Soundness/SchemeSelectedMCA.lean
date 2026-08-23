@@ -1,4 +1,4 @@
-import SelectedMCA.DirectLineExtraction
+import SelectedMCA.LineFailure
 import LigeroFamily.Soundness.SchemeLiftBridge
 import LigeroFamily.Soundness.AgreementProfile
 import LigeroFamily.Soundness.SelectedMCAParameters
@@ -20,7 +20,7 @@ open AffineAgreement SelectedMCA
 variable {F CheckedMask DirectMask : Type*}
 variable [Field F] [Fintype F] [DecidableEq F]
 variable [Fintype CheckedMask] [DecidableEq CheckedMask]
-variable {r w n nw nq e g d threshold : ℕ}
+variable {r w n nw nq e g d bound : ℕ}
 
 namespace SchemeSelectedMCA
 
@@ -227,17 +227,20 @@ private theorem observed_affine
   simp [affineWord]
   ring
 
-/-- On every nonzero direction, the direct clique theorem bounds the
+/-- On every nonzero direction, a per-line selected-MCA bound bounds the
 number of bad selected responses whose actual agreement set also sees that
-direction as far. -/
+direction as far.  The line bound is supplied by whichever proximity theorem the
+certificate uses -- the marked-triples clique condition through
+`SelectedMCA.lineFailureBound_of_directClique`, or the Johnson regime through
+`JBAgreement.lineFailureBound_of_johnson`. -/
 theorem bad_far_on_direction_card_le
     (respond : Weights F CheckedMask nw nq → EvaluationRow F r w n)
-    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
-    (hdirect : SelectedMCA.DirectCliqueCondition n e g d threshold)
+    (hline : SelectedMCA.LineFailureBound C.baseCode e g
+      (bound))
     (direction : Weights F CheckedMask nw nq) (hdirection : direction ≠ 0) :
     (badFarWeights (C := C) (oracle := oracle) (e := e) (g := g)
       respond direction).card ≤
-      SelectedMCA.directLineFailureBound threshold *
+      bound *
         Fintype.card F ^ (Fintype.card (SchemeTestedRow CheckedMask nw nq 1) - 1) := by
   classical
   simp only [badFarWeights]
@@ -260,7 +263,7 @@ theorem bad_far_on_direction_card_le
       DirectionFar (C := C) (oracle := oracle) (g := g)
         weights direction (respond weights))
     direction hdirection
-    (SelectedMCA.directLineFailureBound threshold)
+    (bound)
   intro base
   let parameters := Finset.univ.filter fun scalar : F ↦
     base + scalar • direction ∈
@@ -315,11 +318,9 @@ theorem bad_far_on_direction_card_le
       rw [← observed_affine (oracle := oracle) base direction scalar]
       simp [schemeProximityAgreement, codeword, eq_comm]
     simpa [hagreement] using hsmall
-  have hbound :=
-    SelectedMCA.directionallyNonliftableParameters_card_le_direct
-      data hmin hdirect
+  have hbound := hline data
   have hparameters : parameters.card ≤
-      SelectedMCA.directLineFailureBound threshold :=
+      bound :=
     (Finset.card_le_card hallNonliftable).trans hbound
   simpa [parameters] using hparameters
 
@@ -327,13 +328,14 @@ theorem bad_far_on_direction_card_le
 theorem bad_far_atAgreement_on_direction_card_le
     (respond : Weights F CheckedMask nw nq → EvaluationRow F r w n)
     (hmin : HasMinimumDistanceAtLeast C.baseCode d)
-    (hdirect : SelectedMCA.DirectCliqueCondition n e g d threshold)
+    (hline : SelectedMCA.LineFailureBound C.baseCode e g
+      (bound))
     (a : ℕ) (direction : Weights F CheckedMask nw nq)
     (hdirection : direction ≠ 0) :
     (badFarWeightsAtAgreement (C := C) (oracle := oracle)
       (e := e) (g := g) respond direction a).card ≤
       (selectedMCAFailureProfile n g d
-        (SelectedMCA.directLineFailureBound threshold)).labelsAtLeast a *
+        (bound)).labelsAtLeast a *
         Fintype.card F ^
           (Fintype.card (SchemeTestedRow CheckedMask nw nq 1) - 1) := by
   classical
@@ -455,7 +457,7 @@ theorem bad_far_atAgreement_on_direction_card_le
         exact Finset.mem_filter.mpr
           ⟨(Finset.mem_filter.mp hparts.1).1, hparts.2⟩
       have hbound := bad_far_on_direction_card_le
-        (C := C) (oracle := oracle) respond hmin hdirect
+        (C := C) (oracle := oracle) respond hline
           direction hdirection
       have hcard := (Finset.card_le_card hsubset).trans hbound
       simpa [selectedMCAFailureProfile, han, hsharp] using hcard
@@ -466,14 +468,15 @@ than the outer-radius clique constant. -/
 theorem badWeightsAtAgreement_density
     (respond : Weights F CheckedMask nw nq → EvaluationRow F r w n)
     (hmin : HasMinimumDistanceAtLeast C.baseCode d)
-    (hdirect : SelectedMCA.DirectCliqueCondition n e g d threshold)
+    (hline : SelectedMCA.LineFailureBound C.baseCode e g
+      (bound))
     (hthree : 3 * g < d - e) (hfield : g + 1 < Fintype.card F)
     (a : ℕ) :
     (Fintype.card F - (g + 1)) *
         (badWeightsAtAgreement (C := C) (oracle := oracle)
           (e := e) (g := g) respond a).card ≤
       (selectedMCAFailureProfile n g d
-        (SelectedMCA.directLineFailureBound threshold)).labelsAtLeast a *
+        (bound)).labelsAtLeast a *
         Fintype.card (Weights F CheckedMask nw nq) := by
   classical
   let q := Fintype.card F
@@ -481,7 +484,7 @@ theorem badWeightsAtAgreement_density
   let power := q ^ (rows - 1)
   let missing := (g + 1) * power
   let profileBound := (selectedMCAFailureProfile n g d
-    (SelectedMCA.directLineFailureBound threshold)).labelsAtLeast a
+    (bound)).labelsAtLeast a
   let perDirection := profileBound * power
   let selected := badWeightsAtAgreement (C := C) (oracle := oracle)
     (e := e) (g := g) respond a
@@ -553,7 +556,7 @@ theorem badWeightsAtAgreement_density
     · dsimp [perDirection, profileBound, power, rows, q, selected]
       simpa [badFarWeightsAtAgreement, far] using
         bad_far_atAgreement_on_direction_card_le
-          (C := C) (oracle := oracle) respond hmin hdirect
+          (C := C) (oracle := oracle) respond hmin hline
             a direction hdirection
   have hdouble := SelectedMCA.double_averaging_card
     selected far missing perDirection hmany hfew
@@ -618,7 +621,7 @@ theorem badWeightsAtAgreement_eq_localRadius
 bad responses are viewed at radius `n - cutoff` and both the outer and local
 clique bounds are available; below it this is the existing profile theorem. -/
 theorem badWeightsAtAgreement_density_refined
-    {cutoff localThreshold : ℕ}
+    {threshold cutoff localThreshold : ℕ}
     (respond : Weights F CheckedMask nw nq → EvaluationRow F r w n)
     (hmin : HasMinimumDistanceAtLeast C.baseCode d)
     (conditions : LigeroFamily.RefinedSelectedMCAParameterConditions
@@ -633,7 +636,7 @@ theorem badWeightsAtAgreement_density_refined
         Fintype.card (Weights F CheckedMask nw nq) := by
   have houter := badWeightsAtAgreement_density
     (C := C) (oracle := oracle) respond hmin
-      conditions.toSelectedMCAParameterConditions.direct.directClique
+      (conditions.toSelectedMCAParameterConditions.direct.lineFailure hmin)
       conditions.toSelectedMCAParameterConditions.punctured.punctured_three_radius
       conditions.toSelectedMCAParameterConditions.punctured.field_large a
   by_cases hcutoff : cutoff ≤ a
@@ -642,7 +645,9 @@ theorem badWeightsAtAgreement_density_refined
       conditions.radius_le_cutoff hcutoff
     have hlocal := badWeightsAtAgreement_density
       (C := C) (oracle := oracle) (e := n - cutoff) (g := g)
-      respond hmin conditions.localDirect conditions.local_three_radius
+      respond hmin
+      (SelectedMCA.lineFailureBound_of_directClique hmin conditions.localDirect)
+      conditions.local_three_radius
       conditions.toSelectedMCAParameterConditions.punctured.field_large a
     rw [← heq] at hlocal
     simp only [selectedMCARefinedFailureProfile, hcutoff, ↓reduceIte]
@@ -663,15 +668,16 @@ profiled theorem. -/
 theorem badWeights_density
     (respond : Weights F CheckedMask nw nq → EvaluationRow F r w n)
     (hmin : HasMinimumDistanceAtLeast C.baseCode d)
-    (hdirect : SelectedMCA.DirectCliqueCondition n e g d threshold)
+    (hline : SelectedMCA.LineFailureBound C.baseCode e g
+      (bound))
     (hthree : 3 * g < d - e) (hfield : g + 1 < Fintype.card F) :
     (Fintype.card F - (g + 1)) *
         (badWeights (C := C) (oracle := oracle) (e := e) (g := g)
           respond).card ≤
-      SelectedMCA.directLineFailureBound threshold *
+      bound *
         Fintype.card (Weights F CheckedMask nw nq) := by
   have hprofile := badWeightsAtAgreement_density
-    (C := C) (oracle := oracle) respond hmin hdirect
+    (C := C) (oracle := oracle) respond hmin hline
       hthree hfield 0
   have hbad :
       badWeightsAtAgreement (C := C) (oracle := oracle)

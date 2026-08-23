@@ -239,6 +239,75 @@ theorem lazyRun_trace_slot (tape : Fin T → D) (dflt : D) :
       · obtain ⟨hmem, hval⟩ := lazyRun_trace_slot tape dflt (next y) seen' qa htail
         exact ⟨hmem, hval⟩
 
+/-! ### Distinct queries receive the tape verbatim
+
+The bridge from the *hash-oracle* model to the *coin-tape* model.  `Bcs.Rbr` and the Fiat–Shamir
+zero-knowledge statements treat a round's challenge as a tape coordinate; the deployed protocol
+obtains it by hashing a transcript prefix.  These agree exactly when the queries are **distinct**,
+which the honest Fiat–Shamir prover's are — each round hashes a longer prefix.
+
+`lazyRun_trace_slot` says an answer is the tape at its query's permanent slot; the content here is
+that for distinct queries in a known order those slots are `0, 1, 2, …`, so the answer sequence *is*
+the tape.  Nothing is assumed and nothing is paid: the coin-tape model is realised.
+-/
+
+/--
+**A run whose distinct queries are `qs` receives the tape in order.**
+
+The answer recorded at `qs k` is tape slot `k`.  So the challenge sequence a Fiat–Shamir prover
+derives by hashing is the coin tape, coordinate for coordinate.
+-/
+theorem lazyRun_answer_eq_tape {L : ℕ} (tape : Fin T → D) (dflt : D)
+    {fuel : ℕ} (c : Tree Q D A fuel) (qs : Fin L → Q) (hinj : Function.Injective qs)
+    (hseen : (lazyRun tape dflt c []).2.1 = List.ofFn qs)
+    {k : Fin L} (hk : k.val < T)
+    {qa : Q × D} (hqa : qa ∈ (lazyRun tape dflt c []).2.2) (hq : qa.1 = qs k) :
+    qa.2 = tape ⟨k.val, hk⟩ := by
+  obtain ⟨-, hval⟩ := lazyRun_trace_slot tape dflt c [] qa hqa
+  have hlen : k.val < (List.ofFn qs).length := by simp
+  have helem : (List.ofFn qs)[k.val] = qs k := by simp
+  have hidx : List.idxOf (qs k) (List.ofFn qs) = k.val := by
+    have h := (List.nodup_ofFn.mpr hinj).idxOf_getElem k.val hlen
+    rwa [helem] at h
+  rw [hval, hseen, hq, hidx, tapeAt, dif_pos hk]
+
+/-! ### A program that asks a fixed sequence
+
+`lazyRun_answer_eq_tape` needs to know an execution's distinct queries.  For the honest Fiat–Shamir
+prover they are known in advance: one hash per round, at a strictly longer prefix.  `askFin` is that
+program and `lazyRun_seen_askFin` computes its seen-list, so the hypothesis becomes a theorem.
+-/
+
+/-- The program that asks `qs 0, qs 1, …, qs (L-1)` in order.  Its fuel is exactly `L`. -/
+def askFin : (L : ℕ) → (qs : Fin L → Q) → Tree Q D Unit L
+  | 0, _ => .done ()
+  | L + 1, qs => .query (qs 0) fun _ => askFin L fun i => qs i.succ
+
+/--
+**Its distinct queries are `qs`, in order.**
+
+So a prover that hashes a fresh point each round has seen-list `List.ofFn qs`, which is exactly what
+`lazyRun_answer_eq_tape` asks for.
+-/
+theorem lazyRun_seen_askFin (tape : Fin T → D) (dflt : D) :
+    ∀ (L : ℕ) (qs : Fin L → Q) (seen : List Q), (∀ i, qs i ∉ seen) → Function.Injective qs →
+      (lazyRun tape dflt (askFin L qs) seen).2.1 = seen ++ List.ofFn qs
+  | 0, qs, seen, _, _ => by simp [askFin]
+  | L + 1, qs, seen, hfresh, hinj => by
+      rw [askFin, lazyRun_query]
+      have hq0 : qs 0 ∉ seen := hfresh 0
+      simp only [if_neg hq0]
+      have hfresh' : ∀ i : Fin L, qs i.succ ∉ seen ++ [qs 0] := by
+        intro i hmem
+        rcases List.mem_append.mp hmem with h | h
+        · exact hfresh i.succ h
+        · exact absurd (hinj (by simpa using h)) (Fin.succ_ne_zero i)
+      have hinj' : Function.Injective fun i : Fin L => qs i.succ :=
+        fun a b hab => Fin.succ_injective L (hinj hab)
+      rw [lazyRun_seen_askFin tape dflt L (fun i => qs i.succ) _ hfresh' hinj']
+      rw [List.ofFn_succ, List.append_assoc]
+      rfl
+
 /-! ### The tape past a phase's slots
 
 A run handed a base of length `L` that it never queries reads only slots `L, L+1, …`.  `shiftTape L`
@@ -385,6 +454,119 @@ theorem lazy_traceCollision_card_le [Fintype Q] [Fintype D] [DecidableEq D]
         answerTape_pairCollision_card_le T (slotPairs T t) slotPairs_distinct
     _ ≤ t * (t - 1) / 2 * (Fintype.card D) ^ (T - 1) :=
         Nat.mul_le_mul_right _ (slotPairs_card_le T t)
+
+/-! ## Slots are determined by the slots before them
+
+The fact a Fiat--Shamir adversary needs, and the reason lazy sampling is the right model for one:
+
+> **the query occupying slot `j` is a function of the tape's slots `< j`.**
+
+`lazyRun` assigns the `j`-th *distinct* query the `j`-th slot, so which query lands in slot `j` is
+decided before slot `j` is read — an adaptive adversary chooses *what* to ask from what it has been
+told, and it has been told slots `0 … j-1`.  That is the prefix-measurability a round-by-round
+argument against a grinding prover requires: the bad event at slot `j` is "the query made at slot `j`
+was doomed and its answer escaped", and the first half has to be a function of the prefix.
+
+`lazyRun_seen_take_congr` is the statement; the `+ 1` in it is the point, since slot `j`'s *query* is
+fixed by the slots before it even though slot `j`'s *answer* is not.  `slotQuery` packages it as
+data.
+-/
+
+/-- A prefix of a longer list has the same `take n` as the longer list, once the prefix is at least
+`n` long.  The list-level content of "a slot, once assigned, stays assigned". -/
+private theorem take_eq_of_prefix_of_length_le {α : Type*} {l l' : List α} (h : l <+: l') {n : ℕ}
+    (hn : n ≤ l.length) : l'.take n = l.take n := by
+  rw [List.prefix_iff_eq_take.mp h, List.take_take, Nat.min_eq_left (le_trans hn (by simp))]
+
+/--
+**Slots are decided before they are read.**
+
+If two tapes agree on every slot below `j`, the two lazy executions agree on the first `j + 1`
+distinct queries.  So slot `j`'s query is a function of slots `0 … j-1`, which is what makes the
+bad event at slot `j` prefix-measurable.
+
+The induction is on the adversary's tree.  At each query the slot read is either below `j`, where the
+two tapes agree and the executions stay in lockstep, or at least `j`, in which case `seen` already
+has `j + 1` entries — the query that went into slot `j` is already in the list — and both runs can
+only extend it.
+-/
+theorem lazyRun_seen_take_congr (tape tape' : Fin T → D) (dflt : D) (j : ℕ)
+    (hagree : ∀ i : Fin T, i.val < j → tape i = tape' i) :
+    ∀ {fuel : ℕ} (c : Tree Q D A fuel) (seen : List Q),
+      (lazyRun tape dflt c seen).2.1.take (j + 1)
+        = (lazyRun tape' dflt c seen).2.1.take (j + 1)
+  | _, .done _, seen => by simp
+  | _, .query q next, seen => by
+      classical
+      rw [lazyRun_query, lazyRun_query]
+      set seen' := if q ∈ seen then seen else seen ++ [q] with hseen'
+      by_cases hslot : seen'.idxOf q < j
+      · -- the slot read is below `j`: the tapes agree there, so the runs stay in lockstep
+        have hy : tapeAt tape dflt (seen'.idxOf q) = tapeAt tape' dflt (seen'.idxOf q) := by
+          unfold tapeAt
+          by_cases hlt : seen'.idxOf q < T
+          · simp only [dif_pos hlt]
+            exact hagree ⟨seen'.idxOf q, hlt⟩ hslot
+          · simp only [dif_neg hlt]
+        simp only [hy]
+        exact lazyRun_seen_take_congr tape tape' dflt j hagree (next _) seen'
+      · -- the slot read is at or above `j`: `seen'` already fixes the first `j + 1` entries
+        have hlen : j + 1 ≤ seen'.length := by
+          have hmem : q ∈ seen' := by
+            by_cases h : q ∈ seen
+            · simp [hseen', h]
+            · simp [hseen', h]
+          have := List.idxOf_lt_length_of_mem (l := seen') hmem
+          omega
+        have hpref := lazyRun_seen_prefix tape dflt (next
+          (tapeAt tape dflt (seen'.idxOf q))) seen'
+        have hpref' := lazyRun_seen_prefix tape' dflt (next
+          (tapeAt tape' dflt (seen'.idxOf q))) seen'
+        rw [take_eq_of_prefix_of_length_le hpref hlen,
+          take_eq_of_prefix_of_length_le hpref' hlen]
+
+/-! ## The slot's query, as data -/
+
+/-- Extend a prefix of slots to a whole tape by padding with `dflt`. -/
+def pad (dflt : D) {j : ℕ} (pref : Fin j → D) : Fin T → D :=
+  fun i => if h : i.val < j then pref ⟨i.val, h⟩ else dflt
+
+theorem pad_agree (dflt : D) {j : ℕ} (pref : Fin j → D) (i : Fin T)
+    (hi : i.val < j) : pad (T := T) dflt pref i = pref ⟨i.val, hi⟩ := by
+  simp only [pad, dif_pos hi]
+
+/--
+**The query at slot `j`, read off the prefix.**
+
+`none` when the adversary never reaches a `j`-th distinct query — it stopped early, or repeated
+itself — in which case slot `j` is never read and there is nothing to be doomed about.
+-/
+noncomputable def slotQuery (dflt : D) {fuel : ℕ} (c : Tree Q D A fuel) {j : ℕ}
+    (pref : Fin j → D) : Option Q :=
+  (lazyRun (pad (T := T) dflt pref) dflt c []).2.1[j]?
+
+/--
+**It is the real run's slot-`j` query.**
+
+So a predicate written against `slotQuery` — a function of the prefix, by its type — is a predicate
+about what the adversary actually asked at that slot.  This is the bridge from
+`lazyRun_seen_take_congr` to `Bcs.RbrCore.bad`.
+-/
+theorem slotQuery_eq (dflt : D) {fuel : ℕ} (c : Tree Q D A fuel) {j : ℕ} (hj : j ≤ T)
+    (tape : Fin T → D) :
+    slotQuery (T := T) dflt c (fun i : Fin j => tape ⟨i.val, lt_of_lt_of_le i.isLt hj⟩)
+      = (lazyRun tape dflt c []).2.1[j]? := by
+  classical
+  have hagree : ∀ i : Fin T, i.val < j →
+      pad (T := T) dflt (fun i : Fin j => tape ⟨i.val, lt_of_lt_of_le i.isLt hj⟩) i = tape i := by
+    intro i hi
+    rw [pad_agree dflt _ i hi]
+  have h := lazyRun_seen_take_congr
+    (pad (T := T) dflt (fun i : Fin j => tape ⟨i.val, lt_of_lt_of_le i.isLt hj⟩))
+    tape dflt j hagree c []
+  unfold slotQuery
+  rw [← List.getElem?_take_of_lt (by omega : j < j + 1), h,
+    List.getElem?_take_of_lt (by omega : j < j + 1)]
 
 end Lazy
 

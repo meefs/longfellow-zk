@@ -1,3 +1,4 @@
+import JBAgreement.LigeroCode
 import Ligero.V1.Soundness.V1EndToEnd
 import examples.Grid
 
@@ -103,6 +104,38 @@ theorem V1Certificate.compressedV1Soundness_eq
   rw [AgreementProfile.contribution_eq_compressedContribution,
     AgreementProfile.contribution_eq_compressedContribution]
 
+/-- **The Johnson-route conditions of a certificate.**  The punctured and
+lift-list conditions are the clique route's; the clique condition itself is
+replaced by a checked Johnson certificate at `η = 1 / 2 ^ etaBits`, with the
+certificate's `lineBound` as the bad-parameter count.
+
+A Johnson row stores its line bound in `m` exactly as a clique row does -- the
+soundness expression reads `lineBound = m - 1` either way -- so the two routes
+produce comparable certificates and only the checked conditions differ. -/
+def Certificate.johnsonConditions (c : Certificate) (etaBits : ℕ) : Bool :=
+  JBAgreement.johnsonConditionsBool c.n (c.k - 1) c.e etaBits c.lineBound
+      c.fieldSize &&
+    (3 * c.g < c.d - c.e) && (c.g + 1 < c.fieldSize) &&
+    decide (0 < CodingTheory.InterleavedJohnson.denominator c.n c.d (c.e + c.g))
+
+/-- The Johnson-route certificate reaches the same route-agnostic bundle the
+masters consume, given a Reed–Solomon presentation of the base code. -/
+theorem Certificate.johnsonLineConditions (c : Certificate) {etaBits : ℕ}
+    {F : Type*} [_root_.Field F] [Fintype F] [DecidableEq F]
+    {C : CodingTheory.LinearCode F c.n}
+    (P : JBAgreement.RSPresentation c.n (c.k - 1) C)
+    (hfield : Fintype.card F = c.fieldSize)
+    (h : c.johnsonConditions etaBits = true) :
+    LigeroFamily.SelectedMCALineConditions C c.fieldSize c.e c.g c.d
+      c.lineBound := by
+  simp only [Certificate.johnsonConditions, Bool.and_eq_true,
+    decide_eq_true_eq] at h
+  exact
+    { line := JBAgreement.lineFailureBound_of_johnsonConditions P hfield
+        (JBAgreement.johnsonConditions_of_bool h.1.1.1)
+      punctured := ⟨h.1.1.2, h.1.2⟩
+      johnson := ⟨h.2⟩ }
+
 def Certificate.conditions (c : Certificate) : Prop :=
   SelectedMCAParameterConditions c.fieldSize c.n c.e c.g c.d c.m
 
@@ -126,10 +159,12 @@ theorem V1Certificate.v1_protocol_soundness
     (SchemeVerifier.protocol C Ligero.V1.scheme).acceptanceRate prover
       statement ≤
       c.v1Soundness c.openings := by
+  have hnumeric : LigeroFamily.SelectedMCAParameterConditions
+      (Fintype.card F) c.n c.e c.g c.d c.m := by
+    simpa [Certificate.conditions, hfield] using hconditions
   have hmaster := Ligero.V1.v1_ligero_soundness_selectedMCA
     hrows C statement prover (LigeroFamily.NoDecodedSolution.of_not_language hfalse)
-    hmin (by
-      simpa [Certificate.conditions, hfield] using hconditions)
+    hmin (hnumeric.lineConditions hmin)
       (c.v1JohnsonRange hkpos hresponse C hk)
   simpa [V1Certificate.v1Soundness, Certificate.failureContribution,
     Certificate.failureProfile, V1Certificate.v1Profile,

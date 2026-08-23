@@ -167,6 +167,36 @@ private theorem badChallenges_agreement_density_of_fibers
   exact hpairDensity
 
 omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- The challenge-side density, from a per-line bound supplied by any proximity
+theorem.  `SelectedMCA.LineFailureBound` is the whole interface; `bound` is the
+line-failure count it certifies. -/
+theorem badChallenges_agreement_density_ofLineFailure {bound : ℕ}
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (hline : SelectedMCA.LineFailureBound C.baseCode e g bound)
+    (hthree : 3 * g < d - e) (hfield : g + 1 < Fintype.card F)
+    (a : ℕ) :
+    (Fintype.card F - (g + 1)) *
+        (AgreementProfile.restrictedTailSet
+          (extractor.badChallenges (oracle := oracle)
+            (respond := respond) (e := e) (g := g))
+          (failureAgreement (policy := policy) (oracle := oracle)
+            (respond := respond)) a).card ≤
+      (SchemeSelectedMCA.selectedMCAFailureProfile n g d
+        bound).labelsAtLeast a *
+        Fintype.card Challenge := by
+  apply extractor.badChallenges_agreement_density_of_fibers
+    (SchemeSelectedMCA.selectedMCAFailureProfile n g d bound) a
+  intro tail
+  exact
+    SchemeSelectedMCA.badWeightsAtAgreement_density
+      (C := C) (oracle := oracle)
+      (extractor.responseAtTail (respond := respond) tail) hmin
+      hline hthree hfield a
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- The clique-route specialization, which is what the parameter bundle of a
+committed certificate supplies. -/
 theorem badChallenges_agreement_density
     [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
     (hmin : HasMinimumDistanceAtLeast C.baseCode d)
@@ -181,18 +211,11 @@ theorem badChallenges_agreement_density
             (respond := respond)) a).card ≤
       (SchemeSelectedMCA.selectedMCAFailureProfile n g d
         (SelectedMCA.directLineFailureBound threshold)).labelsAtLeast a *
-        Fintype.card Challenge := by
-  apply extractor.badChallenges_agreement_density_of_fibers
-    (SchemeSelectedMCA.selectedMCAFailureProfile n g d
-      (SelectedMCA.directLineFailureBound threshold)) a
-  intro tail
-  exact
-    SchemeSelectedMCA.badWeightsAtAgreement_density
-      (C := C) (oracle := oracle)
-      (extractor.responseAtTail (respond := respond) tail) hmin
-      conditions.direct.directClique
-      conditions.punctured.punctured_three_radius
-      conditions.punctured.field_large a
+        Fintype.card Challenge :=
+  badChallenges_agreement_density_ofLineFailure extractor hmin
+    (conditions.direct.lineFailure hmin)
+    conditions.punctured.punctured_three_radius
+    conditions.punctured.field_large a
 
 omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
 /-- Policy-level density theorem for the agreement-local selected-MCA
@@ -287,12 +310,12 @@ theorem exists_policyLiftList_of_selectedMCA
 omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
 /-- Construct the fixed lift list together with the selected-MCA density
 bound consumed by the profiled soundness theorem. -/
-theorem exists_profiledPolicyLiftList_of_selectedMCA
+theorem exists_profiledPolicyLiftList_of_selectedMCA {bound : ℕ}
     (extractor : SchemeExtractorPolicy policy Tail)
     [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
     (hmin : HasMinimumDistanceAtLeast C.baseCode d)
-    (conditions : SelectedMCAParameterConditions
-      (Fintype.card F) n e g d threshold) :
+    (conditions : SelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d bound) :
     ∃ certificate : PolicyLiftListCertificate policy oracle respond e g (e + g)
         (CodingTheory.InterleavedJohnson.listBound n d (e + g)),
       ∀ a ≤ n,
@@ -303,7 +326,7 @@ theorem exists_profiledPolicyLiftList_of_selectedMCA
                   (policy.proximityWeights challenge 0)
                   (policy.proximityResponse (respond challenge) 0)).card) a).card ≤
           (SchemeSelectedMCA.selectedMCAFailureProfile n g d
-            (SelectedMCA.directLineFailureBound threshold)).labelsAtLeast a *
+            bound).labelsAtLeast a *
             Fintype.card Challenge := by
   obtain ⟨certificate, hfailure⟩ :=
     exists_policyLiftList_of_selectedMCA (extractor := extractor)
@@ -313,8 +336,10 @@ theorem exists_profiledPolicyLiftList_of_selectedMCA
   refine ⟨certificate, ?_⟩
   intro a _ha
   rw [hfailure]
-  exact extractor.badChallenges_agreement_density
-    (oracle := oracle) (respond := respond) hmin conditions a
+  exact extractor.badChallenges_agreement_density_ofLineFailure
+    (oracle := oracle) (respond := respond) hmin conditions.line
+    conditions.punctured.punctured_three_radius
+    conditions.punctured.field_large a
 
 omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
 /-- Construct the fixed lift list with the agreement-local failure profile. -/

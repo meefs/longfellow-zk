@@ -1,4 +1,4 @@
-import SelectedMCA.Parameters
+import SelectedMCA.LineFailure
 import CodingTheory.ListDecoding.InterleavedJohnson
 
 /-!
@@ -15,6 +15,17 @@ namespace LigeroFamily
 structure DirectMCAConditions (n e g d threshold : ℕ) : Prop where
   directClique : SelectedMCA.DirectCliqueCondition n e g d threshold
 
+/-- The clique bundle supplies the per-line selected-MCA interface, which is what
+the density argument consumes.  A certificate using a different proximity theorem
+supplies `SelectedMCA.LineFailureBound` directly instead. -/
+theorem DirectMCAConditions.lineFailure {F : Type*} [Field F] [DecidableEq F]
+    {n e g d threshold : ℕ} {C : CodingTheory.LinearCode F n}
+    (conditions : DirectMCAConditions n e g d threshold)
+    (hmin : CodingTheory.HasMinimumDistanceAtLeast C d) :
+    SelectedMCA.LineFailureBound C e g
+      (SelectedMCA.directLineFailureBound threshold) :=
+  SelectedMCA.lineFailureBound_of_directClique hmin conditions.directClique
+
 /-- Hypotheses used only when punctured directional lifts are globalized. -/
 structure PuncturedGlobalizationConditions (q e g d : ℕ) : Prop where
   punctured_three_radius : 3 * g < d - e
@@ -25,12 +36,39 @@ structure JohnsonListConditions (n e g d : ℕ) : Prop where
   list_denominator_positive :
     0 < CodingTheory.InterleavedJohnson.denominator n d (e + g)
 
+/-- **The route-agnostic composition.**  Identical to
+`SelectedMCAParameterConditions` except that the clique condition is replaced by
+the per-line bound it exists to provide, so a certificate can reach this bundle
+through any proximity theorem.  `bound` is the line-failure count.
+
+The masters take this; a committed clique certificate reaches it through
+`SelectedMCAParameterConditions.lineConditions`, and a Johnson certificate
+through `JBAgreement.lineFailureBound_of_johnsonConditions`. -/
+structure SelectedMCALineConditions {F : Type*} [Field F] [DecidableEq F]
+    {n : ℕ} (C : CodingTheory.LinearCode F n) (q e g d bound : ℕ) : Prop where
+  line : SelectedMCA.LineFailureBound C e g bound
+  punctured : PuncturedGlobalizationConditions q e g d
+  johnson : JohnsonListConditions n e g d
+
 /-- Protocol composition of the three independent numerical interfaces. -/
 structure SelectedMCAParameterConditions
     (q n e g d threshold : ℕ) : Prop where
   direct : DirectMCAConditions n e g d threshold
   punctured : PuncturedGlobalizationConditions q e g d
   johnson : JohnsonListConditions n e g d
+
+/-- The clique bundle reaches the route-agnostic bundle, so every committed
+certificate keeps working unchanged. -/
+theorem SelectedMCAParameterConditions.lineConditions
+    {F : Type*} [Field F] [DecidableEq F] {n : ℕ}
+    {C : CodingTheory.LinearCode F n} {q e g d threshold : ℕ}
+    (conditions : SelectedMCAParameterConditions q n e g d threshold)
+    (hmin : CodingTheory.HasMinimumDistanceAtLeast C d) :
+    SelectedMCALineConditions C q e g d
+      (SelectedMCA.directLineFailureBound threshold) where
+  line := conditions.direct.lineFailure hmin
+  punctured := conditions.punctured
+  johnson := conditions.johnson
 
 /-- Parameters for the agreement-local selected-MCA refinement.  The outer
 certificate still constructs the lift list.  The local certificate is applied

@@ -95,6 +95,76 @@ theorem Tree.run_congr_on_trace {Q : Type uQ} {D : Type uD} {A : Type uA}
         exact Or.inr hqa
       rw [ih (H q) htail]
 
+/-! ### Programming
+
+Programming an oracle is replacing its answers on a designated finite set of inputs.  The whole
+content is that it is **undetectable unless the adversary asks**: if an execution's trace never
+presents a programmed input, reprogramming leaves the execution — output and trace alike — unchanged.
+
+This is where the simulator's licence comes from, in the hiding argument and in any Fiat–Shamir
+simulator that has to force a challenge.  Nothing here is about Merkle trees or about any particular
+programmed set: `Merkle.MH.reprogramLeaves` is the instance at the honest leaf inputs.
+
+Note which representation programming acts on.  An oracle here is a *function* `Q → D`, and
+programming patches the function.  Counting happens in the tape representation
+(`Merkle.LazyTape.lazyRun`), where the sample space is finite; the two are bridged by taking the
+oracle to be a tape-indexed *family* of functions, which is the shape `run_congr_off_programQueried`
+below has.  Patching tape slots directly would be wrong: `lazyRun` indexes the tape by first-query
+order, so the input-to-slot map depends on the adversary's own behaviour.
+-/
+
+/-- The oracle `H`, with the inputs in `P` answered by `fresh` instead. -/
+def reprogram {Q : Type uQ} {D : Type uD} [DecidableEq Q]
+    (P : Finset Q) (H fresh : Q → D) : Q → D :=
+  fun x => if x ∈ P then fresh x else H x
+
+@[simp] theorem reprogram_of_not_mem {Q : Type uQ} {D : Type uD} [DecidableEq Q]
+    (P : Finset Q) (H fresh : Q → D) (x : Q) (hx : x ∉ P) :
+    reprogram P H fresh x = H x := by
+  rw [reprogram, if_neg hx]
+
+/--
+**Programming is undetectable unless asked.**
+
+If the execution under `H` never queries a programmed input, then it is *identical* under the
+programmed oracle — same output, same trace.  An equality, not a bound: the bound comes later, from
+counting the sample points where the execution does query one.
+-/
+theorem Tree.run_congr_off_programmed {Q : Type uQ} {D : Type uD} {A : Type uA}
+    [DecidableEq Q] {fuel : ℕ} (P : Finset Q) (H fresh : Q → D)
+    (c : Tree Q D A fuel)
+    (hmiss : ∀ qa ∈ (c.run H).2, qa.1 ∉ P) :
+    c.run (reprogram P H fresh) = c.run H := by
+  refine Tree.run_congr_on_trace c H _ fun qa hqa => ?_
+  rw [reprogram_of_not_mem P H fresh qa.1 (hmiss qa hqa)]
+  exact (Tree.trace_sound c H qa hqa).symm
+
+/-- The sample points whose execution does query a programmed input: the detection event, as a
+definition.  Both the oracle and the programmed set may depend on the sample point — the oracle
+because a tape indexes a family of functions, the set because a simulator chooses what to program
+after seeing its own coins. -/
+noncomputable def programQueried {Q : Type uQ} {D : Type uD} {A : Type uA}
+    [DecidableEq Q] [Fintype D] [DecidableEq D] {fuel T : ℕ}
+    (P : (Fin T → D) → Finset Q) (oracle : (Fin T → D) → Q → D)
+    (c : Tree Q D A fuel) : Finset (Fin T → D) := by
+  classical
+  exact Finset.univ.filter fun ω => ∃ qa ∈ (c.run (oracle ω)).2, qa.1 ∈ P ω
+
+/-- Off the detection event the execution is unchanged, stated over the tape. -/
+theorem run_congr_off_programQueried {Q : Type uQ} {D : Type uD} {A : Type uA}
+    [DecidableEq Q] [Fintype D] [DecidableEq D] {fuel T : ℕ}
+    (P : (Fin T → D) → Finset Q) (oracle fresh : (Fin T → D) → Q → D)
+    (c : Tree Q D A fuel) (ω : Fin T → D)
+    (hω : ω ∉ programQueried P oracle c) :
+    c.run (reprogram (P ω) (oracle ω) (fresh ω)) = c.run (oracle ω) := by
+  classical
+  refine Tree.run_congr_off_programmed (P ω) (oracle ω) (fresh ω) c ?_
+  intro qa hqa
+  rw [programQueried] at hω
+  simp only [Finset.mem_filter, Finset.mem_univ, true_and, not_exists] at hω
+  intro hmem
+  exact hω qa ⟨hqa, hmem⟩
+
 /-- A trace collision uses two distinct queried inputs with the same recorded
 answer. -/
 def TraceCollision {Q : Type uQ} {D : Type uD} (tr : List (Q × D)) : Prop :=
