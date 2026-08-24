@@ -22,9 +22,9 @@ that make the extracted data usable downstream:
   injective, so any identity between `p^f`-th powers of field elements descends.
 
 The second point is what keeps the quantitative side intact.  Running the machinery on
-`S` forces the jet order up to `κ = k·p^f` (the proximates become `q_z = p_z^{p^f}`),
-but the final interpolation happens *after* untwisting each coordinate value, so it
-still needs only `k+1` coordinates; and the column bound is
+`S` uses the conservative jet order `κ = k·p^f` (the proximates become
+`q_z = p_z^{p^f}`), but the final interpolation happens *after* untwisting each
+coordinate value, so it still uses exactly `k` coordinates; and the column bound is
 
   `(2κ+1)·deg_Y S·D_Z = (2k·p^f+1)·(deg_Y P/p^f)·D_Z ≈ 2k·deg_Y P·D_Z` —
 

@@ -12,17 +12,14 @@ good slice after finite scalar extension.  Its only hypotheses are the words, th
 per-parameter proximity, and explicitly checkable numeric conditions on
 `(m, D, dY, dZ)`:
 
-* `hkdY`, `hcnt` — the interpolation is solvable (more coefficients than
-  constraints);
+* `hkdY`, `hcnt` — interpolation at degree cap `k - 1` is solvable (more
+  coefficients than constraints);
 * `hroot` — the agreement overwhelms the weighted degree (`D < m·(n-e)`);
 * `hslack`, `hS` — positivity of the agreement slack and the weighted threshold.
 
 The proof constructs a large enough extension internally and descends its affine
-bucket, so there is no base-field size condition.
-
-`Johnson.lean`-style feasibility (`johnson` below): in the Johnson regime
-`n - e ≥ √(k·n) + 4·η·n` (stated in squared, `√`-free form) all these conditions are
-satisfiable with `dY = O(n/(kη))`, `dZ = O(n/(kη²))`, giving the `η³` threshold.
+bucket, so there is no base-field size condition.  No real-valued relaxation is
+defined in this module.
 -/
 
 namespace JBAgreement
@@ -34,26 +31,27 @@ section Unconditional
 variable {F : Type*} [Field F] [Fintype F] [DecidableEq F]
 variable {ι : Type*} [Fintype ι] [DecidableEq ι]
 
-/-- **The Guruswami–Sudan package, for a given family of proximates.**  Constructs the
-interpolant and derives its root property at every parameter of `S`.  Shared by the
+/-- **The Guruswami–Sudan package, for a given family of proximates.**  Here `k`
+is the code dimension, so the interpolant is weighted by the degree cap `k - 1`.
+It derives the root property at every parameter of `S` and is shared by the
 unconditional correlated agreement theorem and the strong mutual variant. -/
 theorem exists_gs_for
     (dom : ι → F) (hdom : Function.Injective dom) (u₀ u₁ : ι → F) (k e : ℕ)
     (S : Finset F) (p : F → F[X])
-    (hpdeg : ∀ z ∈ S, (p z).natDegree ≤ k)
+    (hpdeg : ∀ z ∈ S, (p z).natDegree < k)
     (hprox : ∀ z ∈ S,
       (disagree (fun x => u₀ x + z * u₁ x) (RSeval dom (p z))).card ≤ e)
     (m D dY dZ : ℕ)
-    (hkdY : k * dY ≤ D)
+    (hkdY : (k - 1) * dY ≤ D)
     (hcnt : Fintype.card ι * (m * (m + 1)) * (dZ + dY + 1)
-        < ((dY + 1) * (2 * (D + 1)) - k * (dY * (dY + 1))) * (dZ + 1))
+        < ((dY + 1) * (2 * (D + 1)) - (k - 1) * (dY * (dY + 1))) * (dZ + 1))
     (hroot : D < m * (Fintype.card ι - e)) :
     ∃ Q : (F[X][X])[X], Q ≠ 0 ∧ Q.natDegree ≤ dY ∧
       (∀ j, (Q.coeff j).natDegree ≤ D) ∧
       (∀ j i, ((Q.coeff j).coeff i).natDegree ≤ dZ) ∧
       ∀ z ∈ S, ((Q.map (mapRingHom (evalRingHom z))).eval (p z)) = 0 := by
   obtain ⟨Q, hQ0, hQY, hQb, hQZ, hQvan⟩ :=
-    exists_interpolant dom u₀ u₁ k m D dY dZ hkdY hcnt
+    exists_interpolant dom u₀ u₁ (k - 1) m D dY dZ hkdY hcnt
   refine ⟨Q, hQ0, hQY, fun j => le_trans (hQb j) (Nat.sub_le _ _),
     fun j => hQZ j, ?_⟩
   intro z hz
@@ -66,7 +64,7 @@ theorem exists_gs_for
     have := hprox z hz
     omega
   refine eval_map_eq_zero_of_agreements (m := m) (T := T) hQY hkdY hQb
-    (hpdeg z hz) ?_ ?_
+    (Nat.le_pred_of_lt (hpdeg z hz)) ?_ ?_
   · intro x₀ hx₀
     obtain ⟨x, hx, rfl⟩ := Finset.mem_image.mp hx₀
     rw [mem_sdiff, mem_disagree, not_not] at hx
@@ -87,18 +85,18 @@ a sufficiently large finite scalar extension and then descended. -/
 theorem correlatedAgreement_unconditional_sharp_noFieldSize
     (dom : ι → F) (hdom : Function.Injective dom) (u₀ u₁ : ι → F) (k e : ℕ)
     (hk : 1 ≤ k) (S : Finset F)
-    (hclose : ∀ z ∈ S, ∃ p : F[X], p.natDegree ≤ k ∧
+    (hclose : ∀ z ∈ S, ∃ p : F[X], p.natDegree < k ∧
       (disagree (fun x => u₀ x + z * u₁ x) (RSeval dom p)).card ≤ e)
     (m D dY dZ : ℕ)
-    (hkdY : k * dY ≤ D)
+    (hkdY : (k - 1) * dY ≤ D)
     (hcnt : Fintype.card ι * (m * (m + 1)) * (dZ + dY + 1)
-        < ((dY + 1) * (2 * (D + 1)) - k * (dY * (dY + 1))) * (dZ + 1))
+        < ((dY + 1) * (2 * (D + 1)) - (k - 1) * (dY * (dY + 1))) * (dZ + 1))
     (hroot : D < m * (Fintype.card ι - e))
-    (hslack : 1 ≤ Fintype.card ι - e - k)
+    (hslack : 1 ≤ Fintype.card ι - e - (k))
     (hS : dY * (e + 2) +
-        (Fintype.card ι - k) * (4 * k * (dY * dZ) + dY) /
-          (Fintype.card ι - e - k) + dZ + 3 * (dY * dZ) < S.card) :
-    ∃ v₀ v₁ : F[X], v₀.degree ≤ (k : ℕ) ∧ v₁.degree ≤ (k : ℕ) ∧
+        (Fintype.card ι - (k)) * (4 * (k) * (dY * dZ) + dY) /
+          (Fintype.card ι - e - (k)) + dZ + 3 * (dY * dZ) < S.card) :
+    ∃ v₀ v₁ : F[X], v₀.natDegree < k ∧ v₁.natDegree < k ∧
       (pairDisagree u₀ u₁ (RSeval dom v₀) (RSeval dom v₁)).card ≤ e ∧
       (∀ S₂ : Finset F, e + 1 < S₂.card →
         (∀ z ∈ S₂, (disagree (fun x => u₀ x + z * u₁ x)
@@ -107,7 +105,7 @@ theorem correlatedAgreement_unconditional_sharp_noFieldSize
           lineAgree u₀ u₁ (RSeval dom v₀) (RSeval dom v₁) z
             ≠ corrAgree u₀ u₁ (RSeval dom v₀) (RSeval dom v₁)).card ≤ e) := by
   classical
-  have hchoice : ∀ z : F, ∃ p : F[X], z ∈ S → (p.natDegree ≤ k ∧
+  have hchoice : ∀ z : F, ∃ p : F[X], z ∈ S → (p.natDegree < k ∧
       (disagree (fun x => u₀ x + z * u₁ x) (RSeval dom p)).card ≤ e) := by
     intro z
     by_cases hz : z ∈ S
@@ -137,7 +135,7 @@ Under the (√-free, squared) Johnson condition `k·n ≤ (t - 4ηn)²` with
 numeric hypothesis of the interpolation and root steps, with the `η`-sized bounds
 `dY ≤ 3n/(4kη)`, `dZ ≤ n/(kη²)`, `D ≤ 3n/(4η)` — the shape that gives the `η³`
 threshold. -/
-theorem johnson_params (k n t : ℕ) (η : ℝ)
+theorem johnson_params_degreeCap (k n t : ℕ) (η : ℝ)
     (hk1 : 1 ≤ k) (hη : 0 < η) (hη4 : η ≤ 1/4)
     (hηn : 1 ≤ η * n)
     (ht4 : 4 * η * n ≤ (t : ℝ)) (htn : t ≤ n)
@@ -342,15 +340,16 @@ theorem johnson_params (k n t : ℕ) (η : ℝ)
 
 end Johnson
 
-/-- The explicit `|S|`-threshold of the Johnson-regime theorem.  It mirrors the
-weighted factor-selection bound: the incidence term contains one `dY·dZ` factor,
-not the old uniform-bucket `dY²·dZ` factor.  For constant rate and slack this is
-`O_ρ(n/η³)`; see `johnsonThreshold_le`. -/
+/-- The explicit `|S|`-threshold of the Johnson-regime theorem.  The
+interpolation bounds use the degree cap `w = k - 1`, while the weighted selector
+and agreement slack use the code dimension `k`.  The incidence term contains
+one `dY·dZ` factor, not the old uniform-bucket `dY²·dZ` factor. -/
 noncomputable def johnsonThreshold (k n e : ℕ) (η : ℝ) : ℝ :=
-  (3 * n / (4 * k * η)) * ((e : ℝ) + 2) +
-    (n - k : ℕ) * (4 * k * (3 * n / (4 * k * η) * (n / (k * η ^ 2)))
-      + 3 * n / (4 * k * η)) / ((n - e - k : ℕ) : ℝ)
-    + n / (k * η ^ 2) + 3 * (3 * n / (4 * k * η) * (n / (k * η ^ 2))) + 1
+  let w := k - 1
+  (3 * n / (4 * w * η)) * ((e : ℝ) + 2) +
+    (n - k : ℕ) * (4 * k * (3 * n / (4 * w * η) * (n / (w * η ^ 2)))
+      + 3 * n / (4 * w * η)) / ((n - e - k : ℕ) : ℝ)
+    + n / (w * η ^ 2) + 3 * (3 * n / (4 * w * η) * (n / (w * η ^ 2))) + 1
 
 section Final
 
@@ -362,33 +361,38 @@ set_option maxHeartbeats 1600000 in
 the threshold bound, all sharp `ℕ`-side conditions (with `n` the domain size and
 `cS` the parameter-set size).  Shared by the plain and strong mutual variants. -/
 theorem johnson_numeric (k n e cS : ℕ) (η : ℝ)
-    (hk1 : 1 ≤ k) (hη : 0 < η) (hη4 : η ≤ 1/4)
+    (hk2 : 2 ≤ k) (hη : 0 < η) (hη4 : η ≤ 1/4)
     (hηn : 1 ≤ η * n)
     (ht4 : 4 * η * n ≤ ((n - e : ℕ) : ℝ))
-    (hJ : (k : ℝ) * n ≤ (((n - e : ℕ) : ℝ) - 4 * η * n) ^ 2)
+    (hJ : ((k - 1 : ℕ) : ℝ) * n ≤
+      (((n - e : ℕ) : ℝ) - 4 * η * n) ^ 2)
     (hS : johnsonThreshold k n e η ≤ (cS : ℝ)) :
     ∃ m D dY dZ : ℕ,
-      k * dY ≤ D ∧
+      (k - 1) * dY ≤ D ∧
       (n * (m * (m + 1)) * (dZ + dY + 1)
-        < ((dY + 1) * (2 * (D + 1)) - k * (dY * (dY + 1))) * (dZ + 1)) ∧
+        < ((dY + 1) * (2 * (D + 1)) - (k - 1) * (dY * (dY + 1))) *
+          (dZ + 1)) ∧
       D < m * (n - e) ∧ 1 ≤ n - e - k ∧
       dY * (e + 2) + (n - k) * (4 * k * (dY * dZ) + dY) / (n - e - k) +
         dZ + 3 * (dY * dZ) < cS := by
   -- Notation.
+  let w := k - 1
+  have hw1 : 1 ≤ w := by simp [w]; omega
   have htn : n - e ≤ n := Nat.sub_le _ _
   -- The Guruswami–Sudan parameters.
   obtain ⟨m, D, dY, dZ, hm1, hkdY, hDlt, hdY1, hdZdef, hcnt, hdYreal, hdZreal, hDreal, -⟩ :=
-    johnson_params k (n) (n - e) η hk1 hη hη4 hηn ht4 htn hJ
+    johnson_params_degreeCap w n (n - e) η hw1 hη hη4 hηn ht4 htn
+      (by simpa [w] using hJ)
   -- Real abbreviations and positivity.
-  have hK1 : (1 : ℝ) ≤ (k : ℝ) := by exact_mod_cast hk1
-  have hK0 : (0 : ℝ) < (k : ℝ) := by linarith
+  have hW1 : (1 : ℝ) ≤ (w : ℝ) := by exact_mod_cast hw1
+  have hW0 : (0 : ℝ) < (w : ℝ) := by linarith
   have hN4 : (4 : ℝ) ≤ (n : ℝ) := by nlinarith
   have hN0 : (0 : ℝ) < (n : ℝ) := by linarith
   have hT4 : (4 : ℝ) ≤ ((n - e : ℕ) : ℝ) := by nlinarith
   -- `n - e ≥ k + 4`, so `s ≥ 4`.
   have hsub0 : (0 : ℝ) ≤ ((n - e : ℕ) : ℝ) - 4 * η * (n) := by
     linarith
-  have hKN : (k : ℝ) ≤ (n : ℝ) := by
+  have hWN : (w : ℝ) ≤ (n : ℝ) := by
     have hTN' : ((n - e : ℕ) : ℝ) ≤ (n : ℝ) := by
       exact_mod_cast htn
     have h2 : ((n - e : ℕ) : ℝ) - 4 * η * (n)
@@ -396,36 +400,36 @@ theorem johnson_numeric (k n e cS : ℕ) (η : ℝ)
     have h3 : (((n - e : ℕ) : ℝ) - 4 * η * (n)) ^ 2
         ≤ (n : ℝ) ^ 2 := by nlinarith
     nlinarith
-  have hTk : (k : ℝ) + 4 * η * (n) ≤ ((n - e : ℕ) : ℝ) := by
-    have h1 : (k : ℝ) ≤ ((n - e : ℕ) : ℝ) - 4 * η * (n) := by
+  have hTw : (w : ℝ) + 4 * η * n ≤ ((n - e : ℕ) : ℝ) := by
+    have h1 : (w : ℝ) ≤ ((n - e : ℕ) : ℝ) - 4 * η * n := by
       nlinarith [sq_nonneg (((n - e : ℕ) : ℝ)
-        - 4 * η * (n) - k),
+        - 4 * η * n - w),
         sq_nonneg (((n - e : ℕ) : ℝ)
-        - 4 * η * (n) + k)]
+        - 4 * η * n + w)]
     linarith
-  have hs4 : k + 4 ≤ n - e := by
-    have h1 : (k : ℝ) + 4 ≤ ((n - e : ℕ) : ℝ) := by nlinarith
+  have hw4 : w + 4 ≤ n - e := by
+    have h1 : (w : ℝ) + 4 ≤ ((n - e : ℕ) : ℝ) := by nlinarith
     exact_mod_cast h1
   set s : ℕ := n - e - k with hsdef
-  have hs1 : 4 ≤ s := by omega
+  have hs1 : 3 ≤ s := by simp [w] at hw4; omega
   have hsR : (s : ℝ) = ((n - e : ℕ) : ℝ) - k := by
     rw [hsdef]
     push_cast [Nat.cast_sub (by omega : k ≤ n - e)]
     ring
   have hs0 : (0 : ℝ) < (s : ℝ) := by
-    have : (4 : ℝ) ≤ (s : ℝ) := by exact_mod_cast hs1
+    have : (3 : ℝ) ≤ (s : ℝ) := by exact_mod_cast hs1
     linarith
   -- The real bounds on the weighted threshold.
-  have hY0 : (0 : ℝ) ≤ 3 * (n : ℝ) / (4 * k * η) := by positivity
-  have hZ0 : (0 : ℝ) ≤ (n : ℝ) / (k * η ^ 2) := by positivity
+  have hY0 : (0 : ℝ) ≤ 3 * (n : ℝ) / (4 * w * η) := by positivity
+  have hZ0 : (0 : ℝ) ≤ (n : ℝ) / (w * η ^ 2) := by positivity
   have hdY0 : (0 : ℝ) ≤ (dY : ℝ) := Nat.cast_nonneg _
   have hdZ0 : (0 : ℝ) ≤ (dZ : ℝ) := Nat.cast_nonneg _
-  have hYZ : (dY : ℝ) * dZ ≤ 3 * (n : ℝ) / (4 * k * η)
-        * ((n : ℝ) / (k * η ^ 2)) :=
+  have hYZ : (dY : ℝ) * dZ ≤ 3 * (n : ℝ) / (4 * w * η)
+        * ((n : ℝ) / (w * η ^ 2)) :=
     mul_le_mul hdYreal hdZreal hdZ0 hY0
   have hCap : ((4 * k * (dY * dZ) + dY : ℕ) : ℝ) ≤
-      4 * k * (3 * (n : ℝ) / (4 * k * η)
-        * ((n : ℝ) / (k * η ^ 2))) + 3 * (n : ℝ) / (4 * k * η) := by
+      4 * k * (3 * (n : ℝ) / (4 * w * η)
+        * ((n : ℝ) / (w * η ^ 2))) + 3 * (n : ℝ) / (4 * w * η) := by
     push_cast
     have hk : (0 : ℝ) ≤ 4 * k := by positivity
     exact add_le_add (mul_le_mul_of_nonneg_left hYZ hk) hdYreal
@@ -436,23 +440,23 @@ theorem johnson_numeric (k n e cS : ℕ) (η : ℝ)
           dZ + 3 * (dY * dZ) : ℕ) : ℝ) + 1
         ≤ johnsonThreshold k (n) e η := by
       have hbase : (dY : ℝ) * ((e : ℝ) + 2) ≤
-          (3 * (n : ℝ) / (4 * k * η)) * ((e : ℝ) + 2) :=
+          (3 * (n : ℝ) / (4 * w * η)) * ((e : ℝ) + 2) :=
         mul_le_mul_of_nonneg_right hdYreal (by positivity)
       have hdiv : ((((n - k) * (4 * k * (dY * dZ) + dY)) / s : ℕ) : ℝ) ≤
-          ((n - k : ℕ) : ℝ) * (4 * k * (3 * (n : ℝ) / (4 * k * η)
-            * ((n : ℝ) / (k * η ^ 2))) + 3 * (n : ℝ) / (4 * k * η)) /
+          ((n - k : ℕ) : ℝ) * (4 * k * (3 * (n : ℝ) / (4 * w * η)
+            * ((n : ℝ) / (w * η ^ 2))) + 3 * (n : ℝ) / (4 * w * η)) /
               (s : ℝ) := by
         calc ((((n - k) * (4 * k * (dY * dZ) + dY)) / s : ℕ) : ℝ)
             ≤ ((((n - k) * (4 * k * (dY * dZ) + dY) : ℕ) : ℝ) / (s : ℝ)) :=
               Nat.cast_div_le
-          _ ≤ ((n - k : ℕ) : ℝ) * (4 * k * (3 * (n : ℝ) / (4 * k * η)
-              * ((n : ℝ) / (k * η ^ 2))) + 3 * (n : ℝ) / (4 * k * η)) /
+          _ ≤ ((n - k : ℕ) : ℝ) * (4 * k * (3 * (n : ℝ) / (4 * w * η)
+              * ((n : ℝ) / (w * η ^ 2))) + 3 * (n : ℝ) / (4 * w * η)) /
                 (s : ℝ) := by
             push_cast
             gcongr
       have htail : (dZ : ℝ) + 3 * ((dY : ℝ) * dZ) ≤
-          (n : ℝ) / (k * η ^ 2) + 3 * (3 * (n : ℝ) / (4 * k * η)
-            * ((n : ℝ) / (k * η ^ 2))) := by linarith
+          (n : ℝ) / (w * η ^ 2) + 3 * (3 * (n : ℝ) / (4 * w * η)
+            * ((n : ℝ) / (w * η ^ 2))) := by linarith
       rw [johnsonThreshold]
       push_cast
       rw [← hsdef]
@@ -463,186 +467,9 @@ theorem johnson_numeric (k n e cS : ℕ) (η : ℝ)
     exact_mod_cast h7
   -- Conclude.
   have hroot : D < m * (n - e) := hDlt
-  exact ⟨m, D, dY, dZ, hkdY, hcnt, hroot, by omega, by simpa [hsdef] using hSnat⟩
-
-set_option maxHeartbeats 1600000 in
-/-- **The Johnson-regime correlated agreement theorem, complete.**
-
-Hypotheses:
-* `hclose` — for every `z ∈ S` the line point `u₀ + z·u₁` is within distance `e` of
-  the degree-`k` Reed–Solomon code (the theorem's premise);
-* the Johnson condition `hJ` : `k·n ≤ (n - e - 4ηn)²`, i.e.
-  `n - e ≥ √(k·n) + 4ηn`, in `√`-free squared form, with the regularity conditions
-  `η ≤ 1/4`, `ηn ≥ 1`, `4ηn ≤ n - e`;
-* `hS` — `|S|` exceeds the explicit threshold, of size `O_ρ(n/η³)`.
-
-Conclusion: one pair `(v₀, v₁)` of degree-`≤ k` polynomials achieving **correlated
-agreement** (at most `e` coordinates of pair-disagreement) and **mutual correlated
-agreement** in Haböck's sense.  Nothing is assumed: Guruswami–Sudan interpolation,
-branch selection, the inseparable case, and the finite-jet argument are all proved. -/
-theorem correlatedAgreement_johnson_final
-    (dom : ι → F) (hdom : Function.Injective dom) (u₀ u₁ : ι → F) (k e : ℕ) (η : ℝ)
-    (S : Finset F)
-    (hclose : ∀ z ∈ S, ∃ p : F[X], p.natDegree ≤ k ∧
-      (disagree (fun x => u₀ x + z * u₁ x) (RSeval dom p)).card ≤ e)
-    (hk1 : 1 ≤ k) (hη : 0 < η) (hη4 : η ≤ 1/4)
-    (hηn : 1 ≤ η * (Fintype.card ι))
-    (ht4 : 4 * η * (Fintype.card ι) ≤ ((Fintype.card ι - e : ℕ) : ℝ))
-    (hJ : (k : ℝ) * (Fintype.card ι)
-        ≤ (((Fintype.card ι - e : ℕ) : ℝ) - 4 * η * (Fintype.card ι)) ^ 2)
-    (hS : johnsonThreshold k (Fintype.card ι) e η ≤ (S.card : ℝ)) :
-    ∃ v₀ v₁ : F[X], v₀.degree ≤ (k : ℕ) ∧ v₁.degree ≤ (k : ℕ) ∧
-      (pairDisagree u₀ u₁ (RSeval dom v₀) (RSeval dom v₁)).card ≤ e ∧
-      (∀ S₂ : Finset F, e + 1 < S₂.card →
-        (∀ z ∈ S₂, (disagree (fun x => u₀ x + z * u₁ x)
-            (fun x => (v₀ + C z * v₁).eval (dom x))).card ≤ e) →
-        (S₂.filter fun z =>
-          lineAgree u₀ u₁ (RSeval dom v₀) (RSeval dom v₁) z
-            ≠ corrAgree u₀ u₁ (RSeval dom v₀) (RSeval dom v₁)).card ≤ e) := by
-  obtain ⟨m, D, dY, dZ, hkdY, hcnt, hroot, hslack, hSnat⟩ :=
-    johnson_numeric k (Fintype.card ι) e S.card η
-      hk1 hη hη4 hηn ht4 hJ hS
-  exact correlatedAgreement_unconditional_sharp_noFieldSize dom hdom u₀ u₁ k e hk1
-    S hclose m D dY dZ hkdY hcnt hroot hslack hSnat
+  exact ⟨m, D, dY, dZ, by simpa [w] using hkdY,
+    by simpa [w] using hcnt, hroot, by omega, by simpa [hsdef] using hSnat⟩
 
 end Final
-
-
-/-! ### The `η³` magnitude of the threshold -/
-
-set_option maxHeartbeats 1600000 in
-/-- **The threshold is `O_ρ(n/η³)`.**
-
-For rate bounded below (`ρ·n ≤ k`) and Johnson slack bounded below
-(`σ·n ≤ n - e - k`), the explicit threshold of `correlatedAgreement_johnson_final`
-is at most `13·n/(ρ²·σ·η³)`.
-
-The weighted factor selection sums the exact fiber capacities before choosing a
-factor.  This removes the extra worst-case `dY` multiplier from uniform bucketing;
-the mutual statement costs nothing beyond it. -/
-theorem johnsonThreshold_le (k n e : ℕ) (η ρ σ : ℝ)
-    (hρ0 : 0 < ρ) (hσ0 : 0 < σ)
-    (hρ : ρ * n ≤ k) (hσ : σ * n ≤ ((n - e - k : ℕ) : ℝ))
-    (hη : 0 < η) (hη4 : η ≤ 1 / 4) (hn1 : 1 ≤ (n : ℝ)) (hk1 : 1 ≤ k)
-    (hkn : k ≤ n) :
-    johnsonThreshold k n e η ≤ 13 * n / (ρ ^ 2 * σ * η ^ 3) := by
-  have hK1 : (1 : ℝ) ≤ (k : ℝ) := by exact_mod_cast hk1
-  have hK0 : (0 : ℝ) < (k : ℝ) := by linarith
-  have hN0 : (0 : ℝ) < (n : ℝ) := by linarith
-  have hKN : (k : ℝ) ≤ (n : ℝ) := by exact_mod_cast hkn
-  have hρ1 : ρ ≤ 1 := by nlinarith
-  have hsN : ((n - e - k : ℕ) : ℝ) ≤ (n : ℝ) := by
-    have : (n - e - k : ℕ) ≤ n := by omega
-    exact_mod_cast this
-  have hσ1 : σ ≤ 1 := by nlinarith
-  have hs0 : (0 : ℝ) < ((n - e - k : ℕ) : ℝ) := lt_of_lt_of_le (by positivity) hσ
-  have hη1 : η ≤ 1 := by linarith
-  have hρη1 : ρ * η ≤ 1 := by nlinarith
-  -- Names for the pieces.
-  set Y : ℝ := 3 * n / (4 * k * η) with hYdef
-  set Z : ℝ := (n : ℝ) / (k * η ^ 2) with hZdef
-  have hY0 : 0 ≤ Y := by rw [hYdef]; positivity
-  have hZ0 : 0 ≤ Z := by rw [hZdef]; positivity
-  -- Elementary bounds.
-  have hY : Y ≤ 1 / (ρ * η) := by
-    rw [hYdef, div_le_div_iff₀ (by positivity) (by positivity)]
-    nlinarith
-  have hZ : Z ≤ 1 / (ρ * η ^ 2) := by
-    rw [hZdef, div_le_div_iff₀ (by positivity) (by positivity)]
-    have hη2 : (0 : ℝ) < η ^ 2 := by positivity
-    nlinarith
-  have hYZ : Y * Z ≤ 1 / (ρ ^ 2 * η ^ 3) := by
-    have h1 : Y * Z ≤ (1 / (ρ * η)) * (1 / (ρ * η ^ 2)) :=
-      mul_le_mul hY hZ hZ0 (by positivity)
-    have h2 : (1 / (ρ * η)) * (1 / (ρ * η ^ 2)) = 1 / (ρ ^ 2 * η ^ 3) := by
-      field_simp
-    linarith
-  -- The weighted incidence factor.
-  have hG : 4 * (k : ℝ) * (Y * Z) + Y ≤ 5 * n / (ρ ^ 2 * η ^ 3) := by
-    have h1 : 4 * (k : ℝ) * (Y * Z) ≤ 4 * n / (ρ ^ 2 * η ^ 3) := by
-      have h2 : 4 * (k : ℝ) ≤ 4 * n := by nlinarith
-      have h3 := mul_le_mul h2 hYZ (by positivity) (by positivity)
-      calc 4 * (k : ℝ) * (Y * Z)
-          ≤ (4 * n) * (1 / (ρ ^ 2 * η ^ 3)) := h3
-        _ = 4 * n / (ρ ^ 2 * η ^ 3) := by ring
-    have h4 : Y ≤ (n : ℝ) / (ρ ^ 2 * η ^ 3) := by
-      refine le_trans hY ?_
-      rw [div_le_div_iff₀ (by positivity) (by positivity)]
-      have hρη2 : ρ * η ^ 2 ≤ 1 := by nlinarith [sq_nonneg η]
-      calc 1 * (ρ ^ 2 * η ^ 3) = (ρ * η) * (ρ * η ^ 2) := by ring
-        _ ≤ (ρ * η) * 1 := by
-            exact mul_le_mul_of_nonneg_left hρη2 (by positivity)
-        _ = ρ * η := by ring
-        _ ≤ (n : ℝ) * (ρ * η) := le_mul_of_one_le_left (by positivity) hn1
-    calc 4 * (k : ℝ) * (Y * Z) + Y
-        ≤ 4 * n / (ρ ^ 2 * η ^ 3) + n / (ρ ^ 2 * η ^ 3) := add_le_add h1 h4
-      _ = 5 * n / (ρ ^ 2 * η ^ 3) := by ring
-  have hnk : ((n - k : ℕ) : ℝ) ≤ (n : ℝ) := by
-    exact_mod_cast Nat.sub_le n k
-  have hInc : ((n - k : ℕ) : ℝ) * (4 * (k : ℝ) * (Y * Z) + Y) /
-      ((n - e - k : ℕ) : ℝ) ≤ 5 * n / (ρ ^ 2 * σ * η ^ 3) := by
-    calc ((n - k : ℕ) : ℝ) * (4 * (k : ℝ) * (Y * Z) + Y) /
-          ((n - e - k : ℕ) : ℝ)
-        ≤ (n : ℝ) * (4 * (k : ℝ) * (Y * Z) + Y) / (σ * n) := by
-            gcongr
-      _ ≤ (n : ℝ) * (5 * n / (ρ ^ 2 * η ^ 3)) / (σ * n) := by gcongr
-      _ = 5 * n / (ρ ^ 2 * σ * η ^ 3) := by field_simp
-  have heN : (e : ℝ) + 2 ≤ 3 * n := by
-    have he : e ≤ n := by
-      apply Nat.le_of_not_lt
-      intro hc
-      have : (n - e - k : ℕ) = 0 := by omega
-      rw [this] at hs0
-      norm_num at hs0
-    have := show (e : ℝ) ≤ n by exact_mod_cast he
-    nlinarith
-  have hsmallY : ρ * σ * η ^ 2 ≤ 1 :=
-    mul_le_one₀ (mul_le_one₀ hρ1 hσ0.le hσ1)
-      (by positivity) (pow_le_one₀ hη.le hη1)
-  have hYwide : Y ≤ 1 / (ρ ^ 2 * σ * η ^ 3) := by
-    refine le_trans hY ?_
-    rw [div_le_div_iff₀ (by positivity) (by positivity)]
-    calc 1 * (ρ ^ 2 * σ * η ^ 3) = (ρ * η) * (ρ * σ * η ^ 2) := by ring
-      _ ≤ (ρ * η) * 1 := mul_le_mul_of_nonneg_left hsmallY (by positivity)
-      _ = 1 * (ρ * η) := by ring
-  have hBase : Y * ((e : ℝ) + 2) ≤ 3 * n / (ρ ^ 2 * σ * η ^ 3) := by
-    calc Y * ((e : ℝ) + 2)
-        ≤ (1 / (ρ ^ 2 * σ * η ^ 3)) * (3 * n) :=
-          mul_le_mul hYwide heN (by positivity) (by positivity)
-      _ = 3 * n / (ρ ^ 2 * σ * η ^ 3) := by ring
-  have hsmallZ : ρ * σ * η ≤ 1 :=
-    mul_le_one₀ (mul_le_one₀ hρ1 hσ0.le hσ1) hη.le hη1
-  have hZwide : Z ≤ (n : ℝ) / (ρ ^ 2 * σ * η ^ 3) := by
-    refine le_trans hZ ?_
-    rw [div_le_div_iff₀ (by positivity) (by positivity)]
-    calc 1 * (ρ ^ 2 * σ * η ^ 3) = (ρ * η ^ 2) * (ρ * σ * η) := by ring
-      _ ≤ (ρ * η ^ 2) * 1 := mul_le_mul_of_nonneg_left hsmallZ (by positivity)
-      _ = 1 * (ρ * η ^ 2) := by ring
-      _ ≤ (n : ℝ) * (ρ * η ^ 2) := mul_le_mul_of_nonneg_right hn1 (by positivity)
-  have hYZwide : 3 * (Y * Z) ≤ 3 * n / (ρ ^ 2 * σ * η ^ 3) := by
-    have h1 : Y * Z ≤ (n : ℝ) / (ρ ^ 2 * σ * η ^ 3) := by
-      refine le_trans hYZ ?_
-      rw [div_le_div_iff₀ (by positivity) (by positivity)]
-      calc 1 * (ρ ^ 2 * σ * η ^ 3) = σ * (ρ ^ 2 * η ^ 3) := by ring
-        _ ≤ 1 * (ρ ^ 2 * η ^ 3) :=
-          mul_le_mul_of_nonneg_right hσ1 (by positivity)
-        _ ≤ (n : ℝ) * (ρ ^ 2 * η ^ 3) :=
-          mul_le_mul_of_nonneg_right hn1 (by positivity)
-    calc 3 * (Y * Z) ≤ 3 * (n / (ρ ^ 2 * σ * η ^ 3)) :=
-          mul_le_mul_of_nonneg_left h1 (by norm_num)
-      _ = 3 * n / (ρ ^ 2 * σ * η ^ 3) := by ring
-  have hone : (1 : ℝ) ≤ (n : ℝ) / (ρ ^ 2 * σ * η ^ 3) := by
-    rw [le_div_iff₀ (by positivity)]
-    have hsmall : ρ ^ 2 * σ * η ^ 3 ≤ 1 :=
-      mul_le_one₀ (mul_le_one₀ (pow_le_one₀ hρ0.le hρ1) hσ0.le hσ1)
-        (by positivity) (pow_le_one₀ hη.le hη1)
-    linarith
-  rw [johnsonThreshold, ← hYdef, ← hZdef]
-  have hsum : 3 * (n : ℝ) / (ρ ^ 2 * σ * η ^ 3) +
-      5 * n / (ρ ^ 2 * σ * η ^ 3) + n / (ρ ^ 2 * σ * η ^ 3) +
-      3 * n / (ρ ^ 2 * σ * η ^ 3) + n / (ρ ^ 2 * σ * η ^ 3) =
-        13 * n / (ρ ^ 2 * σ * η ^ 3) := by ring
-  linarith
-
 
 end JBAgreement

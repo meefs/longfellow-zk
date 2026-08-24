@@ -3,10 +3,10 @@ import JBAgreement.ClearedJet
 /-!
 # Sharp cleared Newton jets
 
-This file instantiates the derivative-sensitive ledger and clears the `k`-jet with
-the common exponent `2*k`.  If `slope` bounds both the derivative-sensitive base and
+This file instantiates the derivative-sensitive ledger and clears the `r`-jet with
+the common exponent `2*r`.  If `slope` bounds both the derivative-sensitive base and
 the simple-root coefficient, every coefficient of the cleared jet has size at most
-`2*k*slope`.  This is the local estimate behind the sharp `4*k` skeleton capacity.
+`2*r*slope`.  This is the local estimate behind the sharp `4*r` skeleton capacity.
 -/
 
 namespace JBAgreement
@@ -19,7 +19,7 @@ variable {A : Type*} [CommRing A] [IsDomain A]
 
 /-- A cleared jet with the sharp derivative-sensitive size bound. -/
 theorem exists_sharpClearedJet {Idx : Type*} [Nonempty Idx]
-    (SS : Idx → SizeSystem A) (R₀ : A[X][X]) (a₀ : A) (d k : ℕ)
+    (SS : Idx → SizeSystem A) (R₀ : A[X][X]) (a₀ : A) (d r : ℕ)
     (mR mα mξ slope : Idx → ℕ)
     (hd : R₀.natDegree ≤ d)
     (hmR : ∀ o j i, (SS o).P ((R₀.coeff j).coeff i) (mR o))
@@ -27,14 +27,14 @@ theorem exists_sharpClearedJet {Idx : Type*} [Nonempty Idx]
     (hmξ : ∀ o, (SS o).P (xi R₀ a₀) (mξ o))
     (hbase : ∀ o, mR o + d * mα o ≤ slope o)
     (hξSlope : ∀ o, mξ o ≤ slope o)
-    (hconst : ∀ o, 2 * k * mξ o + mα o ≤ 2 * k * slope o)
+    (hconst : ∀ o, 2 * r * mξ o + mα o ≤ 2 * r * slope o)
     (hξ0 : xi R₀ a₀ ≠ 0) :
-    ∃ γ : A[X], γ.natDegree ≤ k ∧
-      γ.coeff 0 = xi R₀ a₀ ^ (2 * k) * a₀ ∧
-      (∀ o i, (SS o).P (γ.coeff i) (2 * k * slope o)) ∧
-      (X : A[X]) ^ (k + 1) ∣
-        evalH R₀ d (xi R₀ a₀ ^ (2 * k)) γ
-          - C (xi R₀ a₀ ^ ((2 * k) * d) * jetConst R₀ a₀) := by
+    ∃ γ : A[X], γ.natDegree ≤ r ∧
+      γ.coeff 0 = xi R₀ a₀ ^ (2 * r) * a₀ ∧
+      (∀ o i, (SS o).P (γ.coeff i) (2 * r * slope o)) ∧
+      (X : A[X]) ^ (r + 1) ∣
+        evalH R₀ d (xi R₀ a₀ ^ (2 * r)) γ
+          - C (xi R₀ a₀ ^ ((2 * r) * d) * jetConst R₀ a₀) := by
   classical
   set K := FractionRing A
   set ψ : A →+* K := algebraMap A K with hψ
@@ -49,9 +49,9 @@ theorem exists_sharpClearedJet {Idx : Type*} [Nonempty Idx]
     rw [← hξint]
     exact fun h => hξ0 (hinj (by simpa using h))
   have hRd : R.natDegree ≤ d := le_trans natDegree_map_le hd
-  set c : A := ξ₀ ^ (2 * k) with hc
-  have key : ∀ t : ℕ, ∃ g : A, ψ g = ψ c * (jet R α₀ k).coeff t ∧
-      ∀ o, (SS o).P g (2 * k * slope o) := by
+  set c : A := ξ₀ ^ (2 * r) with hc
+  have key : ∀ t : ℕ, ∃ g : A, ψ g = ψ c * (jet R α₀ r).coeff t ∧
+      ∀ o, (SS o).P g (2 * r * slope o) := by
     intro t
     rcases Nat.eq_zero_or_pos t with rfl | ht
     · refine ⟨c * a₀, ?_, fun o => ?_⟩
@@ -59,7 +59,7 @@ theorem exists_sharpClearedJet {Idx : Type*} [Nonempty Idx]
       · refine (SS o).mono ((SS o).mul ((SS o).pow (hmξ o) _) (hmα o)) ?_
         simpa [hc] using hconst o
     obtain ⟨t', rfl⟩ : ∃ t', t = t' + 1 := ⟨t - 1, by omega⟩
-    rcases Nat.lt_or_ge t' k with htk | htk
+    rcases Nat.lt_or_ge t' r with htk | htk
     · have model : ∀ o, ∃ g : A,
           ψ g = xi R α₀ ^ (2 * t' + 1) *
               ((jet R α₀ (t' + 1)).coeff (t' + 1)) ∧
@@ -77,9 +77,9 @@ theorem exists_sharpClearedJet {Idx : Type*} [Nonempty Idx]
         · simpa using hbase o
         · exact hξSlope o
       obtain ⟨g₀, hg₀, _⟩ := model (Classical.arbitrary Idx)
-      refine ⟨ξ₀ ^ (2 * k - (2 * t' + 1)) * g₀, ?_, fun o => ?_⟩
+      refine ⟨ξ₀ ^ (2 * r - (2 * t' + 1)) * g₀, ?_, fun o => ?_⟩
       · rw [map_mul, map_pow, hg₀, hξint,
-          jet_coeff_stable R α₀ (t' + 1) k (by omega)]
+          jet_coeff_stable R α₀ (t' + 1) r (by omega)]
         rw [hc, map_pow, hξint, ← mul_assoc, ← pow_add]
         congr 2
         omega
@@ -87,29 +87,29 @@ theorem exists_sharpClearedJet {Idx : Type*} [Nonempty Idx]
         have hgg : g = g₀ := hinj (by rw [hg, hg₀])
         rw [hgg] at hgs
         refine (SS o).mono ((SS o).mul ((SS o).pow (hmξ o) _) hgs) ?_
-        have hmul : (2 * k - (2 * t' + 1)) * mξ o ≤
-            (2 * k - (2 * t' + 1)) * slope o :=
+        have hmul : (2 * r - (2 * t' + 1)) * mξ o ≤
+            (2 * r - (2 * t' + 1)) * slope o :=
           Nat.mul_le_mul_left _ (hξSlope o)
         calc
-          (2 * k - (2 * t' + 1)) * mξ o + slope o * (2 * t' + 1)
-              ≤ (2 * k - (2 * t' + 1)) * slope o + slope o * (2 * t' + 1) :=
+          (2 * r - (2 * t' + 1)) * mξ o + slope o * (2 * t' + 1)
+              ≤ (2 * r - (2 * t' + 1)) * slope o + slope o * (2 * t' + 1) :=
                 Nat.add_le_add_right hmul _
-          _ = 2 * k * slope o := by
-            have hu : 2 * t' + 1 ≤ 2 * k := by omega
+          _ = 2 * r * slope o := by
+            have hu : 2 * t' + 1 ≤ 2 * r := by omega
             calc
-              (2 * k - (2 * t' + 1)) * slope o + slope o * (2 * t' + 1) =
-                  ((2 * k - (2 * t' + 1)) + (2 * t' + 1)) * slope o := by ring
-              _ = 2 * k * slope o := by rw [Nat.sub_add_cancel hu]
+              (2 * r - (2 * t' + 1)) * slope o + slope o * (2 * t' + 1) =
+                  ((2 * r - (2 * t' + 1)) + (2 * t' + 1)) * slope o := by ring
+              _ = 2 * r * slope o := by rw [Nat.sub_add_cancel hu]
     · refine ⟨0, ?_, fun o => (SS o).zero _⟩
       rw [map_zero, coeff_eq_zero_of_natDegree_lt
-        (lt_of_le_of_lt (natDegree_jet_le R α₀ k) (by omega)), mul_zero]
+        (lt_of_le_of_lt (natDegree_jet_le R α₀ r) (by omega)), mul_zero]
   choose G hGmap hGsize using key
-  refine ⟨∑ t ∈ range (k + 1), monomial t (G t), ?_, ?_, ?_, ?_⟩
+  refine ⟨∑ t ∈ range (r + 1), monomial t (G t), ?_, ?_, ?_, ?_⟩
   · exact natDegree_sum_le_of_forall_le _ _ fun t ht =>
       le_trans (natDegree_monomial_le _) (by simpa using Nat.lt_succ_iff.mp (mem_range.mp ht))
   all_goals
-    have hcoeff : ∀ i, (∑ t ∈ range (k + 1), monomial t (G t)).coeff i =
-        if i < k + 1 then G i else 0 := by
+    have hcoeff : ∀ i, (∑ t ∈ range (r + 1), monomial t (G t)).coeff i =
+        if i < r + 1 then G i else 0 := by
       intro i
       rw [finsetSum_coeff]
       simp [coeff_monomial, Finset.sum_ite_eq', Finset.mem_range]
@@ -122,28 +122,28 @@ theorem exists_sharpClearedJet {Idx : Type*} [Nonempty Idx]
     split_ifs
     · exact hGsize i o
     · exact (SS o).zero _
-  · set γ : A[X] := ∑ t ∈ range (k + 1), monomial t (G t) with hγ
-    have hmapγ : γ.map ψ = C (ψ c) * jet R α₀ k := by
+  · set γ : A[X] := ∑ t ∈ range (r + 1), monomial t (G t) with hγ
+    have hmapγ : γ.map ψ = C (ψ c) * jet R α₀ r := by
       apply Polynomial.ext
       intro i
       rw [coeff_map, hcoeff i, coeff_C_mul]
       split_ifs with h
       · exact hGmap i
       · rw [map_zero, coeff_eq_zero_of_natDegree_lt
-          (lt_of_le_of_lt (natDegree_jet_le R α₀ k) (by omega)), mul_zero]
-    have hev : (evalH R₀ d c γ).map ψ = C (ψ c ^ d) * R.eval (jet R α₀ k) := by
+          (lt_of_le_of_lt (natDegree_jet_le R α₀ r) (by omega)), mul_zero]
+    have hev : (evalH R₀ d c γ).map ψ = C (ψ c ^ d) * R.eval (jet R α₀ r) := by
       rw [← evalH_map ψ R₀ d c γ, hmapγ, ← hRdef, evalH_C_mul R hRd]
     have hcoeff0 : (evalH R₀ d c γ).coeff 0 = c ^ d * jetConst R₀ a₀ := by
       refine hinj ?_
       have h := congrArg (fun p => Polynomial.coeff p 0) hev
       simp only [coeff_map, coeff_C_mul] at h
       rw [h, coeff_zero_eval_jet, ← hHint, ← map_pow, ← map_mul]
-    have hcoeffs : ∀ s, 1 ≤ s → s ≤ k → (evalH R₀ d c γ).coeff s = 0 := by
+    have hcoeffs : ∀ s, 1 ≤ s → s ≤ r → (evalH R₀ d c γ).coeff s = 0 := by
       intro s hs₁ hsk
       refine hinj ?_
       have h := congrArg (fun p => Polynomial.coeff p s) hev
       simp only [coeff_map, coeff_C_mul] at h
-      rw [h, coeff_eval_jet_eq_zero R α₀ hξK k s hs₁ hsk, mul_zero, map_zero]
+      rw [h, coeff_eval_jet_eq_zero R α₀ hξK r s hs₁ hsk, mul_zero, map_zero]
     rw [X_pow_dvd_iff]
     intro i hi
     rw [coeff_sub, coeff_C]

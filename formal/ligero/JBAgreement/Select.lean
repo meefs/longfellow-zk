@@ -168,7 +168,8 @@ From the Guruswami–Sudan data alone — a nonzero interpolant `Q` with degree 
 kills `H`.
 
 Requires `2·dY·dX < |F|` (room for the slice).  The parameter threshold uses the
-sharp total capacity `4k·dYdZ+dY`. -/
+sharp total capacity `4k·dYdZ+dY`.  The binder `cols` is the number of columns
+charged by the selector, not the evaluation-domain size. -/
 theorem exists_bucket_sharp (S : Finset F) (p : F → F[X])
     (Q : (F[X][X])[X]) (hQ0 : Q ≠ 0) (dX dY dZ : ℕ)
     (hQY : Q.natDegree ≤ dY)
@@ -176,8 +177,8 @@ theorem exists_bucket_sharp (S : Finset F) (p : F → F[X])
     (hQZ : ∀ j i, ((Q.coeff j).coeff i).natDegree ≤ dZ)
     (hGS : ∀ z ∈ S, ((Q.map (mapRingHom (evalRingHom z))).eval (p z)) = 0)
     (hfield : 2 * dY * dX < Fintype.card F)
-    (k n e slack : ℕ) (hslack : 1 ≤ slack)
-    (hS : dY * (e + 2) + n * (4 * k * (dY * dZ) + dY) / slack
+    (k cols e slack : ℕ) (hslack : 1 ≤ slack)
+    (hS : dY * (e + 2) + cols * (4 * k * (dY * dZ) + dY) / slack
       + dZ + 3 * (dY * dZ) < S.card) :
     ∃ (S' : Finset F) (N d' : ℕ) (Sf : (F[X][X])[X]) (x₀ : F) (H : F[X][X]),
       S' ⊆ S ∧ e + 1 < S'.card ∧
@@ -186,7 +187,7 @@ theorem exists_bucket_sharp (S : Finset F) (p : F → F[X])
       (∀ j, IsHeightLE (Sf.coeff j) dZ) ∧
       Irreducible H ∧ 1 ≤ H.natDegree ∧ H.natDegree ≤ d' ∧ IsHeightLE H dZ ∧
       IsHeightLE H (swap F H).natDegree ∧
-      n * sharpFiberCapacity (k * N) d' dZ N H.natDegree (swap F H).natDegree
+      cols * sharpFiberCapacity (k * N) d' dZ N H.natDegree (swap F H).natDegree
         < slack * S'.card ∧
       (∀ z ∈ S',
         (Sf.map (mapRingHom (evalRingHom z))).eval ((p z) ^ N) = 0 ∧
@@ -663,7 +664,7 @@ theorem exists_bucket_sharp (S : Finset F) (p : F → F[X])
       _ = 2 * (dY * dZ) := by ring
   -- ### 10. The surviving parameters and their labels.
   set S₂ : Finset F := S \ (SbadQ ∪ SbadFib ∪ SbadDisc) with hS₂def
-  have hS₂card : dY * (e + 2) + n * (4 * k * (dY * dZ) + dY) / slack
+  have hS₂card : dY * (e + 2) + cols * (4 * k * (dY * dZ) + dY) / slack
       < S₂.card := by
     have h1 : (SbadQ ∪ SbadFib ∪ SbadDisc).card
         ≤ dZ + dY * dZ + 2 * (dY * dZ) := by
@@ -797,15 +798,15 @@ theorem exists_bucket_sharp (S : Finset F) (p : F → F[X])
     rw [Finset.mem_filter, Multiset.mem_toFinset]
     exact ⟨hg, hdeg⟩
   have hthresholdSum :
-      (∑ l ∈ LBL, incidenceThreshold n slack e (cap k l)) < S₂.card := by
-    refine lt_of_le_of_lt (sum_incidenceThreshold_le LBL (cap k) n slack e) ?_
+      (∑ l ∈ LBL, incidenceThreshold cols slack e (cap k l)) < S₂.card := by
+    refine lt_of_le_of_lt (sum_incidenceThreshold_le LBL (cap k) cols slack e) ?_
     refine lt_of_le_of_lt (Nat.add_le_add
       (Nat.mul_le_mul_right (e + 2) hLBLcard)
-      (Nat.div_le_div_right (Nat.mul_le_mul_left n (hLBLcapacity k)))) hS₂card
+      (Nat.div_le_div_right (Nat.mul_le_mul_left cols (hLBLcapacity k)))) hS₂card
   obtain ⟨labSel, hlabmem, hfibercard, hfiberinc⟩ :=
     exists_weighted_incidence_bucket S₂ lab LBL (cap k)
-      (fun l => incidenceThreshold n slack e (cap k l)) hmapsto hslack
-      (fun l _ => incidenceThreshold_min n slack e (cap k l))
+      (fun l => incidenceThreshold cols slack e (cap k l)) hmapsto hslack
+      (fun l _ => incidenceThreshold_min cols slack e (cap k l))
       (fun l _ => incidenceThreshold_incidence (show 0 < slack by omega)) hthresholdSum
   set Psel := labSel.1 with hPsel
   set Hsel := labSel.2 with hHsel

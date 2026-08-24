@@ -6,16 +6,16 @@ import Mathlib.RingTheory.Ideal.Operations
 import Mathlib.Tactic.Linarith
 
 /-!
-# §1: stop the Hensel lift after `k + 1` coefficients
+# §1: stop the Hensel lift after `r + 1` coefficients
 
 BCIKS construct the infinite Hensel series `γ = ∑_{t ≥ 0} α_t U^t` and devote their
-Step 6 to proving `α_t = 0` for `t > k`.  That step is what drags the `X`-degree `D_X`
+Step 6 to proving `α_t = 0` for `t > r`.  That step is what drags the `X`-degree `D_X`
 of the interpolant into the branch threshold, and it is the source of the extra factor
 of `η`.
 
-The finite-jet argument never forms the series.  It keeps only the `k`-jet
+The finite-jet argument never forms the series.  It keeps only the `r`-jet
 
-  `Γ_k(X) = ∑_{t = 0}^{k} α_t U^t`,   `U = X - x₀`,
+  `Γ_k(X) = ∑_{t = 0}^{r} α_t U^t`,   `U = X - x₀`,
 
 and observes that this is already everything the affine-gluing argument needs.  The
 justification is *finite Hensel uniqueness*, which this file proves in the two forms it
@@ -24,13 +24,13 @@ is used.
 ## Main results
 
 * `eq_of_sub_isNilpotent_of_isUnit_derivative` — uniqueness of a root lifting a simple
-  root modulo a nilpotent ideal.  Working modulo `U ^ (k+1)` makes `U` nilpotent, so
+  root modulo a nilpotent ideal.  Working modulo `U ^ (r+1)` makes `U` nilpotent, so
   this is exactly the statement that the truncated implicit-function recursion has a
   unique solution.  It holds over an arbitrary commutative ring, so no function field,
   valuation, or power series ring is required.
 
-* `eq_of_sub_dvd_of_degree_le` — two polynomials of degree at most `k` that agree
-  modulo `U ^ (k+1)` are equal.  This is the step "both sides have degree at most `k`,
+* `eq_of_sub_dvd_of_degree_le` — two polynomials of degree at most `r` that agree
+  modulo `U ^ (r+1)` are equal.  This is the step "both sides have degree at most `r`,
   so `π_z(Γ_k) = p_z` as polynomials".
 
 Together these give the conclusion of §1: the specialised jet *is* the proximate, with
@@ -48,7 +48,7 @@ open Polynomial
 If `y₁` and `y₂` are both roots of `f`, differ by a nilpotent, and `f'(y₁)` is a unit,
 then `y₁ = y₂`.
 
-Applied with the ambient ring `A[U] / (U ^ (k+1))` — in which `U` is nilpotent — this
+Applied with the ambient ring `A[U] / (U ^ (r+1))` — in which `U` is nilpotent — this
 says the truncated implicit-function recursion determines its solution uniquely.  The
 hypothesis `IsUnit (f.derivative.eval y₁)` is the simple-root condition `ξ ≠ 0` of §1. -/
 theorem eq_of_sub_isNilpotent_of_isUnit_derivative
@@ -72,39 +72,39 @@ theorem eq_of_sub_isNilpotent_of_isUnit_derivative
 
 /-! ### Degree truncation -/
 
-/-- **Two `k`-jets that agree are equal.**
+/-- **Two `r`-jets that agree are equal.**
 
-If `p` and `q` both have degree at most `k` and agree modulo `(X - x₀) ^ (k+1)`, they
+If `p` and `q` both have degree at most `r` and agree modulo `(X - x₀) ^ (r+1)`, they
 are equal.  This is the second half of §1: the specialised jet `π_z(Γ_k)` and the
-proximate `p_z` agree to order `k + 1` and both have degree at most `k`, hence coincide
+proximate `p_z` agree to order `r + 1` and both have degree at most `r`, hence coincide
 as polynomials. -/
-theorem eq_of_sub_dvd_of_degree_le {F : Type*} [Field F] {p q : F[X]} {k : ℕ} {x₀ : F}
-    (hp : p.degree ≤ (k : ℕ)) (hq : q.degree ≤ (k : ℕ))
-    (hdvd : (X - C x₀) ^ (k + 1) ∣ (p - q)) : p = q := by
+theorem eq_of_sub_dvd_of_degree_le {F : Type*} [Field F] {p q : F[X]} {r : ℕ} {x₀ : F}
+    (hp : p.degree ≤ (r : ℕ)) (hq : q.degree ≤ (r : ℕ))
+    (hdvd : (X - C x₀) ^ (r + 1) ∣ (p - q)) : p = q := by
   rw [← not_ne_iff]
   intro hne
   have hsub : p - q ≠ 0 := sub_ne_zero.mpr hne
-  have hdeg : ((X - C x₀) ^ (k + 1)).degree ≤ (p - q).degree :=
+  have hdeg : ((X - C x₀) ^ (r + 1)).degree ≤ (p - q).degree :=
     degree_le_of_dvd hdvd hsub
-  have hpow : ((X - C x₀) ^ (k + 1)).degree = ((k + 1 : ℕ) : WithBot ℕ) := by
+  have hpow : ((X - C x₀) ^ (r + 1)).degree = ((r + 1 : ℕ) : WithBot ℕ) := by
     simp [degree_pow, degree_X_sub_C]
-  have hle : (p - q).degree ≤ ((k : ℕ) : WithBot ℕ) :=
+  have hle : (p - q).degree ≤ ((r : ℕ) : WithBot ℕ) :=
     le_trans (degree_sub_le p q) (max_le hp hq)
   rw [hpow] at hdeg
-  have hfin : ((k + 1 : ℕ) : WithBot ℕ) ≤ ((k : ℕ) : WithBot ℕ) := le_trans hdeg hle
+  have hfin : ((r + 1 : ℕ) : WithBot ℕ) ≤ ((r : ℕ) : WithBot ℕ) := le_trans hdeg hle
   rw [Nat.cast_le] at hfin
   omega
 
-/-! ### Interpolation: pinning the jet down from `k + 1` coordinates
+/-! ### Interpolation: pinning the jet down from `r + 1` coordinates
 
-This is the last step of §3.  The incidence count produces `k + 1` coordinates on which
-the jet `Γ_k` agrees with `v₀ + Z v₁`; both sides have `X`-degree at most `k`, so they
+This is the last step of §3.  The incidence count produces `r + 1` coordinates on which
+the jet `Γ_k` agrees with `v₀ + Z v₁`; both sides have `X`-degree at most `r`, so they
 agree identically. -/
 
-/-- Two polynomials of degree at most `k` agreeing at `k + 1` distinct points are equal. -/
+/-- Two polynomials of degree at most `r` agreeing at `r + 1` distinct points are equal. -/
 theorem eq_of_eval_eq_of_degree_le {F : Type*} [Field F] [DecidableEq F] {p q : F[X]}
-    {k : ℕ} (hp : p.degree ≤ (k : ℕ)) (hq : q.degree ≤ (k : ℕ))
-    (T : Finset F) (hT : k + 1 ≤ T.card)
+    {r : ℕ} (hp : p.degree ≤ (r : ℕ)) (hq : q.degree ≤ (r : ℕ))
+    (T : Finset F) (hT : r + 1 ≤ T.card)
     (heval : ∀ x ∈ T, p.eval x = q.eval x) : p = q := by
   rw [← not_ne_iff]
   intro hne
@@ -115,11 +115,11 @@ theorem eq_of_eval_eq_of_degree_le {F : Type*} [Field F] [DecidableEq F] {p q : 
     have : (p - q).eval x = 0 := by
       simp [eval_sub, heval x hx]
     simpa [Multiset.mem_toFinset, mem_roots, hsub] using this
-  have hnatdeg : (p - q).natDegree ≤ k := by
-    have hle : (p - q).degree ≤ ((k : ℕ) : WithBot ℕ) :=
+  have hnatdeg : (p - q).natDegree ≤ r := by
+    have hle : (p - q).degree ≤ ((r : ℕ) : WithBot ℕ) :=
       le_trans (degree_sub_le p q) (max_le hp hq)
     exact natDegree_le_iff_degree_le.mpr hle
-  have hcard : T.card ≤ k :=
+  have hcard : T.card ≤ r :=
     le_trans (le_trans (Finset.card_le_card hTroots) (p - q).roots.toFinset_card_le)
       (le_trans (card_roots' (p - q)) hnatdeg)
   omega
@@ -127,7 +127,7 @@ theorem eq_of_eval_eq_of_degree_le {F : Type*} [Field F] [DecidableEq F] {p q : 
 /-! ### The Newton step
 
 Existence of the jet is a Newton iteration.  Because we only ever work modulo
-`U ^ (k+1)`, the ideal is nilpotent and the iteration terminates after finitely many
+`U ^ (r+1)`, the ideal is nilpotent and the iteration terminates after finitely many
 steps — there is no completeness or power-series input.  This is the "finite recursion"
 of §1, in the form that works in every characteristic. -/
 

@@ -29,10 +29,10 @@ theorem descend_affine_bucket [DecidableEq F] [DecidableEq K]
     (φ : F →+* K) (hφ : Function.Injective φ)
     (k e : ℕ) (S : Finset F) (p : F → F[X])
     (SK : Finset K) (hSK : SK ⊆ S.image φ) (hSKcard : e + 1 < SK.card)
-    (v₀ v₁ : K[X]) (hv₀ : v₀.degree ≤ (k : ℕ)) (hv₁ : v₁.degree ≤ (k : ℕ))
+    (v₀ v₁ : K[X]) (hv₀ : v₀.natDegree < k) (hv₁ : v₁.natDegree < k)
     (hp : ∀ z ∈ S, φ z ∈ SK → (p z).map φ = v₀ + C (φ z) * v₁) :
     ∃ (w₀ w₁ : F[X]) (S' : Finset F), S' ⊆ S ∧ e + 1 < S'.card ∧
-      w₀.degree ≤ (k : ℕ) ∧ w₁.degree ≤ (k : ℕ) ∧
+      w₀.natDegree < k ∧ w₁.natDegree < k ∧
       ∀ z ∈ S', p z = w₀ + C z * w₁ := by
   set S' : Finset F := S.filter fun z => φ z ∈ SK with hS'def
   have himage : S'.image φ = SK := by
@@ -83,11 +83,11 @@ theorem descend_affine_bucket [DecidableEq F] [DecidableEq K]
   have hmapw₀ : w₀.map φ = v₀ := by
     rw [hw₀, Polynomial.map_sub, hp₀, Polynomial.map_mul, Polynomial.map_C, hmapw₁]
     ring
-  have hw₀deg : w₀.degree ≤ (k : ℕ) := by
-    rw [← degree_map_eq_of_injective hφ, hmapw₀]
+  have hw₀deg : w₀.natDegree < k := by
+    rw [← natDegree_map_eq_of_injective hφ, hmapw₀]
     exact hv₀
-  have hw₁deg : w₁.degree ≤ (k : ℕ) := by
-    rw [← degree_map_eq_of_injective hφ, hmapw₁]
+  have hw₁deg : w₁.natDegree < k := by
+    rw [← natDegree_map_eq_of_injective hφ, hmapw₁]
     exact hv₁
   refine ⟨w₀, w₁, S', Finset.filter_subset _ _, by simpa [hcard] using hSKcard,
     hw₀deg, hw₁deg, ?_⟩
@@ -142,7 +142,7 @@ theorem exists_affine_bucket_of_GS_sharp_scalarExtension
     (φ : F →+* K) (hφ : Function.Injective φ)
     (dom : ι → F) (hdom : Function.Injective dom) (u₀ u₁ : ι → F) (k e : ℕ)
     (hk : 1 ≤ k) (S : Finset F) (p : F → F[X])
-    (hpdeg : ∀ z ∈ S, (p z).natDegree ≤ k)
+    (hpdeg : ∀ z ∈ S, (p z).natDegree < k)
     (hprox : ∀ z ∈ S,
       (disagree (fun x => u₀ x + z * u₁ x) (RSeval dom (p z))).card ≤ e)
     (Q : (F[X][X])[X]) (hQ0 : Q ≠ 0) (dX dY dZ : ℕ)
@@ -157,7 +157,7 @@ theorem exists_affine_bucket_of_GS_sharp_scalarExtension
           (Fintype.card ι - e - k) +
         dZ + 3 * (dY * dZ) < S.card) :
     ∃ (v₀ v₁ : F[X]) (S' : Finset F), S' ⊆ S ∧ e + 1 < S'.card ∧
-      v₀.degree ≤ (k : ℕ) ∧ v₁.degree ≤ (k : ℕ) ∧
+      v₀.natDegree < k ∧ v₁.natDegree < k ∧
       ∀ z ∈ S', p z = v₀ + C z * v₁ := by
   classical
   set SK : Finset K := S.image φ with hSK
@@ -171,11 +171,11 @@ theorem exists_affine_bucket_of_GS_sharp_scalarExtension
   have hpK_apply : ∀ z : F, pK (φ z) = (p z).map φ := by
     intro z
     simp [hpK, extendPolyFamily_apply φ hφ]
-  have hpdegK : ∀ z ∈ SK, (pK z).natDegree ≤ k := by
+  have hpdegK : ∀ z ∈ SK, (pK z).natDegree < k := by
     intro z hz
     obtain ⟨z₀, hz₀, rfl⟩ := Finset.mem_image.mp (hSK ▸ hz)
     rw [hpK_apply]
-    exact le_trans natDegree_map_le (hpdeg z₀ hz₀)
+    exact lt_of_le_of_lt natDegree_map_le (hpdeg z₀ hz₀)
   have hproxK : ∀ z ∈ SK,
       (disagree (fun x => u₀K x + z * u₁K x) (RSeval domK (pK z))).card ≤ e := by
     intro z hz
@@ -237,7 +237,7 @@ theorem exists_affine_bucket_of_GS_sharp_noFieldSize
     {ι : Type*} [Fintype ι] [DecidableEq ι]
     (dom : ι → F) (hdom : Function.Injective dom) (u₀ u₁ : ι → F) (k e : ℕ)
     (hk : 1 ≤ k) (S : Finset F) (p : F → F[X])
-    (hpdeg : ∀ z ∈ S, (p z).natDegree ≤ k)
+    (hpdeg : ∀ z ∈ S, (p z).natDegree < k)
     (hprox : ∀ z ∈ S,
       (disagree (fun x => u₀ x + z * u₁ x) (RSeval dom (p z))).card ≤ e)
     (Q : (F[X][X])[X]) (hQ0 : Q ≠ 0) (dX dY dZ : ℕ)
@@ -251,7 +251,7 @@ theorem exists_affine_bucket_of_GS_sharp_noFieldSize
           (Fintype.card ι - e - k) +
         dZ + 3 * (dY * dZ) < S.card) :
     ∃ (v₀ v₁ : F[X]) (S' : Finset F), S' ⊆ S ∧ e + 1 < S'.card ∧
-      v₀.degree ≤ (k : ℕ) ∧ v₁.degree ≤ (k : ℕ) ∧
+      v₀.natDegree < k ∧ v₁.natDegree < k ∧
       ∀ z ∈ S', p z = v₀ + C z * v₁ := by
   let t : ℕ := 2 * dY * dX
   let n : ℕ := t + 1
@@ -285,7 +285,7 @@ theorem correlatedAgreement_of_GS_sharp_noFieldSize
     {ι : Type*} [Fintype ι] [DecidableEq ι]
     (dom : ι → F) (hdom : Function.Injective dom) (u₀ u₁ : ι → F) (k e : ℕ)
     (hk : 1 ≤ k) (S : Finset F) (p : F → F[X])
-    (hpdeg : ∀ z ∈ S, (p z).natDegree ≤ k)
+    (hpdeg : ∀ z ∈ S, (p z).natDegree < k)
     (hprox : ∀ z ∈ S,
       (disagree (fun x => u₀ x + z * u₁ x) (RSeval dom (p z))).card ≤ e)
     (Q : (F[X][X])[X]) (hQ0 : Q ≠ 0) (dX dY dZ : ℕ)
@@ -298,7 +298,7 @@ theorem correlatedAgreement_of_GS_sharp_noFieldSize
         (Fintype.card ι - k) * (4 * k * (dY * dZ) + dY) /
           (Fintype.card ι - e - k) +
         dZ + 3 * (dY * dZ) < S.card) :
-    ∃ v₀ v₁ : F[X], v₀.degree ≤ (k : ℕ) ∧ v₁.degree ≤ (k : ℕ) ∧
+    ∃ v₀ v₁ : F[X], v₀.natDegree < k ∧ v₁.natDegree < k ∧
       (pairDisagree u₀ u₁ (RSeval dom v₀) (RSeval dom v₁)).card ≤ e ∧
       (∀ S₂ : Finset F, e + 1 < S₂.card →
         (∀ z ∈ S₂, (disagree (fun x => u₀ x + z * u₁ x)

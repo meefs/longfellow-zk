@@ -45,20 +45,20 @@ variable {ι : Type*} [Fintype ι] [DecidableEq ι]
 def sharpGSBound (k dY dZ : ℕ) : ℕ := 4 * k * (dY * dZ) + dY
 
 /-- **The affine bucket.**  The shared core of the end-to-end theorems: from the GS
-data, a pair `(v₀, v₁)` of degree-≤`k` polynomials and a sub-bucket `S' ⊆ S` with
+data, a pair `(v₀, v₁)` of dimension-`k` polynomials and a sub-bucket `S' ⊆ S` with
 `|S'| > e + 1` on which *the chosen proximates are exactly the line*:
 `p z = v₀ + z·v₁`.  Everything downstream (plain CA, per-line mutual CA, and the
 strong mutual CA of `StrongMutual.lean`) is endgame bookkeeping on this output.
 
 Hypotheses:
-* `hpdeg`, `hprox` — for each `z ∈ S` a proximate `p z` of degree ≤ `k` within
+* `hpdeg`, `hprox` — for each `z ∈ S` a proximate `p z` with natural degree `< k` within
   distance `e` of the line point `u₀ + z·u₁`;
 * `Q, …, hGS` — **the assumed GS interpolant**: nonzero, `Y`-degree ≤ `dY`,
   `X`-degree ≤ `dX`, `Z`-height ≤ `dZ`, with `Q(X, p_z(X), z) = 0` for `z ∈ S`;
 * `hfield` — the field is large enough for a good slice;
 * `hslack`, `hS` — the weighted threshold, of size `O_ρ(n/η³)`.
 
-Conclusion: a single pair `(v₀, v₁)` of degree-≤`k` polynomials with
+Conclusion: a single pair `(v₀, v₁)` of dimension-`k` polynomials with
 * **correlated agreement**: `(u₀, u₁)` differs from `(v₀, v₁)` on at most `e`
   coordinates, and
 * **mutual correlated agreement** (Haböck): on any parameter set where the line stays
@@ -67,7 +67,7 @@ Conclusion: a single pair `(v₀, v₁)` of degree-≤`k` polynomials with
 theorem exists_affine_bucket_of_GS_sharp
     (dom : ι → F) (hdom : Function.Injective dom) (u₀ u₁ : ι → F) (k e : ℕ)
     (hk : 1 ≤ k) (S : Finset F) (p : F → F[X])
-    (hpdeg : ∀ z ∈ S, (p z).natDegree ≤ k)
+    (hpdeg : ∀ z ∈ S, (p z).natDegree < k)
     (hprox : ∀ z ∈ S,
       (disagree (fun x => u₀ x + z * u₁ x) (RSeval dom (p z))).card ≤ e)
     (Q : (F[X][X])[X]) (hQ0 : Q ≠ 0) (dX dY dZ : ℕ)
@@ -82,7 +82,7 @@ theorem exists_affine_bucket_of_GS_sharp
           (Fintype.card ι - e - k) +
         dZ + 3 * (dY * dZ) < S.card) :
     ∃ (v₀ v₁ : F[X]) (S' : Finset F), S' ⊆ S ∧ e + 1 < S'.card ∧
-      v₀.degree ≤ (k : ℕ) ∧ v₁.degree ≤ (k : ℕ) ∧
+      v₀.natDegree < k ∧ v₁.natDegree < k ∧
       ∀ z ∈ S', p z = v₀ + C z * v₁ := by
   -- ### The bucket.
   obtain ⟨S', N, d', Sf, x₀, H, hS'S, hS'card, ⟨f, hNf⟩, hd'1, hSfd', hd'N, hSfZ,
@@ -128,7 +128,7 @@ theorem exists_affine_bucket_of_GS_sharp
     intro z hz
     rw [hq]
     calc ((p z) ^ N).natDegree ≤ N * (p z).natDegree := natDegree_pow_le
-      _ ≤ N * k := Nat.mul_le_mul_left _ (hpdeg z (hS'S hz))
+      _ ≤ N * k := Nat.mul_le_mul_left _ (Nat.le_of_lt (hpdeg z (hS'S hz)))
       _ = κ := by rw [hκ]; ring
   have hroot : ∀ z ∈ S',
       (R₀.map (mapRingHom (spec z ((q z).eval x₀)))).eval ((q z).comp (X + C x₀)) = 0 := by
@@ -147,7 +147,7 @@ theorem exists_affine_bucket_of_GS_sharp
   -- ### The good coordinates.
   have hκ1 : 1 ≤ κ := by
     rw [hκ]
-    exact Nat.mul_pos hk hN1
+    exact Nat.mul_pos (by omega) hN1
   obtain ⟨I, hIcard, hgood⟩ :
       ∃ I : Finset ι, k < I.card ∧ ∀ x ∈ I, ∀ z ∈ S',
         (q z).eval (dom x) = w₀ x + z ^ N * w₁ x := by
@@ -167,37 +167,34 @@ theorem exists_affine_bucket_of_GS_sharp
     show ((p z).eval (dom x)) ^ N = (u₀ x + z * u₁ x) ^ N
     rw [htwist, ← eval_pow]
     exact h1
-  -- ### Lagrange interpolation through `k + 1` good coordinates.
-  obtain ⟨T, hTI, hTcard⟩ := Finset.exists_subset_card_eq (n := k + 1) (s := I) (by omega)
+  -- ### Lagrange interpolation through `k` good coordinates.
+  obtain ⟨T, hTI, hTcard⟩ := Finset.exists_subset_card_eq (n := k) (s := I) (by omega)
   set v₀ : F[X] := Lagrange.interpolate T dom u₀ with hv₀
   set v₁ : F[X] := Lagrange.interpolate T dom u₁ with hv₁
   have hinj : Set.InjOn dom ↑T := hdom.injOn
-  have hdegbnd : ∀ w : F[X], w.degree < ((k + 1 : ℕ) : WithBot ℕ) → w.degree ≤ (k : ℕ) := by
-    intro w hw
-    rcases eq_or_ne w 0 with rfl | h0
-    · rw [degree_zero]; exact bot_le
-    · rw [← natDegree_le_iff_degree_le]
-      have := (natDegree_lt_iff_degree_lt h0).mpr hw
-      omega
-  have hdeg₀ : v₀.degree ≤ (k : ℕ) := by
-    refine hdegbnd _ ?_
+  have hdeg₀ : v₀.natDegree < k := by
     have h := Lagrange.degree_interpolate_lt (r := u₀) hinj
-    rwa [hTcard] at h
-  have hdeg₁ : v₁.degree ≤ (k : ℕ) := by
-    refine hdegbnd _ ?_
+    rw [hTcard] at h
+    rcases eq_or_ne v₀ 0 with hv | hv
+    · simpa [hv] using (show 0 < k by omega)
+    · exact (natDegree_lt_iff_degree_lt hv).mpr h
+  have hdeg₁ : v₁.natDegree < k := by
     have h := Lagrange.degree_interpolate_lt (r := u₁) hinj
-    rwa [hTcard] at h
+    rw [hTcard] at h
+    rcases eq_or_ne v₁ 0 with hv | hv
+    · simpa [hv] using (show 0 < k by omega)
+    · exact (natDegree_lt_iff_degree_lt hv).mpr h
   have hpz : ∀ z ∈ S', p z = v₀ + C z * v₁ := by
     intro z hz
-    have hdegsum : (v₀ + C z * v₁).degree ≤ (k : ℕ) := by
-      rw [← natDegree_le_iff_degree_le]
-      refine le_trans (natDegree_add_le _ _) (max_le ?_ ?_)
-      · exact natDegree_le_iff_degree_le.mpr hdeg₀
-      · exact le_trans (natDegree_C_mul_le _ _) (natDegree_le_iff_degree_le.mpr hdeg₁)
+    have hdegsum : (v₀ + C z * v₁).natDegree < k := by
+      refine (natDegree_add_le _ _).trans_lt (max_lt hdeg₀ ?_)
+      exact (natDegree_C_mul_le _ _).trans_lt hdeg₁
     refine eq_of_eval_eq_of_degree_le
-      (natDegree_le_iff_degree_le.mp (hpdeg z (hS'S hz))) hdegsum
+      (natDegree_le_iff_degree_le.mp (Nat.le_pred_of_lt (hpdeg z (hS'S hz))))
+      (natDegree_le_iff_degree_le.mp (Nat.le_pred_of_lt hdegsum))
       (T.image dom) ?_ ?_
     · rw [Finset.card_image_of_injective _ hdom, hTcard]
+      rw [Nat.pred_eq_sub_one, Nat.sub_add_cancel (by omega : 1 ≤ k)]
     · intro y hy
       obtain ⟨x, hxT, rfl⟩ := Finset.mem_image.mp hy
       rw [eval_add, eval_mul, eval_C, hv₀, hv₁,
@@ -211,7 +208,7 @@ ledger gives total capacity `4k·dY·dZ+dY`. -/
 theorem correlatedAgreement_of_GS_sharp
     (dom : ι → F) (hdom : Function.Injective dom) (u₀ u₁ : ι → F) (k e : ℕ)
     (hk : 1 ≤ k) (S : Finset F) (p : F → F[X])
-    (hpdeg : ∀ z ∈ S, (p z).natDegree ≤ k)
+    (hpdeg : ∀ z ∈ S, (p z).natDegree < k)
     (hprox : ∀ z ∈ S,
       (disagree (fun x => u₀ x + z * u₁ x) (RSeval dom (p z))).card ≤ e)
     (Q : (F[X][X])[X]) (hQ0 : Q ≠ 0) (dX dY dZ : ℕ)
@@ -225,7 +222,7 @@ theorem correlatedAgreement_of_GS_sharp
         (Fintype.card ι - k) * (4 * k * (dY * dZ) + dY) /
           (Fintype.card ι - e - k) +
         dZ + 3 * (dY * dZ) < S.card) :
-    ∃ v₀ v₁ : F[X], v₀.degree ≤ (k : ℕ) ∧ v₁.degree ≤ (k : ℕ) ∧
+    ∃ v₀ v₁ : F[X], v₀.natDegree < k ∧ v₁.natDegree < k ∧
       (pairDisagree u₀ u₁ (RSeval dom v₀) (RSeval dom v₁)).card ≤ e ∧
       (∀ S₂ : Finset F, e + 1 < S₂.card →
         (∀ z ∈ S₂, (disagree (fun x => u₀ x + z * u₁ x)
@@ -249,13 +246,13 @@ end EndToEnd
 
 /-! ### The eta-cubed size of the sharp factor capacity -/
 
-/-- The summed factor capacity is O((k+1)/eta^3) when dY is O(1/eta) and
+/-- The summed factor capacity is `O(k/eta³)` when `dY = O(1/eta)` and
  dZ is O(1/eta^2).  This is the bound used by the weighted selector. -/
 theorem sharpGSThreshold_le {k dY dZ : ℕ} {η c₁ c₂ : ℝ}
     (hη : 0 < η) (hη1 : η ≤ 1)
     (hDY : (dY : ℝ) ≤ c₁ / η) (hDZ : (dZ : ℝ) ≤ c₂ / η ^ 2) :
     (sharpGSBound k dY dZ : ℝ) ≤
-      (4 * k * c₁ * c₂ + c₁) / η ^ 3 := by
+      (4 * (k : ℕ) * c₁ * c₂ + c₁) / η ^ 3 := by
   have hDY' : (dY : ℝ) * η ≤ c₁ := (le_div_iff₀ hη).mp hDY
   have hDZ' : (dZ : ℝ) * η ^ 2 ≤ c₂ := (le_div_iff₀ (by positivity)).mp hDZ
   have hc₁ : 0 ≤ c₁ := le_trans (by positivity) hDY'
@@ -280,6 +277,6 @@ theorem sharpGSThreshold_le {k dY dZ : ℕ} {η c₁ c₂ : ℝ}
           (dY : ℝ) * η ^ 3 := by ring
     _ ≤ 4 * (k : ℝ) * (c₁ * c₂) + c₁ :=
       add_le_add (mul_le_mul_of_nonneg_left hprod (by positivity)) hlinear
-    _ = 4 * (k : ℝ) * c₁ * c₂ + c₁ := by ring
+    _ = 4 * (k : ℕ) * c₁ * c₂ + c₁ := by ring
 
 end JBAgreement

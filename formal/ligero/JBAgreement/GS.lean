@@ -29,7 +29,7 @@ additive, so as soon as the constraint space is smaller than the coefficient spa
 is not injective, and the difference of two colliding vectors assembles into a nonzero
 `Q` with all constraints zero (`exists_interpolant`).
 
-The support is the Guruswami–Sudan triangle `{(a,b) : b ≤ dY, a + k·b ≤ D}` — the
+The support is the Guruswami–Sudan triangle `{(a,b) : b ≤ dY, a + w·b ≤ D}` — the
 weighted-degree shape is what reaches the Johnson radius (a rectangular support loses
 a factor `√2`) — and the coefficients are polynomials in `Z` of degree `≤ dZ`.  The
 counting hypothesis is the standard one, `#constraints < #coefficients`, in closed
@@ -37,7 +37,8 @@ form.
 
 ## The root property
 
-`eval_eq_zero_of_agreements` : if `p` has degree ≤ `k` and agrees with the specialised
+`eval_map_eq_zero_of_agreements` : if `p` has degree at most the interpolation
+weight `w` and agrees with the specialised
 word on more than `D/m` points, then `Q_z(X, p(X)) = 0` — i.e. `(Y - p) ∣ Q_z`.  The
 divisibilities `(X - x₀)^m` at the (distinct) agreement points multiply up by pairwise
 coprimality and overwhelm the weighted degree `D` of `Q_z(X, p(X))`.
@@ -275,10 +276,11 @@ section Interpolation
 variable {F : Type*} [Field F]
 variable {ι : Type*}
 
-/-- The coefficient index: the Guruswami–Sudan triangle `{(b,a) : a + k·b ≤ D}`
+/-- The coefficient index for weighted interpolation: the Guruswami–Sudan
+triangle `{(b,a) : a + w·b ≤ D}`
 thickened by the `Z`-box. -/
-abbrev gsIdx (k D dY dZ : ℕ) : Type :=
-  (b : Fin (dY + 1)) × (Fin (D + 1 - k * b) × Fin (dZ + 1))
+abbrev gsIdx (w D dY dZ : ℕ) : Type :=
+  (b : Fin (dY + 1)) × (Fin (D + 1 - w * b) × Fin (dZ + 1))
 
 /-- The constraint index: a point, a Taylor bidegree `(i,j)` with `i + j < m`, and a
 `Z`-coefficient slot. -/
@@ -286,15 +288,15 @@ abbrev gsCon (ι : Type*) (m dY dZ : ℕ) : Type _ :=
   ι × ((j : Fin m) × Fin (m - j)) × Fin (dZ + dY + 1)
 
 /-- Assembling a coefficient vector into a polynomial. -/
-noncomputable def gsAssemble (k D dY dZ : ℕ) (q : gsIdx k D dY dZ → F) :
+noncomputable def gsAssemble (w D dY dZ : ℕ) (q : gsIdx w D dY dZ → F) :
     (F[X][X])[X] :=
-  ∑ v : gsIdx k D dY dZ,
+  ∑ v : gsIdx w D dY dZ,
     monomial (v.1 : ℕ) (monomial (v.2.1 : ℕ) (monomial (v.2.2 : ℕ) (q v)))
 
 /-- Coefficient extraction: the assembly is coefficientwise. -/
-theorem gsAssemble_coeff (k D dY dZ : ℕ) (q : gsIdx k D dY dZ → F)
-    (v : gsIdx k D dY dZ) :
-    (((gsAssemble k D dY dZ q).coeff v.1).coeff v.2.1).coeff v.2.2 = q v := by
+theorem gsAssemble_coeff (w D dY dZ : ℕ) (q : gsIdx w D dY dZ → F)
+    (v : gsIdx w D dY dZ) :
+    (((gsAssemble w D dY dZ q).coeff v.1).coeff v.2.1).coeff v.2.2 = q v := by
   unfold gsAssemble
   rw [finsetSum_coeff]
   simp_rw [finsetSum_coeff]
@@ -320,23 +322,22 @@ theorem gsAssemble_coeff (k D dY dZ : ℕ) (q : gsIdx k D dY dZ → F)
     exact absurd (Finset.mem_univ v) h
 
 /-- The assembly is subtractive. -/
-theorem gsAssemble_sub (k D dY dZ : ℕ) (q q' : gsIdx k D dY dZ → F) :
-    gsAssemble k D dY dZ (q - q')
-      = gsAssemble k D dY dZ q - gsAssemble k D dY dZ q' := by
+theorem gsAssemble_sub (w D dY dZ : ℕ) (q q' : gsIdx w D dY dZ → F) :
+    gsAssemble w D dY dZ (q - q')
+      = gsAssemble w D dY dZ q - gsAssemble w D dY dZ q' := by
   simp [gsAssemble, Pi.sub_apply, map_sub, Finset.sum_sub_distrib]
 
 /-- `Y`-degree of the assembly. -/
-theorem gsAssemble_natDegree (k D dY dZ : ℕ) (q : gsIdx k D dY dZ → F) :
-    (gsAssemble k D dY dZ q).natDegree ≤ dY := by
+theorem gsAssemble_natDegree (w D dY dZ : ℕ) (q : gsIdx w D dY dZ → F) :
+    (gsAssemble w D dY dZ q).natDegree ≤ dY := by
   refine natDegree_sum_le_of_forall_le _ _ fun v _ => ?_
   refine le_trans (natDegree_monomial_le _) ?_
   have := v.1.isLt
   omega
 
-/-- Weighted `X`-degree of the assembly: the `b`-th coefficient has degree at most
-`D - k·b`. -/
-theorem gsAssemble_coeff_natDegree (k D dY dZ : ℕ) (q : gsIdx k D dY dZ → F) (b : ℕ) :
-    ((gsAssemble k D dY dZ q).coeff b).natDegree ≤ D - k * b := by
+/-- Weighted `X`-degree of the assembly. -/
+theorem gsAssemble_coeff_natDegree (w D dY dZ : ℕ) (q : gsIdx w D dY dZ → F) (b : ℕ) :
+    ((gsAssemble w D dY dZ q).coeff b).natDegree ≤ D - w * b := by
   unfold gsAssemble
   rw [finsetSum_coeff]
   refine natDegree_sum_le_of_forall_le _ _ fun v _ => ?_
@@ -349,8 +350,8 @@ theorem gsAssemble_coeff_natDegree (k D dY dZ : ℕ) (q : gsIdx k D dY dZ → F)
   · simp
 
 /-- `Z`-heights of the assembly. -/
-theorem gsAssemble_isHeightLE (k D dY dZ : ℕ) (q : gsIdx k D dY dZ → F) (b : ℕ) :
-    IsHeightLE ((gsAssemble k D dY dZ q).coeff b) dZ := by
+theorem gsAssemble_isHeightLE (w D dY dZ : ℕ) (q : gsIdx w D dY dZ → F) (b : ℕ) :
+    IsHeightLE ((gsAssemble w D dY dZ q).coeff b) dZ := by
   unfold gsAssemble
   rw [finsetSum_coeff]
   intro a
@@ -396,16 +397,16 @@ coefficient count (hypothesis `hcnt`, stated in doubled closed form), there is a
 
 No rank computation: the constraint map is subtractive, and a counting collision
 provides the interpolant. -/
-theorem exists_interpolant (dom : ι → F) (u₀ u₁ : ι → F) (k m D dY dZ : ℕ)
-    (hkdY : k * dY ≤ D)
+theorem exists_interpolant (dom : ι → F) (u₀ u₁ : ι → F) (w m D dY dZ : ℕ)
+    (hwdY : w * dY ≤ D)
     (hcnt : Fintype.card ι * (m * (m + 1)) * (dZ + dY + 1)
-        < ((dY + 1) * (2 * (D + 1)) - k * (dY * (dY + 1))) * (dZ + 1)) :
+        < ((dY + 1) * (2 * (D + 1)) - w * (dY * (dY + 1))) * (dZ + 1)) :
     ∃ Q : (F[X][X])[X], Q ≠ 0 ∧ Q.natDegree ≤ dY ∧
-      (∀ b, (Q.coeff b).natDegree ≤ D - k * b) ∧
+      (∀ b, (Q.coeff b).natDegree ≤ D - w * b) ∧
       (∀ b, IsHeightLE (Q.coeff b) dZ) ∧
       ∀ x : ι, vanishesTo m (C (dom x)) (wordZ u₀ u₁ x) Q := by
-  set φ : (gsIdx k D dY dZ → F) → (gsCon ι m dY dZ → F) := fun q con =>
-    (((shift2 (C (dom con.1)) (wordZ u₀ u₁ con.1) (gsAssemble k D dY dZ q)).coeff
+  set φ : (gsIdx w D dY dZ → F) → (gsCon ι m dY dZ → F) := fun q con =>
+    (((shift2 (C (dom con.1)) (wordZ u₀ u₁ con.1) (gsAssemble w D dY dZ q)).coeff
         con.2.1.1).coeff con.2.1.2).coeff con.2.2 with hφ
   have hφsub : ∀ q q', φ (q - q') = φ q - φ q' := by
     intro q q'
@@ -413,45 +414,50 @@ theorem exists_interpolant (dom : ι → F) (u₀ u₁ : ι → F) (k m D dY dZ 
     simp only [hφ, Pi.sub_apply]
     rw [gsAssemble_sub, shift2_sub, coeff_sub, coeff_sub, coeff_sub]
   -- The two cardinalities, in doubled closed form.
-  have hIdx2 : 2 * Fintype.card (gsIdx k D dY dZ)
-      = ((dY + 1) * (2 * (D + 1)) - k * (dY * (dY + 1))) * (dZ + 1) := by
-    have h1 : Fintype.card (gsIdx k D dY dZ)
-        = ∑ b : Fin (dY + 1), (D + 1 - k * b) * (dZ + 1) := by
+  have hIdx2 : 2 * Fintype.card (gsIdx w D dY dZ)
+      = ((dY + 1) * (2 * (D + 1)) - w * (dY * (dY + 1))) * (dZ + 1) := by
+    have h1 : Fintype.card (gsIdx w D dY dZ)
+        = ∑ b : Fin (dY + 1), (D + 1 - w * b) * (dZ + 1) := by
       rw [Fintype.card_sigma]
       exact Finset.sum_congr rfl fun b _ => by
         rw [Fintype.card_prod, Fintype.card_fin, Fintype.card_fin]
-    rw [h1, Fin.sum_univ_eq_sum_range (fun b => (D + 1 - k * b) * (dZ + 1))]
+    rw [h1, Fin.sum_univ_eq_sum_range (fun b => (D + 1 - w * b) * (dZ + 1))]
     rw [← Finset.sum_mul]
-    have h2 : (∑ b ∈ Finset.range (dY + 1), (D + 1 - k * b))
-        + k * (∑ b ∈ Finset.range (dY + 1), b)
+    have h2 : (∑ b ∈ Finset.range (dY + 1), (D + 1 - w * b))
+        + w * (∑ b ∈ Finset.range (dY + 1), b)
         = (dY + 1) * (D + 1) := by
       rw [Finset.mul_sum, ← Finset.sum_add_distrib]
-      have h3 : ∀ b ∈ Finset.range (dY + 1), D + 1 - k * b + k * b = D + 1 := by
+      have h3 : ∀ b ∈ Finset.range (dY + 1),
+          D + 1 - w * b + w * b = D + 1 := by
         intro b hb
         have hb' : b ≤ dY := by
           have := Finset.mem_range.mp hb
           omega
-        have : k * b ≤ k * dY := Nat.mul_le_mul_left _ hb'
+        have : w * b ≤ w * dY := Nat.mul_le_mul_left _ hb'
         omega
       rw [Finset.sum_congr rfl h3, Finset.sum_const, Finset.card_range, smul_eq_mul]
     have h4 : (∑ b ∈ Finset.range (dY + 1), b) * 2 = (dY + 1) * dY :=
       Finset.sum_range_id_mul_two (dY + 1)
     -- Combine.
-    have h5 : 2 * (∑ b ∈ Finset.range (dY + 1), (D + 1 - k * b))
-        = (dY + 1) * (2 * (D + 1)) - k * (dY * (dY + 1)) := by
-      have e1 : 2 * ((∑ b ∈ Finset.range (dY + 1), (D + 1 - k * b))
-          + k * (∑ b ∈ Finset.range (dY + 1), b)) = 2 * ((dY + 1) * (D + 1)) := by
+    have h5 : 2 * (∑ b ∈ Finset.range (dY + 1), (D + 1 - w * b))
+        = (dY + 1) * (2 * (D + 1)) - w * (dY * (dY + 1)) := by
+      have e1 : 2 * ((∑ b ∈ Finset.range (dY + 1), (D + 1 - w * b))
+          + w * (∑ b ∈ Finset.range (dY + 1), b)) =
+            2 * ((dY + 1) * (D + 1)) := by
         rw [h2]
-      have e2 : 2 * (k * (∑ b ∈ Finset.range (dY + 1), b)) = k * (dY * (dY + 1)) := by
-        calc 2 * (k * (∑ b ∈ Finset.range (dY + 1), b))
-            = k * ((∑ b ∈ Finset.range (dY + 1), b) * 2) := by ring
-          _ = k * ((dY + 1) * dY) := by rw [h4]
-          _ = k * (dY * (dY + 1)) := by ring
+      have e2 : 2 * (w * (∑ b ∈ Finset.range (dY + 1), b)) =
+          w * (dY * (dY + 1)) := by
+        calc 2 * (w * (∑ b ∈ Finset.range (dY + 1), b))
+            = w * ((∑ b ∈ Finset.range (dY + 1), b) * 2) := by ring
+          _ = w * ((dY + 1) * dY) := by rw [h4]
+          _ = w * (dY * (dY + 1)) := by ring
       have e3 : (dY + 1) * (2 * (D + 1)) = 2 * ((dY + 1) * (D + 1)) := by ring
       omega
-    calc 2 * ((∑ b ∈ Finset.range (dY + 1), (D + 1 - k * b)) * (dZ + 1))
-        = (2 * (∑ b ∈ Finset.range (dY + 1), (D + 1 - k * b))) * (dZ + 1) := by ring
-      _ = ((dY + 1) * (2 * (D + 1)) - k * (dY * (dY + 1))) * (dZ + 1) := by rw [h5]
+    calc 2 * ((∑ b ∈ Finset.range (dY + 1), (D + 1 - w * b)) * (dZ + 1))
+        = (2 * (∑ b ∈ Finset.range (dY + 1), (D + 1 - w * b))) *
+            (dZ + 1) := by ring
+      _ = ((dY + 1) * (2 * (D + 1)) - w * (dY * (dY + 1))) *
+            (dZ + 1) := by rw [h5]
   have hCon2 : 2 * Fintype.card (gsCon ι m dY dZ)
       = Fintype.card ι * (m * (m + 1)) * (dZ + dY + 1) := by
     have h1 : Fintype.card ((j : Fin m) × Fin (m - j)) = ∑ j ∈ Finset.range m, (m - j) := by
@@ -486,7 +492,7 @@ theorem exists_interpolant (dom : ι → F) (u₀ u₁ : ι → F) (k m D dY dZ 
         = Fintype.card ι * ((∑ j ∈ Finset.range m, (m - j)) * 2) * (dZ + dY + 1) := by
           ring
       _ = Fintype.card ι * (m * (m + 1)) * (dZ + dY + 1) := by rw [h2]
-  have hcards : Fintype.card (gsCon ι m dY dZ) < Fintype.card (gsIdx k D dY dZ) := by
+  have hcards : Fintype.card (gsCon ι m dY dZ) < Fintype.card (gsIdx w D dY dZ) := by
     omega
   -- Non-injectivity over the finite field.
   have hnoninj : ¬ Function.Injective φ := by
@@ -497,27 +503,27 @@ theorem exists_interpolant (dom : ι → F) (u₀ u₁ : ι → F) (k m D dY dZ 
     have h2 := Nat.pow_lt_pow_right hF hcards
     omega
   obtain ⟨q₁, q₂, hEq, hne⟩ := Function.not_injective_iff.mp hnoninj
-  set q : gsIdx k D dY dZ → F := q₁ - q₂ with hqdef
+  set q : gsIdx w D dY dZ → F := q₁ - q₂ with hqdef
   have hq0 : q ≠ 0 := sub_ne_zero.mpr hne
   have hφq : φ q = 0 := by
     rw [hqdef, hφsub, hEq, sub_self]
-  refine ⟨gsAssemble k D dY dZ q, ?_, gsAssemble_natDegree k D dY dZ q,
-    gsAssemble_coeff_natDegree k D dY dZ q, gsAssemble_isHeightLE k D dY dZ q, ?_⟩
+  refine ⟨gsAssemble w D dY dZ q, ?_, gsAssemble_natDegree w D dY dZ q,
+    gsAssemble_coeff_natDegree w D dY dZ q, gsAssemble_isHeightLE w D dY dZ q, ?_⟩
   · -- Nonzero: a nonzero entry survives as a coefficient.
     intro h0
     apply hq0
     funext v
-    have := gsAssemble_coeff k D dY dZ q v
+    have := gsAssemble_coeff w D dY dZ q v
     rw [h0] at this
     simpa using this.symm
   · -- The vanishing conditions.
     intro x i j hij
     set c : F[X] := ((shift2 (C (dom x)) (wordZ u₀ u₁ x)
-      (gsAssemble k D dY dZ q)).coeff j).coeff i with hc
+      (gsAssemble w D dY dZ q)).coeff j).coeff i with hc
     have hdegc : c.natDegree ≤ dZ + dY := by
       rw [hc]
-      exact heightLE₂_shift2 (dom x) (gsAssemble_natDegree k D dY dZ q)
-        (gsAssemble_isHeightLE k D dY dZ q) (wordZ_natDegree_le u₀ u₁ x) j i
+      exact heightLE₂_shift2 (dom x) (gsAssemble_natDegree w D dY dZ q)
+        (gsAssemble_isHeightLE w D dY dZ q) (wordZ_natDegree_le u₀ u₁ x) j i
     have hcoeffs : ∀ ℓ, c.coeff ℓ = 0 := by
       intro ℓ
       rcases le_or_gt ℓ (dZ + dY) with hℓ | hℓ
@@ -533,13 +539,13 @@ end Finite
 /-! ### The root property -/
 
 /-- **The Guruswami–Sudan root property.**  If the specialised interpolant vanishes to
-order `m` at `(x₀, p(x₀))` for every `x₀` in a set `T` of size `> D/m`, and `p` has
-degree ≤ `k`, then `Q_z(X, p(X)) = 0` — that is, `(Y - p)` divides `Q_z`. -/
+order `m` at `(x₀, p(x₀))` for every `x₀` in a set `T` of size `> D/m`, and the
+degree of `p` is at most the interpolation weight `w`, then `Q_z(X, p(X)) = 0`. -/
 theorem eval_map_eq_zero_of_agreements
-    {Q : (F[X][X])[X]} {k m D dY : ℕ}
-    (hQY : Q.natDegree ≤ dY) (hkdY : k * dY ≤ D)
-    (hQb : ∀ b, (Q.coeff b).natDegree ≤ D - k * b)
-    {z : F} {p : F[X]} (hp : p.natDegree ≤ k)
+    {Q : (F[X][X])[X]} {w m D dY : ℕ}
+    (hQY : Q.natDegree ≤ dY) (hwdY : w * dY ≤ D)
+    (hQb : ∀ b, (Q.coeff b).natDegree ≤ D - w * b)
+    {z : F} {p : F[X]} (hp : p.natDegree ≤ w)
     {T : Finset F}
     (hvan : ∀ x₀ ∈ T, vanishesTo m x₀ (p.eval x₀) (Q.map (mapRingHom (evalRingHom z))))
     (hDT : D < m * T.card) :
@@ -574,14 +580,14 @@ theorem eval_map_eq_zero_of_agreements
       have h2 : Qz.natDegree ≤ dY := le_trans (natDegree_map_le) hQY
       omega
     refine le_trans (natDegree_mul_le) ?_
-    have h3 : (Qz.coeff b).natDegree ≤ D - k * b := by
+    have h3 : (Qz.coeff b).natDegree ≤ D - w * b := by
       rw [hQz, coeff_map]
       exact le_trans (natDegree_map_le) (hQb b)
-    have h4 : (p ^ b).natDegree ≤ k * b := by
+    have h4 : (p ^ b).natDegree ≤ w * b := by
       rw [natDegree_pow]
-      calc b * p.natDegree ≤ b * k := Nat.mul_le_mul_left _ hp
-        _ = k * b := Nat.mul_comm _ _
-    have h5 : k * b ≤ D := le_trans (Nat.mul_le_mul_left _ hbdY) hkdY
+      calc b * p.natDegree ≤ b * w := Nat.mul_le_mul_left _ hp
+        _ = w * b := Nat.mul_comm _ _
+    have h5 : w * b ≤ D := le_trans (Nat.mul_le_mul_left _ hbdY) hwdY
     omega
   have h6 := natDegree_le_of_dvd hprod hR0
   rw [hdegprod] at h6

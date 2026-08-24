@@ -16,11 +16,11 @@ proximate simultaneously matches the received word.
 Two refinements over the naive assembly make the statement general enough to cover the
 inseparable case (§6.6) with no separability hypothesis anywhere:
 
-* **The jet order `κ` and the incidence order `k` are decoupled.**  For an inseparable
-  factor the machinery runs on the separable core with proximates `q_z = p_z^{p^f}` of
-  degree `κ = k·p^f`; the jet must have order `κ`, but the incidence count only needs
-  to produce `k+1` good coordinates, because the final interpolation happens *after*
-  untwisting each coordinate value.  Quantitatively this supports the `η³` bound: the column
+* **The jet order `κ` and the code dimension `k` are decoupled.**  For an inseparable
+  factor the machinery runs on the separable core with proximates `q_z = p_z^{p^f}`;
+  `κ = k·p^f` is a conservative truncation order, while the incidence count only needs
+  `k` good coordinates because final interpolation happens *after* untwisting each
+  coordinate value.  Quantitatively this supports the `η³` bound: the column
   bound is `(2κ+1)·deg_Y(S)·D_Z ≈ 2k·deg_Y(P)·D_Z`, with the `p^f` cancelling.
 
 * **The word value is `w₀ + Z^M·w₁`.**  In the separable case `M = 1`; for the

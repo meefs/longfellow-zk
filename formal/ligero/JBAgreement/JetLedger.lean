@@ -47,7 +47,7 @@ into exactly the target bound.  No further case analysis is needed beyond
   coefficients.
 * `jet_coeff_integral` — the corollary used downstream: `ξ^(2t-1) · α_t` is integral
   of size at most `(mR + d·mα + mξ) · (2t - 1)`.  Linear in `t`: this is the estimate
-  that puts `2k + 1` — not `D_X` — into the §3 branch bound. Weighted factor selection
+  that puts `2r + 1` for the chosen jet order — not `D_X` — into the §3 branch bound. Weighted factor selection
   then sums exact capacities, improving the final threshold from the original `η⁵`
   and the intermediate uniform-bucket `η⁴` to `η³`.
 -/
@@ -665,8 +665,8 @@ include hR hα hd hmR hmα hmξ hξint hξ0 in
 
 The `(t+1)`-st jet coefficient, cleared by `ξ^(2t+1)`, is integral of size at most
 `(mR + d·mα + mξ) · (2t + 1)`.  Linear in `t`: with heights this reads
-`ht(γ_{t+1}) ≤ (D + mξ) · (2t + 1) = O(D_Z · t)`, which is what puts `2k + 1` — not
-`D_X` — into the §3 branch bound. -/
+`ht(γ_{t+1}) ≤ (D + mξ) · (2t + 1) = O(D_Z · t)`, which is what puts a term
+linear in the chosen jet order — not `D_X` — into the §3 branch bound. -/
 theorem jet_coeff_integral (t : ℕ) :
     ∃ g : A,
       algebraMap A K g = xi R α₀ ^ (2 * t + 1) * ((jet R α₀ (t + 1)).coeff (t + 1)) ∧

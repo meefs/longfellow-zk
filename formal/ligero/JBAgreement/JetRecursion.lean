@@ -21,7 +21,7 @@ property.  Two design decisions remove machinery relative to both BCIKS and the 
    (downstream, `K = Frac(F[Z][T])` with `α₀ = T`), and the conclusion holds
    unconditionally:
 
-     `R(x₀ + U, Γ_k(U), Z) ≡ R(x₀, α₀, Z)  (mod U^{k+1})`.
+     `R(x₀ + U, Γ_k(U), Z) ≡ R(x₀, α₀, Z)  (mod U^{r+1})`.
 
    Specialising `(Z, T) ↦ (z, t_z)` at a root `t_z` of the branch factor `H` kills the
    right-hand side *at the end*.  This meshes with the §2 machinery, whose
@@ -39,7 +39,7 @@ Throughout, `R : K[X][X]` has the `U`-variable *inner* and the `Y`-variable *out
 * `jet` — the recursion; `jet R α₀ t` is the `t`-jet `Γ_t ∈ K[U]`.
 * `coeff_eval_jet_eq_zero` — the vanishing `[Uˢ] R(Γ_t) = 0` for `1 ≤ s ≤ t`.
 * `eval_jet_sub_C_dvd` — the packaged jet property
-  `U^{k+1} ∣ R(Γ_k) - C (R(x₀, α₀))`.
+  `U^{r+1} ∣ R(Γ_k) - C (R(x₀, α₀))`.
 -/
 
 namespace JBAgreement
@@ -248,18 +248,18 @@ theorem coeff_zero_eval_jet (R : K[X][X]) (α₀ : K) (t : ℕ) :
 
 /-- **The jet property (§1, conclusion).**
 
-`U^{k+1}` divides `R(Γ_k) - r₀`.  In the intended instantiation `r₀ = R(x₀, T, Z)`
+`U^{r+1}` divides `R(Γ_k) - r₀`.  In the intended instantiation `r₀ = R(x₀, T, Z)`
 specialises to `0` at every branch point `(z, t_z)`, making the specialised jet a root
-of `R(x₀+U, ·, z)` modulo `U^{k+1}`; finite Hensel uniqueness (`Jet.lean`) then
+of `R(x₀+U, ·, z)` modulo `U^{r+1}`; finite Hensel uniqueness (`Jet.lean`) then
 identifies it with the proximate `p_z`. -/
-theorem eval_jet_sub_C_dvd (R : K[X][X]) (α₀ : K) (hξ : xi R α₀ ≠ 0) (k : ℕ) :
-    (X : K[X]) ^ (k + 1) ∣ R.eval (jet R α₀ k) - C (jetConst R α₀) := by
+theorem eval_jet_sub_C_dvd (R : K[X][X]) (α₀ : K) (hξ : xi R α₀ ≠ 0) (r : ℕ) :
+    (X : K[X]) ^ (r + 1) ∣ R.eval (jet R α₀ r) - C (jetConst R α₀) := by
   rw [X_pow_dvd_iff]
   intro d hd
   rcases Nat.eq_zero_or_pos d with rfl | hdpos
   · rw [coeff_sub, coeff_zero_eval_jet, coeff_C]
     simp
-  · rw [coeff_sub, coeff_eval_jet_eq_zero R α₀ hξ k d hdpos (by omega), coeff_C]
+  · rw [coeff_sub, coeff_eval_jet_eq_zero R α₀ hξ r d hdpos (by omega), coeff_C]
     simp
     omega
 

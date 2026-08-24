@@ -26,9 +26,8 @@ for every `g`, and `strong_mutual_johnson` bounds the right-hand side.
 
 The one structural hypothesis the clique route does not need is that the code is
 Reed–Solomon: the Johnson bound is a statement about polynomials, so the code
-must be presented as evaluations of degree-`≤ k` polynomials on an injective
-domain.  `RSPresentation` records that presentation.  A dimension-`k`
-Reed–Solomon code is presented at degree `k - 1`.
+must be presented as evaluations of polynomials of degree strictly below the
+dimension `k` on an injective domain.  `RSPresentation` records that presentation.
 -/
 
 namespace JBAgreement
@@ -37,9 +36,10 @@ open CodingTheory SelectedMCA AffineAgreement Polynomial Finset
 
 variable {F : Type*} [Field F] [Fintype F] [DecidableEq F]
 
-/-- A Reed–Solomon presentation of a linear code: an injective evaluation domain
-together with the two inclusions identifying `C` with the polynomials of degree
-at most `k`.  Only these two directions are used -- `mem_of_natDegree_le` to
+/-- A dimension-`k` Reed–Solomon presentation of a linear code: an injective
+evaluation domain together with the two inclusions identifying `C` with the
+polynomials of degree strictly below `k`.  Only these two directions are used --
+`mem_of_natDegree_lt` to
 return an explaining component to the code, `exists_of_mem` to read a selected
 codeword as a polynomial. -/
 structure RSPresentation (n k : ℕ) (C : LinearCode F n) where
@@ -48,9 +48,9 @@ structure RSPresentation (n k : ℕ) (C : LinearCode F n) where
   /-- Distinct coordinates carry distinct evaluation points. -/
   dom_injective : Function.Injective dom
   /-- Every low-degree polynomial evaluates into the code. -/
-  mem_of_natDegree_le : ∀ p : F[X], p.natDegree ≤ k → RSeval dom p ∈ C
+  mem_of_natDegree_lt : ∀ p : F[X], p.natDegree < k → RSeval dom p ∈ C
   /-- Every codeword is the evaluation of a low-degree polynomial. -/
-  exists_of_mem : ∀ w ∈ C, ∃ p : F[X], p.natDegree ≤ k ∧ w = RSeval dom p
+  exists_of_mem : ∀ w ∈ C, ∃ p : F[X], p.natDegree < k ∧ w = RSeval dom p
 
 omit [Fintype F] in
 /-- Hamming disagreement is the support of the difference. -/
@@ -88,7 +88,7 @@ theorem hasUnexplainedProximate_of_not_directionallyGLiftable
     exact hnear
   · -- An explaining pair would make `z` liftable, contradicting `hnot`.
     intro p₀ p₁ _ h₁ hexp
-    refine hnot ⟨RSeval P.dom p₁, P.mem_of_natDegree_le p₁ h₁, ?_⟩
+    refine hnot ⟨RSeval P.dom p₁, P.mem_of_natDegree_lt p₁ h₁, ?_⟩
     have hempty : supportOn (selectedAgreementCoordinates D z)
         (v - RSeval P.dom p₁) = ∅ := by
       refine Finset.eq_empty_iff_forall_notMem.mpr ?_
@@ -106,10 +106,11 @@ theorem hasUnexplainedProximate_of_not_directionallyGLiftable
     rw [hempty]
     simp
 
-/-- **The Johnson-regime per-line bound.**  On a Reed–Solomon code presented at
-degree `k`, the selected parameters that fail directional `g`-liftability number
+/-- **The Johnson-regime per-line bound.**  On a dimension-`k` Reed–Solomon code,
+the selected parameters that fail directional `g`-liftability number
 fewer than `johnsonThreshold k n e η`, under exactly the numeric hypotheses of
-`correlatedAgreement_johnson_final`.
+the dimension-aware Johnson theorem.  Its interpolation terms use the degree
+cap `k - 1`; its selector and slack terms use the dimension `k`.
 
 This is the drop-in replacement for
 `SelectedMCA.directionallyNonliftableParameters_card_le_direct`: same conclusion
@@ -117,11 +118,13 @@ shape, a different theorem paying for it. -/
 theorem directionallyNonliftableParameters_card_lt_johnson
     {n k e m g : ℕ} {C : LinearCode F n} {u v : Word F n}
     (P : RSPresentation n k C) (D : DecoderData (e := e) (m := m) C u v) (η : ℝ)
-    (hk1 : 1 ≤ k) (hη : 0 < η) (hη4 : η ≤ 1/4)
+    (hk2 : 2 ≤ k) (hη : 0 < η) (hη4 : η ≤ 1/4)
     (hηn : 1 ≤ η * n)
     (ht4 : 4 * η * n ≤ ((n - e : ℕ) : ℝ))
-    (hJ : (k : ℝ) * n ≤ (((n - e : ℕ) : ℝ) - 4 * η * n) ^ 2)
-    (_hfield : 9 * ((n : ℝ)) ^ 2 / (8 * k * η ^ 2) < Fintype.card F) :
+    (hJ : ((k - 1 : ℕ) : ℝ) * n ≤
+      (((n - e : ℕ) : ℝ) - 4 * η * n) ^ 2)
+    (_hfield : 9 * ((n : ℝ)) ^ 2 /
+      (8 * (k - 1 : ℕ) * η ^ 2) < Fintype.card F) :
     ((directionallyNonliftableParameters D g).card : ℝ) <
       johnsonThreshold k n e η := by
   classical
@@ -137,7 +140,7 @@ theorem directionallyNonliftableParameters_card_lt_johnson
       ((Finset.univ.filter fun z =>
         HasUnexplainedProximate P.dom u v k e z).card : ℝ) := by
     exact_mod_cast Finset.card_le_card hsub
-  have hbad := strong_mutual_johnson P.dom P.dom_injective u v k e η hk1 hη hη4
+  have hbad := strong_mutual_johnson P.dom P.dom_injective u v k e η hk2 hη hη4
     (by rwa [Fintype.card_fin]) (by rwa [Fintype.card_fin])
     (by rwa [Fintype.card_fin])
   rw [Fintype.card_fin] at hbad
@@ -154,16 +157,18 @@ an integer is admissible. -/
 theorem lineFailureBound_of_johnson
     {n k e g bound : ℕ} {C : LinearCode F n}
     (P : RSPresentation n k C) (η : ℝ)
-    (hk1 : 1 ≤ k) (hη : 0 < η) (hη4 : η ≤ 1/4)
+    (hk2 : 2 ≤ k) (hη : 0 < η) (hη4 : η ≤ 1/4)
     (hηn : 1 ≤ η * n)
     (ht4 : 4 * η * n ≤ ((n - e : ℕ) : ℝ))
-    (hJ : (k : ℝ) * n ≤ (((n - e : ℕ) : ℝ) - 4 * η * n) ^ 2)
-    (hfield : 9 * ((n : ℝ)) ^ 2 / (8 * k * η ^ 2) < Fintype.card F)
+    (hJ : ((k - 1 : ℕ) : ℝ) * n ≤
+      (((n - e : ℕ) : ℝ) - 4 * η * n) ^ 2)
+    (hfield : 9 * ((n : ℝ)) ^ 2 /
+      (8 * (k - 1 : ℕ) * η ^ 2) < Fintype.card F)
     (hbound : johnsonThreshold k n e η ≤ ((bound : ℝ) + 1)) :
     SelectedMCA.LineFailureBound C e g bound := by
   intro m u v D
   have hlt := directionallyNonliftableParameters_card_lt_johnson (g := g)
-    P D η hk1 hη hη4 hηn ht4 hJ hfield
+    P D η hk2 hη hη4 hηn ht4 hJ hfield
   have hreal : ((directionallyNonliftableParameters D g).card : ℝ) <
       (bound : ℝ) + 1 := lt_of_lt_of_le hlt hbound
   have hnat : (directionallyNonliftableParameters D g).card < bound + 1 := by

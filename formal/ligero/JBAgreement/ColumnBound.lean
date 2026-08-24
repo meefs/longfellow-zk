@@ -15,14 +15,14 @@ agreement pattern into an algebraic incidence between `H` and `ĝ_x`.
 
 Two things are needed about it, and both are here.
 
-* **Size.**  `size_ghat_exp`: the `T`-degree and `Z`-height of `ĝ_x` are `O(k)` — a direct
+* **Size.**  `size_ghat_exp`: the `T`-degree and `Z`-height of `ĝ_x` are `O(r)` — a direct
   consequence of the ledger estimate.  With `mα = 1, mR = 0` for the `T`-degree and
-  `mα = 0, mR = D_Z` for the `Z`-height this reads `O(k·D_Y)` and `O(k·D_Z)`, and it is
-  what turns the column bound into `O(k·D_Y·D_Z)` rather than something involving `D_X`.
+  `mα = 0, mR = D_Z` for the `Z`-height this reads `O(r·D_Y)` and `O(r·D_Z)`, and it is
+  what turns the column bound into `O(r·D_Y·D_Z)` rather than something involving `D_X`.
 
 * **Divisibility.**  `dvd_of_resultant_eq_zero`: for an irreducible primitive branch
   factor `H`, a vanishing resultant forces `H ∣ ĝ_x` outright.  This is what upgrades the
-  conclusion of the incidence count — "the resultant vanishes at more than `k`
+  conclusion of the incidence count — "the resultant vanishes at more than `r`
   coordinates" — into the identity `Γ_k(dom x) = u₀ x + Z u₁ x` needed for interpolation.
   Gauss's lemma moves irreducibility to `F(Z)[T]`, `resultant_eq_zero_iff` produces a
   common factor there, and primality of `H` in the UFD `F[Z][T]` brings the divisibility
@@ -43,16 +43,16 @@ theorem sub {g h : A} {m : ℕ} (hg : SS.P g m) (hh : SS.P h m) : SS.P (g - h) m
   rw [sub_eq_add_neg]
   exact SS.add hg (SS.neg hh)
 
-/-- Evaluating a polynomial of degree at most `k` costs `k` times the size of the
+/-- Evaluating a polynomial of degree at most `r` costs `r` times the size of the
 argument. -/
-theorem eval_le {γ : A[X]} {k mγ mw : ℕ} (hdeg : γ.natDegree ≤ k)
+theorem eval_le {γ : A[X]} {r mγ mw : ℕ} (hdeg : γ.natDegree ≤ r)
     (hc : ∀ i, SS.P (γ.coeff i) mγ) {w : A} (hw : SS.P w mw) :
-    SS.P (γ.eval w) (mγ + k * mw) := by
-  rw [eval_eq_sum_range' (n := k + 1) (by omega)]
+    SS.P (γ.eval w) (mγ + r * mw) := by
+  rw [eval_eq_sum_range' (n := r + 1) (by omega)]
   refine SS.sum _ _ fun i hi => ?_
-  have hik : i ≤ k := by have := Finset.mem_range.mp hi; omega
+  have hik : i ≤ r := by have := Finset.mem_range.mp hi; omega
   refine SS.mono (SS.mul (hc i) (SS.pow hw i)) ?_
-  have : i * mw ≤ k * mw := Nat.mul_le_mul_right _ hik
+  have : i * mw ≤ r * mw := Nat.mul_le_mul_right _ hik
   omega
 
 end SizeSystem
@@ -68,27 +68,27 @@ evaluated at the coordinate, minus the correspondingly cleared received value. -
 def ghatExp (γ : A[X]) (ξ : A) (E : ℕ) (w val : A) : A :=
   γ.eval w - ξ ^ E * val
 
-/-- The coordinate polynomial `ĝ_x` for the original `2k+1` clearing convention. -/
-def ghat (γ : A[X]) (ξ : A) (k : ℕ) (w val : A) : A :=
-  ghatExp γ ξ (2 * k + 1) w val
+/-- The coordinate polynomial `ĝ_x` for the generic odd clearing exponent `2r+1`. -/
+def ghat (γ : A[X]) (ξ : A) (r : ℕ) (w val : A) : A :=
+  ghatExp γ ξ (2 * r + 1) w val
 
 /-- Size bound for a coordinate polynomial with an arbitrary clearing exponent. -/
 theorem size_ghat_exp (SS : SizeSystem A) {γ : A[X]} {ξ w val : A}
-    {k E mγ mw mξ mval m : ℕ}
-    (hdeg : γ.natDegree ≤ k) (hc : ∀ i, SS.P (γ.coeff i) mγ)
+    {r E mγ mw mξ mval m : ℕ}
+    (hdeg : γ.natDegree ≤ r) (hc : ∀ i, SS.P (γ.coeff i) mγ)
     (hw : SS.P w mw) (hξ : SS.P ξ mξ) (hval : SS.P val mval)
-    (h1 : mγ + k * mw ≤ m) (h2 : E * mξ + mval ≤ m) :
+    (h1 : mγ + r * mw ≤ m) (h2 : E * mξ + mval ≤ m) :
     SS.P (ghatExp γ ξ E w val) m := by
   refine SS.sub (SS.mono (SS.eval_le hdeg hc hw) h1)
     (SS.mono (SS.mul (SS.pow hξ _) hval) h2)
 
-/-- **The size of `ĝ_x` is linear in `k`.**  Both instances matter: with the `T`-degree
-size system this is `O(k·D_Y)`, with the `Z`-height size system `O(k·D_Z)`. -/
-theorem size_ghat (SS : SizeSystem A) {γ : A[X]} {ξ w val : A} {k mγ mw mξ mval m : ℕ}
-    (hdeg : γ.natDegree ≤ k) (hc : ∀ i, SS.P (γ.coeff i) mγ)
+/-- **The size of `ĝ_x` is linear in `r`.**  Both instances matter: with the `T`-degree
+size system this is `O(r·D_Y)`, with the `Z`-height size system `O(r·D_Z)`. -/
+theorem size_ghat (SS : SizeSystem A) {γ : A[X]} {ξ w val : A} {r mγ mw mξ mval m : ℕ}
+    (hdeg : γ.natDegree ≤ r) (hc : ∀ i, SS.P (γ.coeff i) mγ)
     (hw : SS.P w mw) (hξ : SS.P ξ mξ) (hval : SS.P val mval)
-    (h1 : mγ + k * mw ≤ m) (h2 : (2 * k + 1) * mξ + mval ≤ m) :
-    SS.P (ghat γ ξ k w val) m := by
+    (h1 : mγ + r * mw ≤ m) (h2 : (2 * r + 1) * mξ + mval ≤ m) :
+    SS.P (ghat γ ξ r w val) m := by
   exact size_ghat_exp SS hdeg hc hw hξ hval h1 h2
 
 end Ghat

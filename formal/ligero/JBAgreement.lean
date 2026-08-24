@@ -1,8 +1,10 @@
 import JBAgreement.Branch
 import JBAgreement.Certificate
+import JBAgreement.CertificateMinimum
 import JBAgreement.ClearedJet
 import JBAgreement.ColumnBound
 import JBAgreement.Complete
+import JBAgreement.Conclusion
 import JBAgreement.Counting
 import JBAgreement.EndToEnd
 import JBAgreement.FactorSelection

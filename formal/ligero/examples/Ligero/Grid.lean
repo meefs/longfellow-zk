@@ -124,7 +124,7 @@ A Johnson row stores its line bound in `m` exactly as a clique row does -- the
 soundness expression reads `lineBound = m - 1` either way -- so the two routes
 produce comparable certificates and only the checked conditions differ. -/
 def Certificate.johnsonConditions (c : Certificate) (etaBits : ℕ) : Bool :=
-  JBAgreement.johnsonConditionsBool c.n (c.k - 1) c.e etaBits c.lineBound
+  JBAgreement.johnsonConditionsBool c.n c.k c.e etaBits c.lineBound
       c.fieldSize &&
     (3 * c.g < c.d - c.e) && (c.g + 1 < c.fieldSize) &&
     decide (0 < CodingTheory.InterleavedJohnson.denominator c.n c.d (c.e + c.g))
@@ -134,7 +134,7 @@ masters consume, given a Reed–Solomon presentation of the base code. -/
 theorem Certificate.johnsonLineConditions (c : Certificate) {etaBits : ℕ}
     {F : Type*} [_root_.Field F] [Fintype F] [DecidableEq F]
     {C : CodingTheory.LinearCode F c.n}
-    (P : JBAgreement.RSPresentation c.n (c.k - 1) C)
+    (P : JBAgreement.RSPresentation c.n c.k C)
     (hfield : Fintype.card F = c.fieldSize)
     (h : c.johnsonConditions etaBits = true) :
     LigeroFamily.SelectedMCALineConditions C c.fieldSize c.e c.g c.d

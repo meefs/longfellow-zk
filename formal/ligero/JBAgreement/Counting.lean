@@ -11,9 +11,9 @@ This file develops the two purely combinatorial counting arguments of the
 finite-jet reorganisation of the BCIKS Johnson-regime correlated agreement
 theorem.  Neither depends on any algebraic geometry, so both are proved outright.
 
-* `incidence_bound` / `card_exceptional_ge` are §3 of the plan: they replace BCIKS
-  Claims 5.10-5.11 ("take the `k+1` most popular coordinates") by a single
-  incidence inequality.
+* `incidence_bound` / `card_exceptional_ge` are §3 of the plan: they replace the
+  popular-coordinate bookkeeping of BCIKS Claims 5.10--5.11 by a single incidence
+  inequality.
 
 * `eq_of_mem_pairDisagree` and `card_pairDisagree_le` are §4: the elementary
   endgame, one affine root per coordinate.  The same lemma carries Haböck's
@@ -293,10 +293,9 @@ If every parameter in `S` is incident to at least `a` coordinates, every coordin
 outside `I` is incident to at most `B` parameters, and `S` is large enough, then the
 exceptional set `I` has more than `k` elements.
 
-Downstream this is applied with `I = {x | g x = 0}` and `k+1` the number of
-interpolation points needed, so the conclusion `k < |I|` supplies the `k+1`
-coordinates on which the finite jet is pinned down.  This replaces the
-"take the `k+1` most popular coordinates" bookkeeping of BCIKS Claims 5.10-5.11. -/
+Downstream `k` is the code dimension and `I = {x | g x = 0}`.  A dimension-`k`
+polynomial is determined by `k` evaluations; the stronger conclusion `k < |I|`
+therefore supplies enough coordinates. -/
 theorem card_exceptional_ge (S : Finset β) (I : Finset α) (P : α → β → Prop)
     [∀ x z, Decidable (P x z)] (a k B : ℕ) (hka : k ≤ a)
     (hrow : ∀ z ∈ S, a ≤ (univ.filter fun x => P x z).card)

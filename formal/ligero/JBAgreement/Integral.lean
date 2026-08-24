@@ -33,13 +33,13 @@ computes the honest evaluation whenever the denominators can be divided out:
 Reading the first identity forwards over `K` and backwards over `F` is exactly the
 transfer we need — and it never mentions localisation, completions, or valuations.
 
-## 3. Uniqueness modulo `U^{k+1}`
+## 3. Uniqueness modulo `U^{r+1}`
 
 `eq_of_dvd_eval` is finite Hensel uniqueness in the only form the endgame needs, stated
-directly in `F[U]`: two polynomials of degree at most `k`, with the same constant term,
-both annihilating `R` modulo `U^{k+1}`, coincide as soon as `∂_Y R` is nonzero at the
+directly in `F[U]`: two polynomials of degree at most `r`, with the same constant term,
+both annihilating `R` modulo `U^{r+1}`, coincide as soon as `∂_Y R` is nonzero at the
 base point.  Instead of a nilpotent-ideal argument it uses that `U` is prime in `F[U]`:
-the difference `δ` satisfies `U^{k+1} ∣ δ · v` with `v(0) ≠ 0`, so `U^{k+1} ∣ δ`, so
+the difference `δ` satisfies `U^{r+1} ∣ δ · v` with `v(0) ≠ 0`, so `U^{r+1} ∣ δ`, so
 `δ = 0` by degree.
 -/
 
@@ -140,18 +140,18 @@ theorem isCoprime_X_pow_of_coeff_zero_ne_zero {v : F[X]} (hv : v.coeff 0 ≠ 0) 
 
 /-- **Finite Hensel uniqueness, in the form used by the endgame.**
 
-If `γ` and `π` both have degree at most `k`, share their constant term, both annihilate
-`R` modulo `U ^ (k+1)`, and `∂_Y R` evaluated at `π` has nonzero constant term, then
+If `γ` and `π` both have degree at most `r`, share their constant term, both annihilate
+`R` modulo `U ^ (r+1)`, and `∂_Y R` evaluated at `π` has nonzero constant term, then
 `γ = π`.
 
 The proof is the Taylor expansion `R(γ) - R(π) = δ · (∂_Y R(π) + c δ)` together with the
-primality of `U`: the second factor has nonzero constant term, so all of `U ^ (k+1)`
-must divide `δ`, which has degree at most `k`. -/
-theorem eq_of_dvd_eval (R : F[X][X]) {γ π : F[X]} {k : ℕ}
-    (hγ : γ.natDegree ≤ k) (hπ : π.natDegree ≤ k)
+primality of `U`: the second factor has nonzero constant term, so all of `U ^ (r+1)`
+must divide `δ`, which has degree at most `r`. -/
+theorem eq_of_dvd_eval (R : F[X][X]) {γ π : F[X]} {r : ℕ}
+    (hγ : γ.natDegree ≤ r) (hπ : π.natDegree ≤ r)
     (hconst : γ.coeff 0 = π.coeff 0)
-    (hRγ : (X : F[X]) ^ (k + 1) ∣ R.eval γ)
-    (hRπ : (X : F[X]) ^ (k + 1) ∣ R.eval π)
+    (hRγ : (X : F[X]) ^ (r + 1) ∣ R.eval γ)
+    (hRπ : (X : F[X]) ^ (r + 1) ∣ R.eval π)
     (hunit : ((hasseDeriv 1 R).eval π).coeff 0 ≠ 0) :
     γ = π := by
   set δ : F[X] := γ - π with hδdef
@@ -169,12 +169,12 @@ theorem eq_of_dvd_eval (R : F[X][X]) {γ π : F[X]} {k : ℕ}
     rw [hvdef, coeff_add, mul_coeff_zero, hδ0, mul_zero, add_zero]
     exact hunit
   -- Divide out the coprime factor.
-  have hdvd : (X : F[X]) ^ (k + 1) ∣ δ * v := by
+  have hdvd : (X : F[X]) ^ (r + 1) ∣ δ * v := by
     rw [← hfac]; exact dvd_sub hRγ hRπ
-  have hδdvd : (X : F[X]) ^ (k + 1) ∣ δ :=
-    (isCoprime_X_pow_of_coeff_zero_ne_zero hv0 (k + 1)).dvd_of_dvd_mul_right hdvd
+  have hδdvd : (X : F[X]) ^ (r + 1) ∣ δ :=
+    (isCoprime_X_pow_of_coeff_zero_ne_zero hv0 (r + 1)).dvd_of_dvd_mul_right hdvd
   -- Degree forces `δ = 0`.
-  refine eq_of_sub_dvd_of_degree_le (x₀ := (0 : F)) (k := k) ?_ ?_ ?_
+  refine eq_of_sub_dvd_of_degree_le (x₀ := (0 : F)) (r := r) ?_ ?_ ?_
   · exact natDegree_le_iff_degree_le.mp hγ
   · exact natDegree_le_iff_degree_le.mp hπ
   · simpa using hδdvd

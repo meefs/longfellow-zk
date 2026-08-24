@@ -1,3 +1,4 @@
+import JBAgreement.CertificateMinimum
 import JBAgreement.Complete
 
 /-!
@@ -10,8 +11,8 @@ ways: it quantifies over **every** proximate codeword of every parameter — the
 list, not the designated line point — and it demands each agreement set be
 **contained** in the joint agreement set of some *explaining* pair of codewords.
 
-This file proves the strong form, at the same `η³` threshold.  The pipeline never
-cared which proximate is tracked (the interpolant vanishes on the graph of the line,
+This file proves the exact-certificate strong form.  The pipeline never cared
+which proximate is tracked (the interpolant vanishes on the graph of the line,
 so *any* `e`-close codeword is a root of every specialisation), so one simply chooses,
 for each allegedly bad parameter, one unexplained proximate, and runs the machinery on
 those choices (`exists_affine_bucket_of_GS_sharp_noFieldSize`).  On the bucket the chosen proximates
@@ -22,13 +23,9 @@ one-affine-root lemma each coordinate can serve at most one parameter, so at mos
 
 * `explains` — the pair `(p₀, p₁)` explains the proximate `p` at `z`: it decomposes
   `p` along the line and its joint agreement contains the agreement set of `p`.
-* `HasUnexplainedProximate` — `z` admits a degree-≤`k` codeword within distance `e`
+* `HasUnexplainedProximate` — `z` admits a dimension-`k` codeword within distance `e`
   of `u₀ + z·u₁` that no pair explains.
 * `strong_mutual_unconditional` — no set of such parameters can reach the threshold.
-* `strong_mutual_johnson` — the Johnson-regime form: the number of parameters with
-  any unexplained proximate is `< johnsonThreshold` (size `O_ρ(n/η³)`).
-* `strong_mutual_positive` — the positive Hab25 reading: outside a set of size
-  `< johnsonThreshold`, **every** proximate of **every** parameter is explained.
 -/
 
 namespace JBAgreement
@@ -48,13 +45,13 @@ def explains (dom : ι → F) (u₀ u₁ : ι → F) (z : F) (p p₀ p₁ : F[X]
   ∀ x : ι, u₀ x + z * u₁ x = p.eval (dom x) →
     u₀ x = p₀.eval (dom x) ∧ u₁ x = p₁.eval (dom x)
 
-/-- `z` admits an *unexplained proximate*: a degree-≤`k` codeword within distance `e`
-of `u₀ + z·u₁` that no pair of degree-≤`k` codewords explains.  Haböck's mutual
+/-- `z` admits an *unexplained proximate*: a dimension-`k` codeword within distance `e`
+of `u₀ + z·u₁` that no pair of dimension-`k` codewords explains.  Haböck's mutual
 correlated agreement is the statement that few `z` have this property. -/
 def HasUnexplainedProximate (dom : ι → F) (u₀ u₁ : ι → F) (k e : ℕ) (z : F) : Prop :=
-  ∃ p : F[X], p.natDegree ≤ k ∧
+  ∃ p : F[X], p.natDegree < k ∧
     (disagree (fun x => u₀ x + z * u₁ x) (RSeval dom p)).card ≤ e ∧
-    ∀ p₀ p₁ : F[X], p₀.natDegree ≤ k → p₁.natDegree ≤ k →
+    ∀ p₀ p₁ : F[X], p₀.natDegree < k → p₁.natDegree < k →
       ¬ explains dom u₀ u₁ z p p₀ p₁
 
 /-- **Strong mutual correlated agreement, unconditional form.**  A set of parameters
@@ -65,9 +62,10 @@ theorem strong_mutual_unconditional
     (hk : 1 ≤ k) (S : Finset F)
     (hbad : ∀ z ∈ S, HasUnexplainedProximate dom u₀ u₁ k e z)
     (m D dY dZ : ℕ)
-    (hkdY : k * dY ≤ D)
+    (hkdY : (k - 1) * dY ≤ D)
     (hcnt : Fintype.card ι * (m * (m + 1)) * (dZ + dY + 1)
-        < ((dY + 1) * (2 * (D + 1)) - k * (dY * (dY + 1))) * (dZ + 1))
+        < ((dY + 1) * (2 * (D + 1)) - (k - 1) * (dY * (dY + 1))) *
+          (dZ + 1))
     (hroot : D < m * (Fintype.card ι - e))
     (hslack : 1 ≤ Fintype.card ι - e - k)
     (hS : dY * (e + 2) +
@@ -76,9 +74,9 @@ theorem strong_mutual_unconditional
     False := by
   classical
   -- Choose, for each bad parameter, one unexplained proximate.
-  have hchoice : ∀ z : F, ∃ p : F[X], z ∈ S → (p.natDegree ≤ k ∧
+  have hchoice : ∀ z : F, ∃ p : F[X], z ∈ S → (p.natDegree < k ∧
       (disagree (fun x => u₀ x + z * u₁ x) (RSeval dom p)).card ≤ e ∧
-      ∀ p₀ p₁ : F[X], p₀.natDegree ≤ k → p₁.natDegree ≤ k →
+      ∀ p₀ p₁ : F[X], p₀.natDegree < k → p₁.natDegree < k →
         ¬ explains dom u₀ u₁ z p p₀ p₁) := by
     intro z
     by_cases hz : z ∈ S
@@ -104,8 +102,8 @@ theorem strong_mutual_unconditional
     exact h
   -- Each bucket parameter, being unexplained even by `(v₀, v₁)`, consumes a
   -- coordinate of the pair-disagreement set.
-  have hdeg₀' : v₀.natDegree ≤ k := natDegree_le_iff_degree_le.mpr hdeg₀
-  have hdeg₁' : v₁.natDegree ≤ k := natDegree_le_iff_degree_le.mpr hdeg₁
+  have hdeg₀' : v₀.natDegree < k := hdeg₀
+  have hdeg₁' : v₁.natDegree < k := hdeg₁
   have hwit : ∀ z ∈ S', ∃ x : ι,
       u₀ x + z * u₁ x = v₀.eval (dom x) + z * v₁.eval (dom x) ∧
       x ∈ pairDisagree u₀ u₁ (RSeval dom v₀) (RSeval dom v₁) := by
@@ -164,10 +162,10 @@ form): the number of parameters admitting *any* unexplained proximate is below t
 correlated agreement threshold — of size `O_ρ(n/η³)` by `johnsonThreshold_le`. -/
 theorem strong_mutual_johnson
     (dom : ι → F) (hdom : Function.Injective dom) (u₀ u₁ : ι → F) (k e : ℕ) (η : ℝ)
-    (hk1 : 1 ≤ k) (hη : 0 < η) (hη4 : η ≤ 1/4)
+    (hk2 : 2 ≤ k) (hη : 0 < η) (hη4 : η ≤ 1/4)
     (hηn : 1 ≤ η * (Fintype.card ι))
     (ht4 : 4 * η * (Fintype.card ι) ≤ ((Fintype.card ι - e : ℕ) : ℝ))
-    (hJ : (k : ℝ) * (Fintype.card ι)
+    (hJ : ((k - 1 : ℕ) : ℝ) * (Fintype.card ι)
         ≤ (((Fintype.card ι - e : ℕ) : ℝ) - 4 * η * (Fintype.card ι)) ^ 2) :
     ((univ.filter fun z => HasUnexplainedProximate dom u₀ u₁ k e z).card : ℝ)
       < johnsonThreshold k (Fintype.card ι) e η := by
@@ -177,39 +175,11 @@ theorem strong_mutual_johnson
     with hBad
   obtain ⟨m, D, dY, dZ, hkdY, hcnt, hroot, hslack, hSnat⟩ :=
     johnson_numeric k (Fintype.card ι) e Bad.card η
-      hk1 hη hη4 hηn ht4 hJ hcon
-  exact strong_mutual_unconditional dom hdom u₀ u₁ k e hk1 Bad
+      hk2 hη hη4 hηn ht4 hJ hcon
+  exact strong_mutual_unconditional dom hdom u₀ u₁ k e (by omega) Bad
     (fun z hz => (Finset.mem_filter.mp hz).2) m D dY dZ
     hkdY hcnt hroot hslack hSnat
 
-open scoped Classical in
-/-- **Strong mutual correlated agreement, positive form** (the Hab25 reading): there
-is a set `B` of fewer than `johnsonThreshold` parameters such that for every
-`z ∉ B`, **every** degree-≤`k` codeword within distance `e` of the line point
-`u₀ + z·u₁` is explained: it decomposes as `p₀ + z·p₁` with degree-≤`k` components
-whose joint agreement set contains its entire agreement set. -/
-theorem strong_mutual_positive
-    (dom : ι → F) (hdom : Function.Injective dom) (u₀ u₁ : ι → F) (k e : ℕ) (η : ℝ)
-    (hk1 : 1 ≤ k) (hη : 0 < η) (hη4 : η ≤ 1/4)
-    (hηn : 1 ≤ η * (Fintype.card ι))
-    (ht4 : 4 * η * (Fintype.card ι) ≤ ((Fintype.card ι - e : ℕ) : ℝ))
-    (hJ : (k : ℝ) * (Fintype.card ι)
-        ≤ (((Fintype.card ι - e : ℕ) : ℝ) - 4 * η * (Fintype.card ι)) ^ 2) :
-    ∃ B : Finset F, (B.card : ℝ) < johnsonThreshold k (Fintype.card ι) e η ∧
-      ∀ z ∉ B, ∀ p : F[X], p.natDegree ≤ k →
-        (disagree (fun x => u₀ x + z * u₁ x) (RSeval dom p)).card ≤ e →
-        ∃ p₀ p₁ : F[X], p₀.natDegree ≤ k ∧ p₁.natDegree ≤ k ∧
-          explains dom u₀ u₁ z p p₀ p₁ := by
-  refine ⟨univ.filter fun z => HasUnexplainedProximate dom u₀ u₁ k e z,
-    strong_mutual_johnson dom hdom u₀ u₁ k e η hk1 hη hη4 hηn ht4 hJ, ?_⟩
-  intro z hz p hpdeg hpdist
-  have hnot : ¬ HasUnexplainedProximate dom u₀ u₁ k e z := by
-    intro h
-    exact hz (Finset.mem_filter.mpr ⟨Finset.mem_univ _, h⟩)
-  rw [HasUnexplainedProximate] at hnot
-  push Not at hnot
-  obtain ⟨p₀, p₁, hd₀, hd₁, hexp⟩ := hnot p hpdeg hpdist
-  exact ⟨p₀, p₁, hd₀, hd₁, hexp⟩
 
 end Johnson
 

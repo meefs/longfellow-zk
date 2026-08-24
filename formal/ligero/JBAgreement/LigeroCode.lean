@@ -16,8 +16,8 @@ committed-coordinate projection is the ordinary degree-`<r+w` Reed–Solomon cod
 So the presentation is constructed here, not assumed: on the instantiation the
 whole grid uses, the Johnson route costs no new hypothesis.
 
-A dimension-`k = r + w` code has degree bound `k - 1`, which is the `k` the
-Johnson theorems take.
+A dimension-`k = r + w` code consists of polynomials of degree strictly below
+`k`, matching the convention used by the public Johnson theorems.
 -/
 
 namespace JBAgreement
@@ -53,18 +53,18 @@ domain is the committed-coordinate restriction of the Longfellow domain, and the
 two inclusions are `baseCode_eq_evaluationCode` read in each direction. -/
 noncomputable def rsPresentation (D : LigeroFamily.ReedSolomon.Domain F r w n)
     (hkpos : 1 ≤ r + w) (hk : r + w ≤ n) :
-    RSPresentation n (r + w - 1)
+    RSPresentation n (r + w)
       (LigeroFamily.ReedSolomon.multiplicativeCode D hk).baseCode where
   dom := D.codeDomain.point
   dom_injective := D.codeDomain.injective
-  mem_of_natDegree_le p hp := by
+  mem_of_natDegree_lt p hp := by
     rw [LigeroFamily.ReedSolomon.baseCode_eq_evaluationCode D hk]
     exact _root_.ReedSolomon.mem_evaluationCode.mpr
-      ⟨p, mem_degreeLT_of_natDegree_le hkpos hp, fun _ => rfl⟩
+      ⟨p, mem_degreeLT_of_natDegree_le hkpos (Nat.le_pred_of_lt hp), fun _ => rfl⟩
   exists_of_mem word hword := by
     rw [LigeroFamily.ReedSolomon.baseCode_eq_evaluationCode D hk] at hword
     obtain ⟨p, hp, hword⟩ := _root_.ReedSolomon.mem_evaluationCode.mp hword
-    refine ⟨p, natDegree_le_of_mem_degreeLT hp, ?_⟩
+    refine ⟨p, (natDegree_le_of_mem_degreeLT hp).trans_lt (by omega), ?_⟩
     funext j
     exact hword j
 
@@ -75,7 +75,7 @@ theorem lineFailureBound_of_johnsonConditions_rs
     {e g bound etaBits : ℕ}
     (D : LigeroFamily.ReedSolomon.Domain F r w n)
     (hkpos : 1 ≤ r + w) (hk : r + w ≤ n)
-    (h : JohnsonConditions n (r + w - 1) e etaBits bound (Fintype.card F)) :
+    (h : JohnsonConditions n (r + w) e etaBits bound (Fintype.card F)) :
     SelectedMCA.LineFailureBound
       (LigeroFamily.ReedSolomon.multiplicativeCode D hk).baseCode e g bound :=
   lineFailureBound_of_johnsonConditions (rsPresentation D hkpos hk) rfl h

@@ -26,8 +26,8 @@ applies to arbitrary representatives in `F[Z][T]`, so it is enough to track the 
 
     `B ≤ deg_T(g) * ht(H) + deg_T(H) * ht(g)`,
 
-  which is the `(2k+1) * d_H * d * D` of §3 once the height of the jet numerator is
-  known to be linear in `k`.
+  which has shape `(2r+1) * d_H * d * D` once the height of an order-`r` jet numerator
+  is known to be linear in `r`.
 -/
 
 namespace JBAgreement
@@ -99,8 +99,8 @@ most `dg` and `Z`-height at most `hg`, then the number of specialisations `z` at
   `dg * hH + dH * hg`.
 
 Instantiated at `g = g_x` this is the bound `B` fed to `card_exceptional_ge`.  The `§3`
-shape `(2k+1) * d_H * d * D` is the case where the jet numerator has height linear in
-`k`, the remaining estimate. -/
+shape `(2r+1) * d_H * d * D` is the case where an order-`r` jet numerator has height
+linear in `r`, the remaining estimate. -/
 theorem card_badSpecializations_le_of_height (H g : F[X][X]) {dH dg hH hg : ℕ}
     (hHdeg : H.natDegree ≤ dH) (hgdeg : g.natDegree ≤ dg)
     (hHht : IsHeightLE H hH) (hght : IsHeightLE g hg)

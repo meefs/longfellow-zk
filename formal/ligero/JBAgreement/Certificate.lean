@@ -24,10 +24,11 @@ from `johnsonThreshold` term by term so the cast lemma below is a `ring`
 identity. -/
 def johnsonThresholdQ (k n e etaBits : ℕ) : ℚ :=
   let η : ℚ := (2 ^ etaBits)⁻¹
-  3 * n / (4 * k * η) * ((e : ℚ) + 2) +
-    ((n - k : ℕ) : ℚ) * (4 * k * (3 * n / (4 * k * η) * (n / (k * η ^ 2)))
-      + 3 * n / (4 * k * η)) / ((n - e - k : ℕ) : ℚ)
-    + n / (k * η ^ 2) + 3 * (3 * n / (4 * k * η) * (n / (k * η ^ 2))) + 1
+  let w := k - 1
+  3 * n / (4 * w * η) * ((e : ℚ) + 2) +
+    ((n - k : ℕ) : ℚ) * (4 * k * (3 * n / (4 * w * η) * (n / (w * η ^ 2)))
+      + 3 * n / (4 * w * η)) / ((n - e - k : ℕ) : ℚ)
+    + n / (w * η ^ 2) + 3 * (3 * n / (4 * w * η) * (n / (w * η ^ 2))) + 1
 
 /-- The rational mirror is exact: no slack is introduced by leaving `ℝ`. -/
 theorem johnsonThresholdQ_cast (k n e etaBits : ℕ) :
@@ -41,30 +42,31 @@ theorem johnsonThresholdQ_cast (k n e etaBits : ℕ) :
 one hypothesis of `lineFailureBound_of_johnson` with `η = 1 / 2 ^ etaBits` and
 denominators cleared:
 
-* `hk` — `1 ≤ k`;
+* `hk` — `2 ≤ k`, so the degree cap `k - 1` is positive;
 * `hquarter` — `η ≤ 1/4`;
 * `hlength` — `1 ≤ η · n`;
 * `hslack` — `4 · η · n ≤ n - e`, and `k` still fits below the radius;
-* `hjohnson` — the Johnson condition `k · n ≤ (n - e - 4 η n)²`;
-* `hfield` — `9 n² / (8 k η²) < |F|`;
+* `hjohnson` — the Johnson condition `(k - 1) · n ≤ (n - e - 4 η n)²`;
+* `hfield` — `9 n² / (8 (k - 1) η²) < |F|`;
 * `hthreshold` — the certificate's `bound` dominates the threshold. -/
 structure JohnsonConditions (n k e etaBits bound fieldSize : ℕ) : Prop where
-  hk : 1 ≤ k
+  hk : 2 ≤ k
   hquarter : 4 ≤ 2 ^ etaBits
   hlength : 2 ^ etaBits ≤ n
   hslack : 4 * n ≤ (n - e) * 2 ^ etaBits
   hroom : k + 1 ≤ n - e
-  hjohnson : k * n * (2 ^ etaBits) ^ 2 ≤ ((n - e) * 2 ^ etaBits - 4 * n) ^ 2
-  hfield : 9 * n ^ 2 * (2 ^ etaBits) ^ 2 < 8 * k * fieldSize
+  hjohnson : (k - 1) * n * (2 ^ etaBits) ^ 2 ≤
+    ((n - e) * 2 ^ etaBits - 4 * n) ^ 2
+  hfield : 9 * n ^ 2 * (2 ^ etaBits) ^ 2 < 8 * (k - 1) * fieldSize
   hthreshold : johnsonThresholdQ k n e etaBits ≤ (bound : ℚ) + 1
 
 /-- Decidable mirror of `JohnsonConditions`, for certificates the kernel checks.
 Every conjunct is a `Nat` or `Rat` comparison, so `decide` evaluates it. -/
 def johnsonConditionsBool (n k e etaBits bound fieldSize : ℕ) : Bool :=
-  (1 ≤ k) && (4 ≤ 2 ^ etaBits) && (2 ^ etaBits ≤ n) &&
+  (2 ≤ k) && (4 ≤ 2 ^ etaBits) && (2 ^ etaBits ≤ n) &&
     (4 * n ≤ (n - e) * 2 ^ etaBits) && (k + 1 ≤ n - e) &&
-    (k * n * (2 ^ etaBits) ^ 2 ≤ ((n - e) * 2 ^ etaBits - 4 * n) ^ 2) &&
-    (9 * n ^ 2 * (2 ^ etaBits) ^ 2 < 8 * k * fieldSize) &&
+    ((k - 1) * n * (2 ^ etaBits) ^ 2 ≤ ((n - e) * 2 ^ etaBits - 4 * n) ^ 2) &&
+    (9 * n ^ 2 * (2 ^ etaBits) ^ 2 < 8 * (k - 1) * fieldSize) &&
     decide (johnsonThresholdQ k n e etaBits ≤ (bound : ℚ) + 1)
 
 theorem johnsonConditions_of_bool {n k e etaBits bound fieldSize : ℕ}
@@ -101,18 +103,19 @@ theorem four_mul_le_sub (h : JohnsonConditions n k e etaBits bound fieldSize) :
   linarith
 
 theorem johnson_real (h : JohnsonConditions n k e etaBits bound fieldSize) :
-    (k : ℝ) * n ≤ (((n - e : ℕ) : ℝ) - 4 * ((2 ^ etaBits : ℝ))⁻¹ * n) ^ 2 := by
+    ((k - 1 : ℕ) : ℝ) * n ≤
+      (((n - e : ℕ) : ℝ) - 4 * ((2 ^ etaBits : ℝ))⁻¹ * n) ^ 2 := by
   have hpow : (0 : ℝ) < (2 ^ etaBits : ℝ) := by positivity
   have hslack : (4 * n : ℕ) ≤ (n - e) * 2 ^ etaBits := h.hslack
   have hcast : (((n - e) * 2 ^ etaBits - 4 * n : ℕ) : ℝ)
       = ((n - e : ℕ) : ℝ) * (2 ^ etaBits : ℝ) - 4 * (n : ℝ) := by
     push_cast [Nat.cast_sub hslack]
     ring
-  have hJ : ((k * n * (2 ^ etaBits) ^ 2 : ℕ) : ℝ)
+  have hJ : (((k - 1) * n * (2 ^ etaBits) ^ 2 : ℕ) : ℝ)
       ≤ ((((n - e) * 2 ^ etaBits - 4 * n) ^ 2 : ℕ) : ℝ) := by
     exact_mod_cast h.hjohnson
   rw [Nat.cast_pow, hcast] at hJ
-  have hscaled : (k : ℝ) * n * (2 ^ etaBits : ℝ) ^ 2
+  have hscaled : ((k - 1 : ℕ) : ℝ) * n * (2 ^ etaBits : ℝ) ^ 2
       ≤ (((n - e : ℕ) : ℝ) * (2 ^ etaBits : ℝ) - 4 * (n : ℝ)) ^ 2 := by
     push_cast at hJ
     linarith
@@ -125,17 +128,21 @@ theorem johnson_real (h : JohnsonConditions n k e etaBits bound fieldSize) :
   exact le_of_mul_le_mul_right (by linarith) hsq
 
 theorem field_real (h : JohnsonConditions n k e etaBits bound fieldSize) :
-    9 * ((n : ℝ)) ^ 2 / (8 * k * ((2 ^ etaBits : ℝ))⁻¹ ^ 2) < (fieldSize : ℝ) := by
-  have hk : (1 : ℝ) ≤ (k : ℝ) := by exact_mod_cast h.hk
-  have hfield : (9 * n ^ 2 * (2 ^ etaBits) ^ 2 : ℕ) < 8 * k * fieldSize := h.hfield
+    9 * ((n : ℝ)) ^ 2 /
+      (8 * (k - 1 : ℕ) * ((2 ^ etaBits : ℝ))⁻¹ ^ 2) < (fieldSize : ℝ) := by
+  have hk : (1 : ℝ) ≤ ((k - 1 : ℕ) : ℝ) := by
+    have hk2 := h.hk
+    exact_mod_cast (show 1 ≤ k - 1 by omega)
+  have hfield : (9 * n ^ 2 * (2 ^ etaBits) ^ 2 : ℕ) <
+      8 * (k - 1) * fieldSize := h.hfield
   have hcast : (9 : ℝ) * (n : ℝ) ^ 2 * (2 ^ etaBits : ℝ) ^ 2
-      < 8 * (k : ℝ) * (fieldSize : ℝ) := by
+      < 8 * ((k - 1 : ℕ) : ℝ) * (fieldSize : ℝ) := by
     have := (Nat.cast_lt (α := ℝ)).mpr hfield
     push_cast at this
     linarith
   rw [div_lt_iff₀ (by positivity)]
-  have hrewrite : 8 * (k : ℝ) * ((2 ^ etaBits : ℝ))⁻¹ ^ 2
-      * (2 ^ etaBits : ℝ) ^ 2 = 8 * (k : ℝ) := by
+  have hrewrite : 8 * ((k - 1 : ℕ) : ℝ) * ((2 ^ etaBits : ℝ))⁻¹ ^ 2
+      * (2 ^ etaBits : ℝ) ^ 2 = 8 * ((k - 1 : ℕ) : ℝ) := by
     field_simp
   nlinarith [hcast, hrewrite, sq_nonneg ((2 ^ etaBits : ℝ))⁻¹]
 
