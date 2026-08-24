@@ -26,6 +26,16 @@ structure Certificate where
   fieldBits : ℕ
   targetBits : ℕ
   openings : ℕ
+  /-- Exact field cardinality, when it is not `2 ^ fieldBits`.
+
+  Zero means "binary", i.e. `2 ^ fieldBits`, which is what every committed row
+  uses -- so the field is defaulted and those rows are unchanged.  A nonzero
+  value carries the order itself, which is what a prime-order field needs: the
+  soundness expressions read the field only through `fieldSize`, so nothing else
+  in the grid changes.  A prime order additionally means large characteristic,
+  the hypothesis the eta-squared and Sudan routes need and a binary field can
+  never satisfy. -/
+  fieldOrder : ℕ := 0
 
 /-- The protocol-neutral point represented by a Ligero certificate. -/
 def Certificate.point (certificate : Certificate) : Examples.GridPoint :=
@@ -38,7 +48,8 @@ def Certificate.point (certificate : Certificate) : Examples.GridPoint :=
 
 
 abbrev V1Certificate := Certificate
-def Certificate.fieldSize (c : Certificate) : ℕ := 2 ^ c.fieldBits
+def Certificate.fieldSize (c : Certificate) : ℕ :=
+  if c.fieldOrder = 0 then 2 ^ c.fieldBits else c.fieldOrder
 
 def Certificate.lineBound (c : Certificate) : ℕ :=
   SelectedMCA.directLineFailureBound c.m
