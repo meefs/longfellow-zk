@@ -31,6 +31,12 @@ charged to the earlier `H₂` slot and its budget is a global predictable-slot
 count, not a pointwise conditional count at the later `H₁` slot.  These two
 choices prevent, respectively, commitment-selection and continuation-selection
 biases.
+
+`ChainedTrace` is the same accounting for a compiler that **chains**: when the
+query-set hash reads the batching challenge, `H₂(x, root, alpha, response)`, the
+second query cannot precede the first, case B is empty, and the bound loses its
+`caseBAlphaLastBudget` term.  Chaining also subsumes domain separation for this
+argument -- `ChainedTrace.separated` is a theorem rather than a field.
 -/
 
 set_option autoImplicit false
@@ -367,6 +373,124 @@ def toRigidAttribution (F : FirstOccurrenceTrace Ω Query querySlots)
 
 end FirstOccurrenceTrace
 
+/-! ## Chained transcripts: removing case B -/
+
+/-- **A chained first-occurrence trace.**
+
+`FirstOccurrenceTrace` above admits both query orders because the query-set hash
+`H₂(x, root, response)` does not read the batching challenge: nothing stops an
+adversary from fixing the response, reading its query set, and only then asking
+`H₁` for the challenge.  That is case B, and it is the branch that cannot be
+bounded by conditioning on the later query.
+
+Chaining removes it.  If the compiler hashes `H₂(x, root, alpha, response)`
+instead, then the second query's *input* contains the first query's *answer*, so
+in a lazy random-oracle execution the second query cannot occupy an earlier slot
+than the first.  `chained` records exactly that, and it is a fact about the
+serialization, discharged once by a concrete execution.
+
+Two consequences, both realized below: `separated` is no longer a hypothesis --
+strict order gives distinctness, so domain-separation tags are not needed for
+this argument -- and the compiler bound loses its `caseBAlphaLastBudget` term
+together with the predictable-selection reasoning that supplied it.
+-/
+structure ChainedTrace (Ω Query : Type*) (querySlots : ℕ)
+    [BEq Query] [LawfulBEq Query] where
+  /-- The augmented query trace. -/
+  trace : Ω → List Query
+  /-- The batching-challenge query `H₁(x, root)`. -/
+  alphaQuery : Ω → Query
+  /-- The query-set query `H₂(x, root, alpha, response)`. -/
+  subsetQuery : Ω → Query
+  /-- The verifier's recomputation puts `H₁` in the trace. -/
+  alpha_mem : ∀ ω, alphaQuery ω ∈ trace ω
+  /-- The verifier's recomputation puts `H₂` in the trace. -/
+  subset_mem : ∀ ω, subsetQuery ω ∈ trace ω
+  /-- **Chaining.**  `H₂`'s input contains `H₁`'s answer, so `H₁` is queried
+  strictly first. -/
+  chained : ∀ ω, (trace ω).idxOf (alphaQuery ω) < (trace ω).idxOf (subsetQuery ω)
+  /-- The augmented trace fits the `Q + 2` slot budget. -/
+  trace_length : ∀ ω, (trace ω).length ≤ querySlots
+
+namespace ChainedTrace
+
+variable {Ω Query : Type*} [Fintype Ω] [BEq Query] [LawfulBEq Query]
+variable {querySlots : ℕ}
+
+omit [Fintype Ω] in
+/-- Distinctness is a consequence of chaining, not a separate assumption. -/
+theorem separated (F : ChainedTrace Ω Query querySlots) (ω : Ω) :
+    F.alphaQuery ω ≠ F.subsetQuery ω := by
+  intro heq
+  exact absurd (congrArg (fun q => (F.trace ω).idxOf q) heq)
+    (Nat.ne_of_lt (F.chained ω))
+
+/-- The underlying unordered trace. -/
+def toFirstOccurrenceTrace (F : ChainedTrace Ω Query querySlots) :
+    FirstOccurrenceTrace Ω Query querySlots where
+  trace := F.trace
+  alphaQuery := F.alphaQuery
+  subsetQuery := F.subsetQuery
+  alpha_mem := F.alpha_mem
+  subset_mem := F.subset_mem
+  separated := F.separated
+  trace_length := F.trace_length
+
+omit [Fintype Ω] in
+/-- **Case B is empty.**  The whole point of chaining. -/
+theorem not_caseB (F : ChainedTrace Ω Query querySlots)
+    (win bindBreak : Ω → Prop) (i : Fin querySlots) (ω : Ω) :
+    ¬ F.toFirstOccurrenceTrace.caseB win bindBreak i ω := by
+  intro h
+  have hlt := F.chained ω
+  have hgt : (F.trace ω).idxOf (F.subsetQuery ω) <
+      (F.trace ω).idxOf (F.alphaQuery ω) := h.2.2.2
+  omega
+
+/-- Case A for a chained trace.  The order conjunct of
+`FirstOccurrenceTrace.caseA` is now automatic, so the caller's obligation is
+just the win, the binding, and the slot. -/
+def caseA (F : ChainedTrace Ω Query querySlots)
+    (listed win bindBreak : Ω → Prop) (i : Fin querySlots) (ω : Ω) : Prop :=
+  win ω ∧ ¬bindBreak ω ∧
+    ((¬listed ω ∧ (F.trace ω).idxOf (F.subsetQuery ω) = i.val) ∨
+      (listed ω ∧ (F.trace ω).idxOf (F.alphaQuery ω) = i.val))
+
+omit [Fintype Ω] in
+/-- The simplified case A is the original one. -/
+theorem caseA_iff (F : ChainedTrace Ω Query querySlots)
+    (listed win bindBreak : Ω → Prop) (i : Fin querySlots) (ω : Ω) :
+    F.caseA listed win bindBreak i ω ↔
+      F.toFirstOccurrenceTrace.caseA listed win bindBreak i ω := by
+  constructor
+  · exact fun h => ⟨h.1, h.2.1, F.chained ω, h.2.2⟩
+  · exact fun h => ⟨h.1, h.2.1, h.2.2.2⟩
+
+/-- The chained attribution: a zero case-B budget, discharged by `not_caseB`. -/
+def toRigidAttribution (F : ChainedTrace Ω Query querySlots)
+    (listed win bindBreak : Ω → Prop)
+    (bindBudget caseAFloorBudget caseAListedBudget : ℕ)
+    (hbind : (Finset.filter bindBreak Finset.univ).card ≤ bindBudget)
+    (hcaseA : ∀ i, (Finset.filter (F.caseA listed win bindBreak i) Finset.univ).card ≤
+      caseAFloorBudget + caseAListedBudget) :
+    RigidAttribution Ω querySlots :=
+  F.toFirstOccurrenceTrace.toRigidAttribution listed win bindBreak
+    bindBudget caseAFloorBudget caseAListedBudget 0 hbind
+    (by
+      intro i
+      refine le_trans (Finset.card_le_card ?_) (hcaseA i)
+      intro ω hω
+      simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hω ⊢
+      exact (F.caseA_iff listed win bindBreak i ω).mpr hω)
+    (by
+      intro i
+      have hempty : Finset.filter
+          (F.toFirstOccurrenceTrace.caseB win bindBreak i) Finset.univ = ∅ :=
+        Finset.filter_false_of_mem (fun ω _ => F.not_caseB win bindBreak i ω)
+      simp [hempty])
+
+end ChainedTrace
+
 namespace RigidAttribution
 
 variable {Ω : Type*} [Fintype Ω] {querySlots : ℕ}
@@ -451,4 +575,51 @@ theorem rom_compiler_ratio_le [Nonempty Ω] (R : RigidAttribution Ω querySlots)
     (by exact_mod_cast R.rom_compiler_card_le) (le_of_lt hΩ)
 
 end RigidAttribution
+
+/-! ## The chained compiler bound
+
+Stated here rather than beside `ChainedTrace` because it consumes
+`RigidAttribution.rom_compiler_card_le`. -/
+
+namespace ChainedTrace
+
+variable {Ω Query : Type*} [Fintype Ω] [BEq Query] [LawfulBEq Query]
+variable {querySlots : ℕ}
+
+/-- **The chained response-rigid ROM compiler.**
+
+`Bcs.RigidAttribution.rom_compiler_card_le` with the case-B term gone: the union
+bound is over the binding failure and the two case-A charges only.  Nothing else
+about the accounting changes -- the floor is still charged at the fresh `H₂` slot
+and the listed excess at the fresh `H₁` slot.
+-/
+theorem rom_compiler_card_le (F : ChainedTrace Ω Query querySlots)
+    (listed win bindBreak : Ω → Prop)
+    (bindBudget caseAFloorBudget caseAListedBudget : ℕ)
+    (hbind : (Finset.filter bindBreak Finset.univ).card ≤ bindBudget)
+    (hcaseA : ∀ i, (Finset.filter (F.caseA listed win bindBreak i) Finset.univ).card ≤
+      caseAFloorBudget + caseAListedBudget) :
+    (Finset.filter win Finset.univ).card ≤
+      bindBudget + querySlots * (caseAFloorBudget + caseAListedBudget) := by
+  have h := (F.toRigidAttribution listed win bindBreak bindBudget caseAFloorBudget
+    caseAListedBudget hbind hcaseA).rom_compiler_card_le
+  simpa [toRigidAttribution, FirstOccurrenceTrace.toRigidAttribution] using h
+
+/-- Probability form. -/
+theorem rom_compiler_ratio_le [Nonempty Ω] (F : ChainedTrace Ω Query querySlots)
+    (listed win bindBreak : Ω → Prop)
+    (bindBudget caseAFloorBudget caseAListedBudget : ℕ)
+    (hbind : (Finset.filter bindBreak Finset.univ).card ≤ bindBudget)
+    (hcaseA : ∀ i, (Finset.filter (F.caseA listed win bindBreak i) Finset.univ).card ≤
+      caseAFloorBudget + caseAListedBudget) :
+    ((Finset.filter win Finset.univ).card : ℚ) / Fintype.card Ω ≤
+      (bindBudget + querySlots * (caseAFloorBudget + caseAListedBudget) : ℕ) /
+        (Fintype.card Ω : ℚ) := by
+  have hΩ : (0 : ℚ) < Fintype.card Ω := by exact_mod_cast Fintype.card_pos
+  have hcard := F.rom_compiler_card_le listed win bindBreak bindBudget
+    caseAFloorBudget caseAListedBudget hbind hcaseA
+  exact div_le_div_of_nonneg_right (by exact_mod_cast hcard) (le_of_lt hΩ)
+
+end ChainedTrace
+
 end Bcs
