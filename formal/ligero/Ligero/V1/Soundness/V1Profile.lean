@@ -1,5 +1,5 @@
 import Ligero.V1.Soundness.LabelCounting
-import LigeroFamily.Soundness.PolicyProfiledMaster
+import LigeroFamily.Soundness.PolicyEventPartition
 import Ligero.V1.Soundness.V1Soundness
 
 /-!
@@ -511,9 +511,11 @@ end PolicyLiftListCertificate
 
 open PolicyLiftListCertificate
 
-/-- V1 soundness with selected-MCA failures weighted by their actual
-proximity agreement. -/
-theorem v1_ligero_soundness_of_profiledFailure
+/-- V1 soundness through the disjoint event partition.  The unchecked
+arithmetic profile has full mass below its Johnson threshold, so it pays the
+shared baseline through `threshold - 1`; selected-MCA failures pay only their
+excess above that baseline. -/
+theorem v1_ligero_soundness_of_eventPartition
     {respond : SchemeChallenge F NoMask nw nq 1 Equations →
       Response F r w n 1}
     {e failureDenominator L threshold : ℕ}
@@ -540,7 +542,8 @@ theorem v1_ligero_soundness_of_profiledFailure
       prover.respond statement oracle challenge = respond challenge)
     (hfailureDenominator : 0 < failureDenominator) :
     (SchemeVerifier.protocol C scheme).acceptanceRate prover statement ≤
-      failureProfile.contribution failureDenominator n n 0 r +
+      failureProfile.excessContribution failureDenominator n n 0 r
+        (max (n - e - 1) (min n (g + (threshold - 1)))) +
         (uncheckedAgreementProfile (Fintype.card F) n (2 * C.k - 1) L
           threshold).contribution (Fintype.card F) n e g r := by
   obtain ⟨arithmetic⟩ :=
@@ -548,14 +551,27 @@ theorem v1_ligero_soundness_of_profiledFailure
       hfalse johnson
   let classifier := Classical.choice
     (arithmetic.doublyProfiledClassifier_nonempty certificate hfailureDensity)
+  have hfloor : ∀ a ≤ min n (threshold - 1),
+      Fintype.card F ≤
+        (uncheckedAgreementProfile (Fintype.card F) n (2 * C.k - 1) L
+          threshold).labelsAtLeast a := by
+    intro a ha
+    have hthreshold := johnson.threshold_pos
+    simp [uncheckedAgreementProfile, show ¬n < a by omega,
+      show a < threshold by omega]
   calc
     (SchemeVerifier.protocol C scheme).acceptanceRate prover statement =
         classifier.acceptanceRate :=
       classifier.protocol_acceptanceRate_eq prover horacle hrespond
-    _ ≤ failureProfile.contribution failureDenominator n n 0 r +
+    _ ≤ failureProfile.excessContribution failureDenominator n n 0 r
+          (max (n - e - 1) (min n (g + min n (threshold - 1)))) +
         (uncheckedAgreementProfile (Fintype.card F) n (2 * C.k - 1) L
           threshold).contribution (Fintype.card F) n e g r :=
-      classifier.acceptanceRate_le Fintype.card_pos
-        hfailureDenominator C.query_le_length
+      classifier.acceptanceRate_le_eventPartition
+        (min n (threshold - 1)) Fintype.card_pos hfailureDenominator
+        C.query_le_length (min_le_left _ _) hfloor
+    _ = _ := by
+      congr 3
+      omega
 
 end Ligero.V1

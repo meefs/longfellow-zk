@@ -57,6 +57,13 @@ structure SchemeColumn (F CheckedMask DirectMask : Type*)
   directMask : Fin repetitions → DirectMask → F
   proximityBlind : Fin repetitions → F
 
+/-- The all-zero column is the canonical default used by prefix extraction
+when a commitment prefix does not determine a leaf. -/
+instance {F CheckedMask DirectMask : Type*} [Zero F]
+    {nw nq repetitions : ℕ} :
+    Inhabited (SchemeColumn F CheckedMask DirectMask nw nq repetitions) where
+  default := ⟨0, 0, 0, 0⟩
+
 @[ext] theorem SchemeColumn.ext
     {F CheckedMask DirectMask : Type*} {nw nq repetitions : ℕ}
     {first second : SchemeColumn F CheckedMask DirectMask nw nq repetitions}

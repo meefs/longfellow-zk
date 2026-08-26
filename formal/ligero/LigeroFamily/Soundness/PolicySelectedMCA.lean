@@ -121,15 +121,15 @@ theorem badChallengesAtAgreement_eq_restrictedTailSet (a : ℕ) :
 omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
 private theorem badChallenges_agreement_density_of_fibers
     [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
-    (profile : AgreementProfile n) (a : ℕ)
+    (failureDenominator : ℕ) (profile : AgreementProfile n) (a : ℕ)
     (hfiber : ∀ tail : Tail,
-      (Fintype.card F - (g + 1)) *
+      failureDenominator *
           (SchemeSelectedMCA.badWeightsAtAgreement
             (C := C) (oracle := oracle) (e := e) (g := g)
             (extractor.responseAtTail (respond := respond) tail) a).card ≤
         profile.labelsAtLeast a *
           Fintype.card (SchemeSelectedMCA.Weights F CheckedMask nw nq)) :
-    (Fintype.card F - (g + 1)) *
+    failureDenominator *
         (AgreementProfile.restrictedTailSet
           (extractor.badChallenges (oracle := oracle)
             (respond := respond) (e := e) (g := g))
@@ -138,7 +138,7 @@ private theorem badChallenges_agreement_density_of_fibers
       profile.labelsAtLeast a * Fintype.card Challenge := by
   classical
   have hpairDensity :
-      (Fintype.card F - (g + 1)) *
+      failureDenominator *
           (extractor.badChallengePairsAtAgreement (oracle := oracle)
             (respond := respond) (e := e) (g := g) a).card ≤
         profile.labelsAtLeast a *
@@ -151,7 +151,7 @@ private theorem badChallenges_agreement_density_of_fibers
           SchemeSelectedMCA.badWeightsAtAgreement
             (C := C) (oracle := oracle) (e := e) (g := g)
             (extractor.responseAtTail (respond := respond) tail) a)
-        (profile.labelsAtLeast a) (Fintype.card F - (g + 1)) hfiber
+        (profile.labelsAtLeast a) failureDenominator hfiber
   rw [← extractor.badChallengesAtAgreement_eq_restrictedTailSet
     (oracle := oracle) (respond := respond) (e := e) (g := g) a]
   have hcard :
@@ -186,6 +186,7 @@ theorem badChallenges_agreement_density_ofLineFailure {bound : ℕ}
         bound).labelsAtLeast a *
         Fintype.card Challenge := by
   apply extractor.badChallenges_agreement_density_of_fibers
+    (Fintype.card F - (g + 1))
     (SchemeSelectedMCA.selectedMCAFailureProfile n g d bound) a
   intro tail
   exact
@@ -238,6 +239,7 @@ theorem badChallenges_agreement_density_refined
         (SelectedMCA.directLineFailureBound localThreshold)).labelsAtLeast a *
         Fintype.card Challenge := by
   apply extractor.badChallenges_agreement_density_of_fibers
+    (Fintype.card F - (g + 1))
     (SchemeSelectedMCA.selectedMCARefinedFailureProfile n g d
       (SelectedMCA.directLineFailureBound threshold) cutoff
       (SelectedMCA.directLineFailureBound localThreshold)) a
@@ -246,6 +248,90 @@ theorem badChallenges_agreement_density_refined
     SchemeSelectedMCA.badWeightsAtAgreement_density_refined
       (C := C) (oracle := oracle)
       (extractor.responseAtTail (respond := respond) tail) hmin conditions a
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- Route-agnostic version of the agreement-local density theorem. -/
+theorem badChallenges_agreement_density_refinedOfLine
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    {outerBound localBound cutoff : ℕ}
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : RefinedSelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d outerBound cutoff localBound)
+    (a : ℕ) :
+    (Fintype.card F - (g + 1)) *
+        (AgreementProfile.restrictedTailSet
+          (extractor.badChallenges (oracle := oracle)
+            (respond := respond) (e := e) (g := g))
+          (failureAgreement (policy := policy) (oracle := oracle)
+            (respond := respond)) a).card ≤
+      (SchemeSelectedMCA.selectedMCARefinedFailureProfile n g d
+        outerBound cutoff localBound).labelsAtLeast a *
+        Fintype.card Challenge := by
+  apply extractor.badChallenges_agreement_density_of_fibers
+    (Fintype.card F - (g + 1))
+    (SchemeSelectedMCA.selectedMCARefinedFailureProfile n g d
+      outerBound cutoff localBound) a
+  intro tail
+  exact SchemeSelectedMCA.badWeightsAtAgreement_density_refinedOfLine
+    (C := C) (oracle := oracle)
+    (extractor.responseAtTail (respond := respond) tail) hmin conditions a
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- Policy-level threshold-free pointwise density theorem. -/
+theorem badChallenges_agreement_density_endpointOptimizedIntegratedOfLine
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    {outerBound : ℕ} {localBound : ℕ → ℕ}
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : IntegratedSelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d outerBound localBound)
+    (a : ℕ) :
+    (Fintype.card F * (Fintype.card F - (g + 1))) *
+        (AgreementProfile.restrictedTailSet
+          (extractor.badChallenges (oracle := oracle)
+            (respond := respond) (e := e) (g := g))
+          (failureAgreement (policy := policy) (oracle := oracle)
+            (respond := respond)) a).card ≤
+      (SchemeSelectedMCA.endpointOptimizedProfile (Fintype.card F) g
+        (SchemeSelectedMCA.selectedMCAIntegratedFailureProfile n e g d
+          outerBound localBound)).labelsAtLeast a *
+        Fintype.card Challenge := by
+  apply extractor.badChallenges_agreement_density_of_fibers
+    (Fintype.card F * (Fintype.card F - (g + 1)))
+    (SchemeSelectedMCA.endpointOptimizedProfile (Fintype.card F) g
+      (SchemeSelectedMCA.selectedMCAIntegratedFailureProfile n e g d
+        outerBound localBound)) a
+  intro tail
+  exact SchemeSelectedMCA.badWeightsAtAgreement_density_endpointOptimizedIntegratedOfLine
+    (C := C) (oracle := oracle)
+    (extractor.responseAtTail (respond := respond) tail) hmin conditions a
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- Compatibility form of the threshold-free pointwise density theorem.
+The endpoint-optimized theorem above is the public sharp form. -/
+theorem badChallenges_agreement_density_integratedOfLine
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    {outerBound : ℕ} {localBound : ℕ → ℕ}
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : IntegratedSelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d outerBound localBound)
+    (a : ℕ) :
+    (Fintype.card F - (g + 1)) *
+        (AgreementProfile.restrictedTailSet
+          (extractor.badChallenges (oracle := oracle)
+            (respond := respond) (e := e) (g := g))
+          (failureAgreement (policy := policy) (oracle := oracle)
+            (respond := respond)) a).card ≤
+      (SchemeSelectedMCA.selectedMCAIntegratedFailureProfile n e g d
+        outerBound localBound).labelsAtLeast a *
+        Fintype.card Challenge := by
+  apply extractor.badChallenges_agreement_density_of_fibers
+    (Fintype.card F - (g + 1))
+    (SchemeSelectedMCA.selectedMCAIntegratedFailureProfile n e g d
+      outerBound localBound) a
+  intro tail
+  exact SchemeSelectedMCA.badWeightsAtAgreement_density_integratedOfLine
+    (C := C) (oracle := oracle)
+    (extractor.responseAtTail (respond := respond) tail) hmin conditions a
 
 omit [Fintype Equations] [DecidableEq Equations] [Fintype Challenge]
     [DecidableEq Challenge] [DecidableEq Tail] in
@@ -307,6 +393,65 @@ theorem exists_policyLiftList_of_selectedMCA
   refine ⟨certificate, ?_⟩
   simpa [failure] using hcertificate
 
+omit [Fintype Equations] [DecidableEq Equations] [Fintype Challenge]
+    [DecidableEq Challenge] [DecidableEq Tail] in
+/-- Unique-decoding version of the common selected-MCA extractor.  The bad
+challenge set and its selected-MCA proof are unchanged; only the fixed lift
+list is sharpened from the Johnson bound to cardinality one. -/
+theorem exists_policyLiftList_of_selectedMCA_unique
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (hunique : 2 * (e + g) < d) :
+    ∃ certificate : PolicyLiftListCertificate policy oracle respond e g (e + g) 1,
+      certificate.failure = extractor.badChallenges (oracle := oracle)
+        (respond := respond) (e := e) (g := g) := by
+  classical
+  let failure := extractor.badChallenges (oracle := oracle)
+    (respond := respond) (e := e) (g := g)
+  have hwitness (challenge : Challenge)
+      (hnotFailure : challenge ∉ failure)
+      (hresponse : policy.proximityResponse (respond challenge) 0 ∈ C.base)
+      (hsmall : (schemeProximityDisagreement oracle
+        (policy.proximityWeights challenge 0)
+        (policy.proximityResponse (respond challenge) 0)).card ≤ e) :
+      Nonempty (SchemeGLiftWitness C oracle
+        (policy.proximityWeights challenge 0)
+        (policy.proximityResponse (respond challenge) 0) g) := by
+    let pair := extractor.challengeProductEquiv challenge
+    have hweights : pair.2 = policy.proximityWeights challenge 0 :=
+      extractor.weights_eq challenge
+    have hresponseEq :
+        extractor.responseAtTail (respond := respond) pair.1 pair.2 =
+          policy.proximityResponse (respond challenge) 0 := by
+      unfold responseAtTail
+      rw [show (pair.1, pair.2) = pair from Prod.eta pair]
+      change policy.proximityResponse
+        (respond (extractor.challengeProductEquiv.symm
+          (extractor.challengeProductEquiv challenge))) 0 = _
+      rw [extractor.challengeProductEquiv.symm_apply_apply]
+    have hnotBadWeight : pair.2 ∉
+        SchemeSelectedMCA.badWeights
+          (C := C) (oracle := oracle) (e := e) (g := g)
+          (extractor.responseAtTail (respond := respond) pair.1) := by
+      intro hbadWeight
+      apply hnotFailure
+      apply Finset.mem_map.mpr
+      refine ⟨pair, ?_, extractor.challengeProductEquiv.symm_apply_apply challenge⟩
+      exact Finset.mem_filter.mpr ⟨Finset.mem_univ _, hbadWeight⟩
+    have hwitnessPair :=
+      SchemeSelectedMCA.gLiftWitness_nonempty_of_not_mem_badWeights
+        (respond := extractor.responseAtTail (respond := respond) pair.1)
+        pair.2 hnotBadWeight
+        (by rw [hresponseEq]; exact hresponse)
+        (by rw [hresponseEq, hweights]; exact hsmall)
+    rw [hresponseEq, hweights] at hwitnessPair
+    exact hwitnessPair
+  obtain ⟨certificate, hcertificate⟩ :=
+    PolicyLiftListCertificate.exists_of_gLiftWitnesses_unique hmin
+      (by omega) hunique failure hwitness
+  refine ⟨certificate, ?_⟩
+  simpa [failure] using hcertificate
+
 omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
 /-- Construct the fixed lift list together with the selected-MCA density
 bound consumed by the profiled soundness theorem. -/
@@ -333,6 +478,38 @@ theorem exists_profiledPolicyLiftList_of_selectedMCA {bound : ℕ}
       (oracle := oracle) (respond := respond) hmin
       (by have := conditions.punctured.punctured_three_radius; omega)
       conditions.johnson.list_denominator_positive
+  refine ⟨certificate, ?_⟩
+  intro a _ha
+  rw [hfailure]
+  exact extractor.badChallenges_agreement_density_ofLineFailure
+    (oracle := oracle) (respond := respond) hmin conditions.line
+    conditions.punctured.punctured_three_radius
+    conditions.punctured.field_large a
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- Profiled selected-MCA extraction with a genuine singleton fixed lift list.
+The line-failure profile is still proved by selected MCA; unique decoding is
+used only for the list cardinality. -/
+theorem exists_profiledPolicyLiftList_of_selectedMCA_unique {bound : ℕ}
+    (extractor : SchemeExtractorPolicy policy Tail)
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : SelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d bound)
+    (hunique : 2 * (e + g) < d) :
+    ∃ certificate : PolicyLiftListCertificate policy oracle respond e g (e + g) 1,
+      ∀ a ≤ n,
+        (Fintype.card F - (g + 1)) *
+            (AgreementProfile.restrictedTailSet certificate.failure
+              (fun challenge =>
+                (schemeProximityAgreement oracle
+                  (policy.proximityWeights challenge 0)
+                  (policy.proximityResponse (respond challenge) 0)).card) a).card ≤
+          (SchemeSelectedMCA.selectedMCAFailureProfile n g d
+            bound).labelsAtLeast a * Fintype.card Challenge := by
+  obtain ⟨certificate, hfailure⟩ :=
+    exists_policyLiftList_of_selectedMCA_unique (extractor := extractor)
+      (oracle := oracle) (respond := respond) hmin hunique
   refine ⟨certificate, ?_⟩
   intro a _ha
   rw [hfailure]
@@ -374,6 +551,175 @@ theorem exists_profiledPolicyLiftList_of_refinedSelectedMCA
   intro a _ha
   rw [hfailure]
   exact extractor.badChallenges_agreement_density_refined
+    (oracle := oracle) (respond := respond) hmin conditions a
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- Route-agnostic refined extractor used by public protocol and grid
+theorems.  The unrefined selected-MCA construction remains an internal step
+that constructs the oracle-fixed lift list. -/
+theorem exists_profiledPolicyLiftList_of_refinedLine
+    (extractor : SchemeExtractorPolicy policy Tail)
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    {outerBound localBound cutoff : ℕ}
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : RefinedSelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d outerBound cutoff localBound) :
+    ∃ certificate : PolicyLiftListCertificate policy oracle respond e g (e + g)
+        (CodingTheory.InterleavedJohnson.listBound n d (e + g)),
+      ∀ a ≤ n,
+        (Fintype.card F - (g + 1)) *
+            (AgreementProfile.restrictedTailSet certificate.failure
+              (fun challenge =>
+                (schemeProximityAgreement oracle
+                  (policy.proximityWeights challenge 0)
+                  (policy.proximityResponse (respond challenge) 0)).card) a).card ≤
+          (SchemeSelectedMCA.selectedMCARefinedFailureProfile n g d
+            outerBound cutoff localBound).labelsAtLeast a *
+            Fintype.card Challenge := by
+  obtain ⟨certificate, hfailure⟩ :=
+    exists_policyLiftList_of_selectedMCA (extractor := extractor)
+      (oracle := oracle) (respond := respond) hmin
+      (by
+        have := conditions.outer.punctured.punctured_three_radius
+        omega)
+      conditions.outer.johnson.list_denominator_positive
+  refine ⟨certificate, ?_⟩
+  intro a _ha
+  rw [hfailure]
+  exact extractor.badChallenges_agreement_density_refinedOfLine
+    (oracle := oracle) (respond := respond) hmin conditions a
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- Threshold-free profiled extractor.  The exact agreement integral consumes
+the pointwise line-bound family without introducing a cutoff. -/
+theorem exists_profiledPolicyLiftList_of_endpointOptimizedIntegratedLine
+    (extractor : SchemeExtractorPolicy policy Tail)
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    {outerBound : ℕ} {localBound : ℕ → ℕ}
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : IntegratedSelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d outerBound localBound) :
+    ∃ certificate : PolicyLiftListCertificate policy oracle respond e g (e + g)
+        (CodingTheory.InterleavedJohnson.listBound n d (e + g)),
+      ∀ a ≤ n,
+        (Fintype.card F * (Fintype.card F - (g + 1))) *
+            (AgreementProfile.restrictedTailSet certificate.failure
+              (fun challenge ↦
+                (schemeProximityAgreement oracle
+                  (policy.proximityWeights challenge 0)
+                  (policy.proximityResponse (respond challenge) 0)).card) a).card ≤
+          (SchemeSelectedMCA.endpointOptimizedProfile (Fintype.card F) g
+            (SchemeSelectedMCA.selectedMCAIntegratedFailureProfile n e g d
+              outerBound localBound)).labelsAtLeast a *
+            Fintype.card Challenge := by
+  obtain ⟨certificate, hfailure⟩ :=
+    exists_policyLiftList_of_selectedMCA (extractor := extractor)
+      (oracle := oracle) (respond := respond) hmin
+      (by
+        have := conditions.outer.punctured.punctured_three_radius
+        omega)
+      conditions.outer.johnson.list_denominator_positive
+  refine ⟨certificate, ?_⟩
+  intro a _ha
+  rw [hfailure]
+  exact extractor.badChallenges_agreement_density_endpointOptimizedIntegratedOfLine
+    (oracle := oracle) (respond := respond) hmin conditions a
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- Threshold-free profiled extractor with a singleton oracle-fixed lift list.
+Unique decoding changes only the list cardinality; the full pointwise MCA tail
+is retained. -/
+theorem exists_profiledPolicyLiftList_of_endpointOptimizedIntegratedLine_unique
+    (extractor : SchemeExtractorPolicy policy Tail)
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    {outerBound : ℕ} {localBound : ℕ → ℕ}
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : IntegratedSelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d outerBound localBound)
+    (hunique : 2 * (e + g) < d) :
+    ∃ certificate : PolicyLiftListCertificate policy oracle respond e g (e + g) 1,
+      ∀ a ≤ n,
+        (Fintype.card F * (Fintype.card F - (g + 1))) *
+            (AgreementProfile.restrictedTailSet certificate.failure
+              (fun challenge ↦
+                (schemeProximityAgreement oracle
+                  (policy.proximityWeights challenge 0)
+                  (policy.proximityResponse (respond challenge) 0)).card) a).card ≤
+          (SchemeSelectedMCA.endpointOptimizedProfile (Fintype.card F) g
+            (SchemeSelectedMCA.selectedMCAIntegratedFailureProfile n e g d
+              outerBound localBound)).labelsAtLeast a *
+            Fintype.card Challenge := by
+  obtain ⟨certificate, hfailure⟩ :=
+    exists_policyLiftList_of_selectedMCA_unique (extractor := extractor)
+      (oracle := oracle) (respond := respond) hmin hunique
+  refine ⟨certificate, ?_⟩
+  intro a _ha
+  rw [hfailure]
+  exact extractor.badChallenges_agreement_density_endpointOptimizedIntegratedOfLine
+    (oracle := oracle) (respond := respond) hmin conditions a
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- Compatibility threshold-free extractor using the generic normalization. -/
+theorem exists_profiledPolicyLiftList_of_integratedLine
+    (extractor : SchemeExtractorPolicy policy Tail)
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    {outerBound : ℕ} {localBound : ℕ → ℕ}
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : IntegratedSelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d outerBound localBound) :
+    ∃ certificate : PolicyLiftListCertificate policy oracle respond e g (e + g)
+        (CodingTheory.InterleavedJohnson.listBound n d (e + g)),
+      ∀ a ≤ n,
+        (Fintype.card F - (g + 1)) *
+            (AgreementProfile.restrictedTailSet certificate.failure
+              (fun challenge ↦
+                (schemeProximityAgreement oracle
+                  (policy.proximityWeights challenge 0)
+                  (policy.proximityResponse (respond challenge) 0)).card) a).card ≤
+          (SchemeSelectedMCA.selectedMCAIntegratedFailureProfile n e g d
+            outerBound localBound).labelsAtLeast a *
+            Fintype.card Challenge := by
+  obtain ⟨certificate, hfailure⟩ :=
+    exists_policyLiftList_of_selectedMCA (extractor := extractor)
+      (oracle := oracle) (respond := respond) hmin
+      (by
+        have := conditions.outer.punctured.punctured_three_radius
+        omega)
+      conditions.outer.johnson.list_denominator_positive
+  refine ⟨certificate, ?_⟩
+  intro a _ha
+  rw [hfailure]
+  exact extractor.badChallenges_agreement_density_integratedOfLine
+    (oracle := oracle) (respond := respond) hmin conditions a
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq Challenge] in
+/-- Compatibility singleton extractor using the generic normalization. -/
+theorem exists_profiledPolicyLiftList_of_integratedLine_unique
+    (extractor : SchemeExtractorPolicy policy Tail)
+    [Nonempty (SchemeTestedRow CheckedMask nw nq 1)]
+    {outerBound : ℕ} {localBound : ℕ → ℕ}
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : IntegratedSelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d outerBound localBound)
+    (hunique : 2 * (e + g) < d) :
+    ∃ certificate : PolicyLiftListCertificate policy oracle respond e g (e + g) 1,
+      ∀ a ≤ n,
+        (Fintype.card F - (g + 1)) *
+            (AgreementProfile.restrictedTailSet certificate.failure
+              (fun challenge ↦
+                (schemeProximityAgreement oracle
+                  (policy.proximityWeights challenge 0)
+                  (policy.proximityResponse (respond challenge) 0)).card) a).card ≤
+          (SchemeSelectedMCA.selectedMCAIntegratedFailureProfile n e g d
+            outerBound localBound).labelsAtLeast a *
+            Fintype.card Challenge := by
+  obtain ⟨certificate, hfailure⟩ :=
+    exists_policyLiftList_of_selectedMCA_unique (extractor := extractor)
+      (oracle := oracle) (respond := respond) hmin hunique
+  refine ⟨certificate, ?_⟩
+  intro a _ha
+  rw [hfailure]
+  exact extractor.badChallenges_agreement_density_integratedOfLine
     (oracle := oracle) (respond := respond) hmin conditions a
 
 end SchemeExtractorPolicy

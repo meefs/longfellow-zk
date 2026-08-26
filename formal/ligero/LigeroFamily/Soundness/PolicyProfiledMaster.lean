@@ -34,6 +34,92 @@ structure PolicyAcceptingQueryCover
     policy.accepts statement challenge response query
       (openSchemeOracle oracle query) → query.coordinates ⊆ allowed
 
+
+
+
+
+noncomputable def policyAcceptingCoordinates
+    (policy : SchemeProtocolPolicy (Equations := Equations) C layout
+      Challenge Response CheckedMask DirectMask nw nq 1)
+    (oracle : SchemeOracle F CheckedMask DirectMask nw nq n 1)
+    (statement : ConstraintSystem F nw nq logicalWidth Equations)
+    (challenge : Challenge) (response : Response) : Finset (Fin n) := by
+  classical
+  exact Finset.univ.filter fun coordinate ↦
+    ∃ query : QuerySet n r,
+      policy.accepts statement challenge response query
+        (openSchemeOracle oracle query) ∧ coordinate ∈ query.coordinates
+
+/-- Responses that both occur in an accepting query and have actual response
+agreement at least `agreement`. -/
+noncomputable def policyResponseAgreementList
+    [Fintype Response]
+    (policy : SchemeProtocolPolicy (Equations := Equations) C layout
+      Challenge Response CheckedMask DirectMask nw nq 1)
+    (oracle : SchemeOracle F CheckedMask DirectMask nw nq n 1)
+    (statement : ConstraintSystem F nw nq logicalWidth Equations)
+    (challenge : Challenge) (agreement : ℕ) : Finset Response := by
+  classical
+  exact Finset.univ.filter fun response ↦
+    (∃ query : QuerySet n r,
+      policy.accepts statement challenge response query
+        (openSchemeOracle oracle query)) ∧
+    agreement ≤
+      (policyAcceptingCoordinates policy oracle statement challenge response).card
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] [Fintype Challenge] [DecidableEq Challenge]
+    [Nonempty Challenge] in
+theorem query_subset_policyAcceptingCoordinates_of_accepts
+    (policy : SchemeProtocolPolicy (Equations := Equations) C layout
+      Challenge Response CheckedMask DirectMask nw nq 1)
+    (oracle : SchemeOracle F CheckedMask DirectMask nw nq n 1)
+    (statement : ConstraintSystem F nw nq logicalWidth Equations)
+    (challenge : Challenge) (response : Response) (query : QuerySet n r)
+    (haccept : policy.accepts statement challenge response query
+      (openSchemeOracle oracle query)) :
+    query.coordinates ⊆
+      policyAcceptingCoordinates policy oracle statement challenge response := by
+  classical
+  intro coordinate hcoordinate
+  exact Finset.mem_filter.mpr
+    ⟨Finset.mem_univ _, ⟨query, haccept, hcoordinate⟩⟩
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] [Fintype Challenge] [DecidableEq Challenge]
+    [Nonempty Challenge] in
+theorem policyAcceptingCoordinates_subset_cover
+    (policy : SchemeProtocolPolicy (Equations := Equations) C layout
+      Challenge Response CheckedMask DirectMask nw nq 1)
+    (oracle : SchemeOracle F CheckedMask DirectMask nw nq n 1)
+    (statement : ConstraintSystem F nw nq logicalWidth Equations)
+    (challenge : Challenge) (response : Response) (bound : ℕ)
+    (cover : PolicyAcceptingQueryCover policy oracle statement challenge
+      response bound) :
+    policyAcceptingCoordinates policy oracle statement challenge response ⊆
+      cover.allowed := by
+  classical
+  intro coordinate hcoordinate
+  obtain ⟨query, haccept, hmem⟩ :=
+    (Finset.mem_filter.mp hcoordinate).2
+  exact cover.covers query haccept hmem
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] [Fintype Challenge] [DecidableEq Challenge]
+    [Nonempty Challenge] in
+theorem policyAcceptingCoordinates_card_le
+    (policy : SchemeProtocolPolicy (Equations := Equations) C layout
+      Challenge Response CheckedMask DirectMask nw nq 1)
+    (oracle : SchemeOracle F CheckedMask DirectMask nw nq n 1)
+    (statement : ConstraintSystem F nw nq logicalWidth Equations)
+    (challenge : Challenge) (response : Response) :
+    (policyAcceptingCoordinates policy oracle statement challenge response).card
+      ≤ n := by
+  classical
+  simpa using Finset.card_le_card
+    (show policyAcceptingCoordinates policy oracle statement challenge response ⊆
+        (Finset.univ : Finset (Fin n)) from Finset.subset_univ _)
+
 structure PolicyDoublyProfiledSoundnessClassifier
     (policy : SchemeProtocolPolicy (Equations := Equations) C layout
       Challenge Response CheckedMask DirectMask nw nq 1)
@@ -71,6 +157,76 @@ namespace PolicyDoublyProfiledSoundnessClassifier
 
 variable {failureProfile arithmeticProfile : AgreementProfile n}
 
+/-- Actual pointwise response agreement for the classifier's response
+strategy: the number of coordinates occurring in some accepting query. -/
+noncomputable def responseAgreement
+    (_classifier : PolicyDoublyProfiledSoundnessClassifier policy oracle statement
+      respond failureProfile arithmeticProfile profileDenominator
+        failureDenominator e g)
+    (challenge : Challenge) : ℕ :=
+  (policyAcceptingCoordinates policy oracle statement challenge
+    (respond challenge)).card
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] [DecidableEq Challenge] [Nonempty Challenge] in
+theorem responseAgreement_le
+    (classifier : PolicyDoublyProfiledSoundnessClassifier policy oracle statement
+      respond failureProfile arithmeticProfile profileDenominator
+        failureDenominator e g)
+    (challenge : Challenge) : classifier.responseAgreement challenge ≤ n := by
+  exact policyAcceptingCoordinates_card_le policy oracle statement challenge
+    (respond challenge)
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] [DecidableEq Challenge] [Nonempty Challenge] in
+theorem responseAgreement_le_failureAgreement
+    (classifier : PolicyDoublyProfiledSoundnessClassifier policy oracle statement
+      respond failureProfile arithmeticProfile profileDenominator
+        failureDenominator e g)
+    (challenge : Challenge) (hfailure : challenge ∈ classifier.failure) :
+    classifier.responseAgreement challenge ≤
+      classifier.failureAgreement challenge := by
+  let cover := Classical.choice (classifier.failure_cover challenge hfailure)
+  exact (Finset.card_le_card
+    (policyAcceptingCoordinates_subset_cover policy oracle statement challenge
+      (respond challenge) _ cover)).trans cover.allowed_card
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] [DecidableEq Challenge] [Nonempty Challenge] in
+theorem responseAgreement_le_goodCap
+    (classifier : PolicyDoublyProfiledSoundnessClassifier policy oracle statement
+      respond failureProfile arithmeticProfile profileDenominator
+        failureDenominator e g)
+    (challenge : Challenge) (hfailure : challenge ∉ classifier.failure) :
+    classifier.responseAgreement challenge ≤
+      max (n - e - 1) (min n (g + classifier.agreement challenge)) := by
+  classical
+  by_cases hexecution : ∃ query : QuerySet n r,
+      policy.accepts statement challenge (respond challenge) query
+        (openSchemeOracle oracle query)
+  · rcases classifier.uniform_cover challenge hfailure hexecution with
+      hfar | harithmetic
+    · let cover := Classical.choice hfar
+      exact (Finset.card_le_card
+        (policyAcceptingCoordinates_subset_cover policy oracle statement
+          challenge (respond challenge) _ cover)).trans
+        (cover.allowed_card.trans (le_max_left _ _))
+    · let cover := Classical.choice harithmetic
+      exact (Finset.card_le_card
+        (policyAcceptingCoordinates_subset_cover policy oracle statement
+          challenge (respond challenge) _ cover)).trans
+        (cover.allowed_card.trans (le_max_right _ _))
+  · have hcoordinates : policyAcceptingCoordinates policy oracle statement
+        challenge (respond challenge) = ∅ := by
+      ext coordinate
+      constructor
+      · intro hcoordinate
+        obtain ⟨query, haccept, _hmem⟩ :=
+          (Finset.mem_filter.mp hcoordinate).2
+        exact (hexecution ⟨query, haccept⟩).elim
+      · simp
+    simp [responseAgreement, hcoordinates]
+
 noncomputable def acceptingQueries
     (_classifier : PolicyDoublyProfiledSoundnessClassifier policy oracle statement
       respond failureProfile arithmeticProfile profileDenominator
@@ -81,12 +237,62 @@ noncomputable def acceptingQueries
     policy.accepts statement challenge (respond challenge) query
       (openSchemeOracle oracle query)
 
+/-- The actual independent `(challenge, query)` accepting pairs represented
+by a profiled classifier. -/
+noncomputable def acceptingPairs
+    (_classifier : PolicyDoublyProfiledSoundnessClassifier policy oracle statement
+      respond failureProfile arithmeticProfile profileDenominator
+        failureDenominator e g) : Finset (Challenge × QuerySet n r) := by
+  classical
+  exact Finset.univ.filter fun pair =>
+    policy.accepts statement pair.1 (respond pair.1) pair.2
+      (openSchemeOracle oracle pair.2)
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] [Nonempty Challenge] in
+theorem acceptingPairs_card_eq_sum
+    (classifier : PolicyDoublyProfiledSoundnessClassifier policy oracle statement
+      respond failureProfile arithmeticProfile profileDenominator
+        failureDenominator e g) :
+    classifier.acceptingPairs.card =
+      ∑ challenge, (classifier.acceptingQueries challenge).card := by
+  classical
+  exact Internal.card_filter_product_eq_sum
+    (fun challenge query =>
+      policy.accepts statement challenge (respond challenge) query
+        (openSchemeOracle oracle query))
+
 noncomputable def acceptanceRate
     (classifier : PolicyDoublyProfiledSoundnessClassifier policy oracle statement
       respond failureProfile arithmeticProfile profileDenominator
         failureDenominator e g) : ℚ :=
   (∑ challenge, (classifier.acceptingQueries challenge).card : ℚ) /
     (Fintype.card Challenge * n.choose r)
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] [Nonempty Challenge] in
+/-- The classifier's acceptance rate is literally the density of its actual
+independent accepting-pair set. -/
+theorem acceptingPairs_density_eq_acceptanceRate
+    (classifier : PolicyDoublyProfiledSoundnessClassifier policy oracle statement
+      respond failureProfile arithmeticProfile profileDenominator
+        failureDenominator e g) :
+    (classifier.acceptingPairs.card : ℚ) /
+        (Fintype.card Challenge * Fintype.card (QuerySet n r)) =
+      classifier.acceptanceRate := by
+  rw [classifier.acceptingPairs_card_eq_sum, QuerySet.fintype_card]
+  unfold acceptanceRate
+  push_cast
+  rfl
+
+/-- Accepting pairs in the `(query, challenge)` order used by the typed
+two-oracle tape kernel. -/
+noncomputable def strategyAcceptingPairs
+    (respond' : Challenge → Response) : Finset (QuerySet n r × Challenge) := by
+  classical
+  exact Finset.univ.filter fun pair =>
+    policy.accepts statement pair.2 (respond' pair.2) pair.1
+      (openSchemeOracle oracle pair.1)
 
 omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
     [DecidableEq CheckedMask] [DecidableEq Challenge] [Nonempty Challenge] in
@@ -313,6 +519,55 @@ theorem protocol_acceptanceRate_eq
   rw [hnumerator, hdenominator]
   push_cast
   rfl
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] in
+/-- A family of classifiers indexed by arbitrary fixed auxiliary data gives
+the same accepting-pair density bound for every resulting response strategy.
+This is the exact interface consumed by response-rigid Case A after the rest
+of the random-oracle tape has been fixed. -/
+theorem strategyUniform_acceptingPairs_density_le
+    {Data : Type*}
+    (respondBy : Data → Challenge → Response)
+    (classifier : ∀ data,
+      PolicyDoublyProfiledSoundnessClassifier policy oracle statement
+        (respondBy data) failureProfile arithmeticProfile profileDenominator
+          failureDenominator e g)
+    (hprofile : 0 < profileDenominator)
+    (hfailureDenominator : 0 < failureDenominator)
+    (hquery : r ≤ n) (data : Data) :
+    (strategyAcceptingPairs (policy := policy) (oracle := oracle)
+      (statement := statement) (respondBy data)).card /
+        (Fintype.card (QuerySet n r) * Fintype.card Challenge) ≤
+      failureProfile.contribution failureDenominator n n 0 r +
+        arithmeticProfile.contribution profileDenominator n e g r := by
+  classical
+  let current := classifier data
+  have hevent :
+      (strategyAcceptingPairs (policy := policy) (oracle := oracle)
+        (statement := statement) (respondBy data)).card =
+        current.acceptingPairs.card := by
+    let left := strategyAcceptingPairs (policy := policy) (oracle := oracle)
+      (statement := statement) (respondBy data)
+    let right := current.acceptingPairs
+    let swap : (↥left) ≃ (↥right) := {
+      toFun := fun pair => ⟨(pair.1.2, pair.1.1), by
+        have hp := (Finset.mem_filter.mp pair.2).2
+        exact Finset.mem_filter.mpr ⟨Finset.mem_univ _, hp⟩
+        ⟩
+      invFun := fun pair => ⟨(pair.1.2, pair.1.1), by
+        have hp := (Finset.mem_filter.mp pair.2).2
+        exact Finset.mem_filter.mpr ⟨Finset.mem_univ _, hp⟩
+        ⟩
+      left_inv := fun _ => rfl
+      right_inv := fun _ => rfl }
+    calc
+      left.card = Fintype.card ↥left := by simp
+      _ = Fintype.card ↥right := Fintype.card_congr swap
+      _ = right.card := by simp
+  rw [hevent, mul_comm,
+    current.acceptingPairs_density_eq_acceptanceRate]
+  exact current.acceptanceRate_le hprofile hfailureDenominator hquery
 
 end PolicyDoublyProfiledSoundnessClassifier
 

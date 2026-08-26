@@ -88,6 +88,39 @@ namespace PolicyLiftListCertificate
 
 omit [Fintype Equations] [DecidableEq Equations] [DecidableEq CheckedMask]
     [Fintype Challenge] [DecidableEq Challenge] in
+/-- Construct the fixed list from policy-independent punctured lift witnesses
+and an independently proved cardinality bound for the oracle-indexed candidate
+type. -/
+theorem exists_of_gLiftWitnesses_of_card
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (hradius : e + g < d)
+    (failure : Finset Challenge)
+    (hcard : (Finset.univ : Finset
+      (SchemeLiftCandidate C oracle (e + g))).card ≤ L)
+    (hwitness : ∀ challenge, challenge ∉ failure →
+      policy.proximityResponse (respond challenge) 0 ∈ C.base →
+      (schemeProximityDisagreement oracle (policy.proximityWeights challenge 0)
+        (policy.proximityResponse (respond challenge) 0)).card ≤ e →
+      Nonempty (SchemeGLiftWitness C oracle
+        (policy.proximityWeights challenge 0)
+        (policy.proximityResponse (respond challenge) 0) g)) :
+    ∃ certificate : PolicyLiftListCertificate policy oracle respond e g (e + g) L,
+      certificate.failure = failure := by
+  let candidates :=
+    (Finset.univ : Finset (SchemeLiftCandidate C oracle (e + g)))
+  refine ⟨{
+    candidates := candidates
+    failure := failure
+    list_card := hcard
+    lift := ?_ }, rfl⟩
+  intro challenge hnotFailure hresponse hsmall
+  obtain ⟨witness⟩ := hwitness challenge hnotFailure hresponse hsmall
+  obtain ⟨candidate, haggregate, hremaining⟩ :=
+    witness.exists_schemeLiftCandidate hresponse hsmall hmin hradius
+  exact ⟨candidate, Finset.mem_univ candidate, haggregate, hremaining⟩
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq CheckedMask]
+    [Fintype Challenge] [DecidableEq Challenge] in
 /-- Construct the fixed list from policy-independent punctured lift
 witnesses. -/
 theorem exists_of_gLiftWitnesses
@@ -113,16 +146,30 @@ theorem exists_of_gLiftWitnesses
       CodingTheory.InterleavedJohnson.listBound n d (e + g) :=
     SchemeLiftCandidate.univ_card_le_listBound C oracle hmin
       hradiusLength hradius hden
-  refine ⟨{
-    candidates := candidates
-    failure := failure
-    list_card := hlistCard
-    lift := ?_ }, rfl⟩
-  intro challenge hnotFailure hresponse hsmall
-  obtain ⟨witness⟩ := hwitness challenge hnotFailure hresponse hsmall
-  obtain ⟨candidate, haggregate, hremaining⟩ :=
-    witness.exists_schemeLiftCandidate hresponse hsmall hmin hradius
-  exact ⟨candidate, Finset.mem_univ candidate, haggregate, hremaining⟩
+  exact exists_of_gLiftWitnesses_of_card hmin hradius failure hlistCard hwitness
+
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq CheckedMask]
+    [Fintype Challenge] [DecidableEq Challenge] in
+/-- The unique-decoding specialization: the fixed list has at most one member
+whenever twice the lifted radius is below the base-code distance. -/
+theorem exists_of_gLiftWitnesses_unique
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (hradius : e + g < d)
+    (hunique : 2 * (e + g) < d)
+    (failure : Finset Challenge)
+    (hwitness : ∀ challenge, challenge ∉ failure →
+      policy.proximityResponse (respond challenge) 0 ∈ C.base →
+      (schemeProximityDisagreement oracle (policy.proximityWeights challenge 0)
+        (policy.proximityResponse (respond challenge) 0)).card ≤ e →
+      Nonempty (SchemeGLiftWitness C oracle
+        (policy.proximityWeights challenge 0)
+        (policy.proximityResponse (respond challenge) 0) g)) :
+    ∃ certificate : PolicyLiftListCertificate policy oracle respond e g (e + g) 1,
+      certificate.failure = failure := by
+  apply exists_of_gLiftWitnesses_of_card hmin hradius failure
+  · exact SchemeLiftCandidate.univ_card_le_one_of_two_mul_radius_lt_distance
+      C oracle hmin hunique
+  · exact hwitness
 
 end PolicyLiftListCertificate
 

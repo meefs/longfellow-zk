@@ -27,6 +27,22 @@ positive. -/
 def listBound (n d E : ℕ) : ℕ :=
   n * (d - E) / (denominator n d E).toNat
 
+/-- On the radius range `E ≤ n`, decreasing the error radius can only
+increase the Johnson denominator. -/
+theorem denominator_anti_on {n d E E₀ : ℕ}
+    (hE : E ≤ E₀) (hE₀ : E₀ ≤ n) :
+    denominator n d E₀ ≤ denominator n d E := by
+  unfold denominator
+  have hE' : (E : ℤ) ≤ E₀ := by exact_mod_cast hE
+  have hE₀' : (E₀ : ℤ) ≤ n := by exact_mod_cast hE₀
+  nlinarith
+
+theorem denominator_pos_of_le {n d E E₀ : ℕ}
+    (hE : E ≤ E₀) (hE₀ : E₀ ≤ n)
+    (hpos : 0 < denominator n d E₀) :
+    0 < denominator n d E :=
+  hpos.trans_le (denominator_anti_on hE hE₀)
+
 namespace Internal
 
 variable {n : ℕ}

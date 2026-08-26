@@ -113,23 +113,13 @@ theorem residual_of_not_satisfies
     intro hzero
     exact hnonzero (sub_eq_zero.mp (congrFun hzero row))
 
-/-- A false constraint system has either a nonzero linear residual vector or
-a nonzero quadratic residual vector.  Now a corollary of the per-vector form. -/
-theorem false_residual
-    (statement : ConstraintSystem F nw nq w Equations)
-    (messages : CoreMessages F nw nq w) (hfalse : ¬statement.Language) :
-    (fun equation ↦ statement.linearValue messages equation -
-      statement.target equation) ≠ 0 ∨
-      ∃ i, (fun row ↦ messages .left row i * messages .right row i -
-        messages .output row i) ≠ 0 :=
-  statement.residual_of_not_satisfies messages fun hsatisfies ↦ hfalse ⟨messages, hsatisfies⟩
-
 end ConstraintSystem
 
 structure Response (F : Type*) (r w n repetitions : ℕ) where
   proximity : Fin repetitions → EvaluationRow F r w n
   linear : Fin repetitions → EvaluationRow F r w n
   quadratic : Fin repetitions → EvaluationRow F r w n
+  deriving DecidableEq
 
 @[ext] theorem Response.ext {F : Type*} {r w n repetitions : ℕ}
     {first second : Response F r w n repetitions}

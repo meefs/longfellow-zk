@@ -525,6 +525,48 @@ theorem lazyRun_seen_take_congr (tape tape' : Fin T → D) (dflt : D) (j : ℕ)
         rw [take_eq_of_prefix_of_length_le hpref hlen,
           take_eq_of_prefix_of_length_le hpref' hlen]
 
+/-- If a second tape agrees on every slot used by the first lazy execution,
+then the complete executions agree, including the output.  The bound is the
+actual final distinct-query count, not the syntactic fuel, so this also covers
+an adversary that stops early before verifier-appended defining queries. -/
+theorem lazyRun_eq_of_agree_below_seen_length
+    (tape tape' : Fin T → D) (dflt : D) :
+    ∀ {fuel : ℕ} (c : Tree Q D A fuel) (seen : List Q),
+      (∀ i : Fin T,
+        i.val < (lazyRun tape dflt c seen).2.1.length → tape i = tape' i) →
+      lazyRun tape dflt c seen = lazyRun tape' dflt c seen
+  | _, .done _, _seen, _hagree => rfl
+  | _, .query q next, seen, hagree => by
+      rw [lazyRun_query, lazyRun_query]
+      let seen' := if q ∈ seen then seen else seen ++ [q]
+      let slot := seen'.idxOf q
+      have hmem : q ∈ seen' := by
+        by_cases hq : q ∈ seen <;> simp [seen', hq]
+      have hslotSeen : slot < seen'.length := by
+        exact List.idxOf_lt_length_of_mem hmem
+      let answer := tapeAt tape dflt slot
+      have hpref := lazyRun_seen_prefix tape dflt (next answer) seen'
+      have hseenFinal : seen'.length ≤
+          (lazyRun tape dflt (next answer) seen').2.1.length := by
+        exact List.IsPrefix.length_le hpref
+      have hanswer : tapeAt tape dflt slot = tapeAt tape' dflt slot := by
+        unfold tapeAt
+        by_cases hslot : slot < T
+        · simp only [dif_pos hslot]
+          exact hagree ⟨slot, hslot⟩ (hslotSeen.trans_le hseenFinal)
+        · simp only [dif_neg hslot]
+      have hrecursive := lazyRun_eq_of_agree_below_seen_length
+        tape tape' dflt (next answer) seen' (by
+          intro i hi
+          exact hagree i hi)
+      change
+        (let out := lazyRun tape dflt (next answer) seen'
+         (out.1, out.2.1, (q, answer) :: out.2.2)) =
+        (let otherAnswer := tapeAt tape' dflt slot
+         let out := lazyRun tape' dflt (next otherAnswer) seen'
+         (out.1, out.2.1, (q, otherAnswer) :: out.2.2))
+      rw [← hanswer, hrecursive]
+
 /-! ## The slot's query, as data -/
 
 /-- Extend a prefix of slots to a whole tape by padding with `dflt`. -/

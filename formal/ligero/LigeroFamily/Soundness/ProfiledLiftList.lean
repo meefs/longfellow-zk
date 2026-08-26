@@ -113,18 +113,6 @@ theorem residual_of_not_satisfies (candidate : SchemeLiftCandidate C oracle radi
       ∃ i, (fun row ↦ candidate.quadraticResidual row i) ≠ 0 := by
   exact statement.residual_of_not_satisfies candidate.decodedMessages hns
 
-/- A candidate decoded from a false statement has a nonzero linear or
-quadratic residual. -/
-omit [Fintype F] [Fintype Equations] [DecidableEq Equations]
-    [DecidableEq CheckedMask] in
-theorem false_residual (candidate : SchemeLiftCandidate C oracle radius)
-    (statement : ConstraintSystem F nw nq w Equations)
-    (hfalse : ¬statement.Language) :
-    candidate.linearResidual statement ≠ 0 ∨
-      ∃ i, (fun row ↦ candidate.quadraticResidual row i) ≠ 0 :=
-  candidate.residual_of_not_satisfies statement
-    fun hsat ↦ hfalse ⟨candidate.decodedMessages, hsat⟩
-
 noncomputable def badColumns (candidate : SchemeLiftCandidate C oracle radius) :
     Finset (Fin n) :=
   matrixErrorCoordinates (schemeLiftCommittedRows oracle)

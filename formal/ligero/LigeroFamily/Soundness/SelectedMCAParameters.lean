@@ -83,4 +83,78 @@ structure RefinedSelectedMCAParameterConditions
     n (n - cutoff) g d localThreshold
   local_three_radius : 3 * g < d - (n - cutoff)
 
+/-- Numerical direct-clique certificate for the threshold-free integral.
+`localThreshold a` is checked only on the natural agreement range
+`n - e ≤ a ≤ n`; there is no optimizer-chosen cutoff. -/
+structure IntegratedSelectedMCAParameterConditions
+    (q n e g d threshold : ℕ) (localThreshold : ℕ → ℕ) : Prop extends
+    SelectedMCAParameterConditions q n e g d threshold where
+  localDirect : ∀ a, n - e ≤ a → a ≤ n →
+    SelectedMCA.DirectCliqueCondition n (n - a) g d (localThreshold a)
+  local_three_radius : ∀ a, n - e ≤ a → a ≤ n →
+    3 * g < d - (n - a)
+
+/-- Route-agnostic form of the agreement-local refinement.  Both the outer
+and local proximity estimates are expressed through the line-failure
+interface, so the refined profile can be used with either the clique proof or
+another proved proximity theorem (for example the Johnson route). -/
+structure RefinedSelectedMCALineConditions {F : Type*} [Field F] [DecidableEq F]
+    {n : ℕ} (C : CodingTheory.LinearCode F n)
+    (q e g d outerBound cutoff localBound : ℕ) : Prop where
+  outer : SelectedMCALineConditions C q e g d outerBound
+  radius_le_cutoff : n - e ≤ cutoff
+  cutoff_le_length : cutoff ≤ n
+  localLine : SelectedMCA.LineFailureBound C (n - cutoff) g localBound
+  local_three_radius : 3 * g < d - (n - cutoff)
+
+/-- Threshold-free agreement-local MCA interface.  Instead of choosing one
+cutoff and reusing its line bound above that cutoff, it supplies the proved
+line bound at every actual agreement level `a`.  The layer-cake theorem can
+therefore integrate the pointwise best bound directly. -/
+structure IntegratedSelectedMCALineConditions
+    {F : Type*} [Field F] [DecidableEq F]
+    {n : ℕ} (C : CodingTheory.LinearCode F n)
+    (q e g d outerBound : ℕ) (localBound : ℕ → ℕ) : Prop where
+  outer : SelectedMCALineConditions C q e g d outerBound
+  localLine : ∀ a, n - e ≤ a → a ≤ n →
+    SelectedMCA.LineFailureBound C (n - a) g (localBound a)
+  local_three_radius : ∀ a, n - e ≤ a → a ≤ n →
+    3 * g < d - (n - a)
+
+/-- A numerical clique certificate supplies the route-agnostic refined
+interface consumed by protocol theorems. -/
+theorem RefinedSelectedMCAParameterConditions.lineConditions
+    {F : Type*} [Field F] [DecidableEq F] {n : ℕ}
+    {C : CodingTheory.LinearCode F n}
+    {q e g d threshold cutoff localThreshold : ℕ}
+    (conditions : RefinedSelectedMCAParameterConditions
+      q n e g d threshold cutoff localThreshold)
+    (hmin : CodingTheory.HasMinimumDistanceAtLeast C d) :
+    RefinedSelectedMCALineConditions C q e g d
+      (SelectedMCA.directLineFailureBound threshold) cutoff
+      (SelectedMCA.directLineFailureBound localThreshold) where
+  outer := conditions.toSelectedMCAParameterConditions.lineConditions hmin
+  radius_le_cutoff := conditions.radius_le_cutoff
+  cutoff_le_length := conditions.cutoff_le_length
+  localLine := SelectedMCA.lineFailureBound_of_directClique hmin conditions.localDirect
+  local_three_radius := conditions.local_three_radius
+
+/-- A pointwise direct-clique family supplies the threshold-free
+route-agnostic interface. -/
+theorem IntegratedSelectedMCAParameterConditions.lineConditions
+    {F : Type*} [Field F] [DecidableEq F] {n : ℕ}
+    {C : CodingTheory.LinearCode F n}
+    {q e g d threshold : ℕ} {localThreshold : ℕ → ℕ}
+    (conditions : IntegratedSelectedMCAParameterConditions
+      q n e g d threshold localThreshold)
+    (hmin : CodingTheory.HasMinimumDistanceAtLeast C d) :
+    IntegratedSelectedMCALineConditions C q e g d
+      (SelectedMCA.directLineFailureBound threshold)
+      (fun a ↦ SelectedMCA.directLineFailureBound (localThreshold a)) where
+  outer := conditions.toSelectedMCAParameterConditions.lineConditions hmin
+  localLine a ha han :=
+    SelectedMCA.lineFailureBound_of_directClique hmin
+      (conditions.localDirect a ha han)
+  local_three_radius := conditions.local_three_radius
+
 end LigeroFamily

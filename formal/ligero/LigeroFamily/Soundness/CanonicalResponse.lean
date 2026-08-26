@@ -42,6 +42,16 @@ structure Response.Codewords (F : Type*) (n repetitions : ℕ) where
   linear : Fin repetitions → CodingTheory.Word F n
   quadratic : Fin repetitions → CodingTheory.Word F n
 
+omit [Field F] in
+@[ext] theorem Response.Codewords.ext
+    {first second : Response.Codewords F n repetitions}
+    (hproximity : first.proximity = second.proximity)
+    (hlinear : first.linear = second.linear)
+    (hquadratic : first.quadratic = second.quadratic) : first = second := by
+  cases first
+  cases second
+  simp_all
+
 /-- Project an evaluation-form response to its three committed codeword
 families. -/
 def Response.codewords (response : Response F r w n repetitions) :
@@ -83,5 +93,8 @@ theorem Response.eq_of_valid_codewords_eq
   · funext h
     apply C.responseRow_eq_of_codeword_eq h2k (hfirst h).2.2 (hsecond h).2.2
     exact congrFun (congrArg Response.Codewords.quadratic hcodewords) h
+
+
+
 
 end LigeroFamily

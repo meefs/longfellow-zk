@@ -25,12 +25,13 @@ noncomputable local instance endToEndViewDecidableEq :
         (QuerySet n r) (Opening F nw nq 1 n r)) :=
   Classical.decEq _
 
-/-- The selected-MCA soundness expression for V1 masking. -/
+/-- The disjoint-event selected-MCA soundness expression for V1 masking. -/
 def selectedMCASoundnessBound (C : MultiplicativeCode F r w n)
     (e g d m threshold : ℕ) : ℚ :=
   (SchemeSelectedMCA.selectedMCAFailureProfile n g d
-    (SelectedMCA.directLineFailureBound m)).contribution
-      (Fintype.card F - (g + 1)) n n 0 r +
+    (SelectedMCA.directLineFailureBound m)).excessContribution
+      (Fintype.card F - (g + 1)) n n 0 r
+      (max (n - e - 1) (min n (g + (threshold - 1)))) +
   (uncheckedAgreementProfile (Fintype.card F) n (2 * C.k - 1)
     (CodingTheory.InterleavedJohnson.listBound n d (e + g))
     threshold).contribution (Fintype.card F) n e g r

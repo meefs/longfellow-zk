@@ -42,6 +42,17 @@ occupancy bound for a line, without choosing an intermediate support radius. -/
 def directLineOccupancyBound (n g : ℕ) : ℕ :=
   n / (g + 1)
 
+theorem directLineOccupancyBound_antitone {n g g' : ℕ} (hgg' : g ≤ g') :
+    directLineOccupancyBound n g' ≤ directLineOccupancyBound n g := by
+  unfold directLineOccupancyBound
+  exact Nat.div_le_div_left (Nat.add_le_add_right hgg' 1) (Nat.succ_pos g)
+
+theorem simpleCliqueUpperNat_mono_right {m R R' : ℕ} (hRR' : R ≤ R') :
+    simpleCliqueUpperNat m R ≤ simpleCliqueUpperNat m R' := by
+  unfold simpleCliqueUpperNat
+  exact Nat.div_le_div_right
+    (Nat.mul_le_mul_right _ (Nat.sub_le_sub_right hRR' 2))
+
 /-- Denominator-cleared single-clique selected-MCA condition.  Keeping this
 predicate entirely in `ℕ` makes generated certificates fast and transparent.
 The three conjuncts assert that triples exist, the two score caps separate,
@@ -100,5 +111,19 @@ theorem DirectCliqueCondition.radius_lt_distance {n e g d m : ℕ}
     (condition : DirectCliqueCondition n e g d m) : e < d := by
   have := condition.cap_lt
   omega
+
+/-- Increasing the residual budget can only decrease the line-occupancy
+upper bound.  This is the monotonicity used by the exact grid generator: after
+finding the first valid threshold at a larger `g`, every smaller threshold is
+known invalid at a smaller `g`, without assuming that the rounded predicate is
+monotone in `m`. -/
+theorem DirectCliqueCondition.mono_g {n e g g' d m : ℕ}
+    (condition : DirectCliqueCondition n e g d m) (hgg' : g ≤ g') :
+    DirectCliqueCondition n e g' d m := by
+  refine ⟨condition.1, condition.2.1, ?_⟩
+  apply lt_of_le_of_lt _ condition.2.2
+  gcongr
+  exact simpleCliqueUpperNat_mono_right
+    (directLineOccupancyBound_antitone hgg')
 
 end SelectedMCA

@@ -181,14 +181,37 @@ def ProfiledDoomedAfter (failureThreshold arithmeticThreshold : ℕ)
   else
     classifier.agreement challenge ≤ arithmeticThreshold
 
-/-- Challenges escaping the profiled doom state are precisely covered by the two
-agreement tails. -/
+/-- Challenges escaping on the arithmetic branch.  The subtraction by the
+selected-MCA failure set makes the two semantic branches disjoint. -/
+noncomputable def profiledArithmeticEscaping (arithmeticThreshold : ℕ) :
+    Finset Challenge := by
+  classical
+  exact (AgreementProfile.tailSet classifier.agreement
+    (arithmeticThreshold + 1)) \ classifier.failure
+
+/-- Challenges escaping the profiled doom state are precisely covered by two
+disjoint agreement tails: selected-MCA failures, and ordinary arithmetic
+challenges outside the failure set. -/
 noncomputable def profiledEscaping (failureThreshold arithmeticThreshold : ℕ) :
     Finset Challenge := by
   classical
   exact AgreementProfile.restrictedTailSet classifier.failure
       classifier.failureAgreement (failureThreshold + 1) ∪
-    AgreementProfile.tailSet classifier.agreement (arithmeticThreshold + 1)
+    classifier.profiledArithmeticEscaping arithmeticThreshold
+
+omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
+    [DecidableEq CheckedMask] [Nonempty Challenge] in
+theorem profiledEscaping_branches_disjoint
+    (failureThreshold arithmeticThreshold : ℕ) :
+    Disjoint
+      (AgreementProfile.restrictedTailSet classifier.failure
+        classifier.failureAgreement (failureThreshold + 1))
+      (classifier.profiledArithmeticEscaping arithmeticThreshold) := by
+  classical
+  rw [Finset.disjoint_left]
+  intro challenge hfailure harithmetic
+  exact (Finset.mem_sdiff.mp harithmetic).2
+    (Finset.mem_filter.mp hfailure).1
 
 omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
     [DecidableEq CheckedMask] [Nonempty Challenge] in
@@ -205,7 +228,9 @@ theorem not_profiledDoomedAfter_mem_profiledEscaping
     exact ⟨hfailure, Nat.lt_of_not_le h⟩
   next hfailure =>
     apply Finset.mem_union_right
-    simpa [AgreementProfile.tailSet] using Nat.lt_of_not_le h
+    simp only [profiledArithmeticEscaping, Finset.mem_sdiff]
+    exact ⟨by simpa [AgreementProfile.tailSet] using Nat.lt_of_not_le h,
+      hfailure⟩
 
 omit [Fintype F] [DecidableEq F] [Fintype Equations] [DecidableEq Equations]
     [DecidableEq CheckedMask] [Nonempty Challenge] in
@@ -263,8 +288,9 @@ theorem profiledEscaping_density_le
     exact_mod_cast Fintype.card_pos
   let failureTail := AgreementProfile.restrictedTailSet classifier.failure
     classifier.failureAgreement (failureThreshold + 1)
-  let arithmeticTail := AgreementProfile.tailSet classifier.agreement
+  let fullArithmeticTail := AgreementProfile.tailSet classifier.agreement
     (arithmeticThreshold + 1)
+  let arithmeticTail := classifier.profiledArithmeticEscaping arithmeticThreshold
   have hfailCard : (failureDenominator : ℚ) * (failureTail.card : ℚ) ≤
       (failureProfile.labelsAtLeast (failureThreshold + 1) : ℚ) *
         Fintype.card Challenge := by
@@ -274,9 +300,16 @@ theorem profiledEscaping_density_le
   have harithmeticCard : (profileDenominator : ℚ) * (arithmeticTail.card : ℚ) ≤
       (arithmeticProfile.labelsAtLeast (arithmeticThreshold + 1) : ℚ) *
         Fintype.card Challenge := by
-    have := classifier.agreement_density
+    have hfull := classifier.agreement_density
       (arithmeticThreshold + 1) harithmeticThreshold
-    exact_mod_cast this
+    have hsub : arithmeticTail.card ≤ fullArithmeticTail.card := by
+      apply Finset.card_le_card
+      intro challenge hchallenge
+      exact (Finset.mem_sdiff.mp hchallenge).1
+    have hcast : (profileDenominator : ℚ) * (arithmeticTail.card : ℚ) ≤
+        (profileDenominator : ℚ) * (fullArithmeticTail.card : ℚ) := by
+      gcongr
+    exact hcast.trans (by exact_mod_cast hfull)
   have hunion :
       ((classifier.profiledEscaping failureThreshold arithmeticThreshold).card : ℚ) ≤
         (failureTail.card : ℚ) + (arithmeticTail.card : ℚ) := by

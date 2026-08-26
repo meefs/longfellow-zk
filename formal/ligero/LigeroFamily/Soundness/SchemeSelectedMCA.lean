@@ -103,6 +103,46 @@ def selectedMCARefinedFailureProfile
     else
       (selectedMCAFailureProfile n g d outerLineBound).labelsAtLeast a
 
+/-- Threshold-free pointwise MCA profile.  At every agreement level where
+the observed agreement itself improves the decoding radius, use the proved
+line bound for radius `n - a`; otherwise retain the outer bound.  The exact
+`AgreementProfile.contribution` sum integrates these values directly. -/
+def selectedMCAIntegratedFailureProfile
+    (n e g d outerLineBound : ℕ) (localLineBound : ℕ → ℕ) :
+    AgreementProfile n where
+  labelsAtLeast a :=
+    if n - e ≤ a ∧ a ≤ n then
+      min ((selectedMCAFailureProfile n g d outerLineBound).labelsAtLeast a)
+        ((selectedMCAFailureProfile n g d (localLineBound a)).labelsAtLeast a)
+    else
+      (selectedMCAFailureProfile n g d outerLineBound).labelsAtLeast a
+
+/-- Replace the generic selected-MCA normalization by a common denominator
+and take the sharper direct chord count at full agreement.  Away from `n`
+this is exactly the original profile with numerator and denominator both
+scaled by `fieldSize`; at `n` it is the minimum of that unchanged bound and
+the direct close-direction bound. -/
+def endpointOptimizedProfile (fieldSize g : ℕ)
+    (profile : AgreementProfile n) : AgreementProfile n where
+  labelsAtLeast a :=
+    if a = n then
+      min (fieldSize * profile.labelsAtLeast a)
+        ((g + 1) * (fieldSize - (g + 1)))
+    else
+      fieldSize * profile.labelsAtLeast a
+
+/-- The public threshold-free MCA profile: pointwise radius refinement plus
+the exact full-agreement chord count. -/
+def selectedMCAOptimizedIntegratedFailureProfile
+    (fieldSize n e g d outerLineBound : ℕ) (localLineBound : ℕ → ℕ) :
+    AgreementProfile n :=
+  endpointOptimizedProfile fieldSize g
+    (selectedMCAIntegratedFailureProfile n e g d outerLineBound localLineBound)
+
+/-- Common denominator used by the optimized integrated profile. -/
+def selectedMCAOptimizedFailureDenominator (fieldSize g : ℕ) : ℕ :=
+  fieldSize * (fieldSize - (g + 1))
+
 /-- The selected-MCA failure profile has an exact three-band envelope: the
 global line bound, the largest sharp one-line value, and the final value one. -/
 theorem selectedMCAFailureProfile_contribution_le_three_bands
@@ -209,6 +249,135 @@ theorem exists_directionFar_of_no_gLiftWitness
           intro direction
           exact Classical.not_not.mp fun hdirectionFar ↦
             hfar ⟨direction, hdirectionFar⟩)
+
+/-- At full agreement the generic double-averaging loss is unnecessary.
+Fixing one bad response, subtraction injects every other full-agreement bad
+response into the locally close direction set at that response: the difference
+of the two selected codewords is exactly the corresponding row combination.
+The sharp close-direction count therefore applies directly. -/
+theorem badWeightsAtFullAgreement_card_le
+    (respond : Weights F CheckedMask nw nq → EvaluationRow F r w n)
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (hthree : 3 * g < d - e) (hfield : g + 1 < Fintype.card F) :
+    (badWeightsAtAgreement (C := C) (oracle := oracle)
+      (e := e) (g := g) respond n).card ≤
+      (g + 1) * Fintype.card F ^
+        (Fintype.card (SchemeTestedRow CheckedMask nw nq 1) - 1) := by
+  classical
+  let selected := badWeightsAtAgreement (C := C) (oracle := oracle)
+    (e := e) (g := g) respond n
+  change selected.card ≤
+    (g + 1) * Fintype.card F ^
+      (Fintype.card (SchemeTestedRow CheckedMask nw nq 1) - 1)
+  by_cases hempty : selected = ∅
+  · simp [selected, hempty]
+  · obtain ⟨base, hbase⟩ := Finset.nonempty_iff_ne_empty.mpr hempty
+    have hbaseParts := Finset.mem_filter.mp hbase
+    have hbaseBad := Finset.mem_filter.mp hbaseParts.1 |>.2
+    have hbaseAgreementCard :
+        (schemeProximityAgreement oracle base (respond base)).card = n := by
+      have hle :
+          (schemeProximityAgreement oracle base (respond base)).card ≤ n := by
+        simpa using Finset.card_le_univ
+          (schemeProximityAgreement oracle base (respond base))
+      omega
+    have hbaseAgreement :
+        schemeProximityAgreement oracle base (respond base) = Finset.univ := by
+      apply Finset.eq_univ_of_card
+      simpa using hbaseAgreementCard
+    obtain ⟨farDirection, hfarDirection⟩ :=
+      exists_directionFar_of_no_gLiftWitness
+        (C := C) (oracle := oracle) base (respond base)
+        hbaseBad.1 hbaseBad.2.1 hmin hthree hfield hbaseBad.2.2
+    let close := SelectedMCA.closeCombinationChallengesOn C.baseCode
+      oracle.testedRow
+      (schemeProximityAgreement oracle base (respond base)) g
+    have hcloseCard : close.card ≤
+        (g + 1) * Fintype.card F ^
+          (Fintype.card (SchemeTestedRow CheckedMask nw nq 1) - 1) := by
+      apply SelectedMCA.closeCombinationChallengesOn_card_le_of_direction_far
+        (e := e) C.baseCode oracle.testedRow
+        (schemeProximityAgreement oracle base (respond base)) hmin
+        (direction := farDirection)
+      · have hdisagreement := schemeProximityDisagreement_eq_compl_agreement
+          oracle base (respond base)
+        rw [← hdisagreement]
+        exact hbaseBad.2.1
+      · exact hthree
+      · exact hfarDirection
+    let translate : Weights F CheckedMask nw nq →
+        Weights F CheckedMask nw nq := fun weights ↦ weights - base
+    have htranslate : selected.image translate ⊆ close := by
+      intro direction hdirection
+      obtain ⟨weights, hweights, rfl⟩ := Finset.mem_image.mp hdirection
+      have hweightsParts := Finset.mem_filter.mp hweights
+      have hweightsBad := Finset.mem_filter.mp hweightsParts.1 |>.2
+      have hweightsAgreementCard :
+          (schemeProximityAgreement oracle weights (respond weights)).card = n := by
+        have hle :
+            (schemeProximityAgreement oracle weights (respond weights)).card ≤ n := by
+          simpa using Finset.card_le_univ
+            (schemeProximityAgreement oracle weights (respond weights))
+        omega
+      have hweightsAgreement :
+          schemeProximityAgreement oracle weights (respond weights) =
+            Finset.univ := by
+        apply Finset.eq_univ_of_card
+        simpa using hweightsAgreementCard
+      have hbaseObserved : schemeProximityObserved oracle base =
+          codeword (respond base) := by
+        funext j
+        have hj : j ∈ schemeProximityAgreement oracle base (respond base) := by
+          rw [hbaseAgreement]
+          simp
+        simpa [schemeProximityAgreement, codeword, eq_comm] using hj
+      have hweightsObserved : schemeProximityObserved oracle weights =
+          codeword (respond weights) := by
+        funext j
+        have hj : j ∈
+            schemeProximityAgreement oracle weights (respond weights) := by
+          rw [hweightsAgreement]
+          simp
+        simpa [schemeProximityAgreement, codeword, eq_comm] using hj
+      apply Finset.mem_filter.mpr
+      refine ⟨Finset.mem_univ _, codeword (respond weights) - codeword (respond base),
+        C.baseCode.sub_mem
+          (C.codeword_mem_baseCode hweightsBad.1)
+          (C.codeword_mem_baseCode hbaseBad.1), ?_⟩
+      have hcombination : wordCombination oracle.testedRow (weights - base) =
+          codeword (respond weights) - codeword (respond base) := by
+        rw [← hweightsObserved, ← hbaseObserved]
+        have hsub : weights - base = weights + (-1 : F) • base := by
+          funext row
+          simp [sub_eq_add_neg]
+        rw [hsub, wordCombination_add_smul]
+        have observed_eq (challenge : Weights F CheckedMask nw nq) :
+            schemeProximityObserved oracle challenge =
+              wordCombination oracle.testedRow challenge +
+                oracle.proximityBlind 0 := by
+          funext j
+          simp [schemeProximityObserved, wordCombination_apply]
+        rw [observed_eq weights, observed_eq base]
+        funext j
+        simp [sub_eq_add_neg]
+      dsimp [translate]
+      rw [hcombination, sub_self]
+      simp [supportOn]
+    have hcard : selected.card ≤
+        (g + 1) * Fintype.card F ^
+          (Fintype.card (SchemeTestedRow CheckedMask nw nq 1) - 1) := by
+      calc
+        selected.card = (selected.image translate).card := by
+          symm
+          apply Finset.card_image_of_injective
+          intro first second heq
+          dsimp [translate] at heq
+          exact sub_left_injective heq
+        _ ≤ close.card := Finset.card_le_card htranslate
+        _ ≤ (g + 1) * Fintype.card F ^
+            (Fintype.card (SchemeTestedRow CheckedMask nw nq 1) - 1) :=
+          hcloseCard
+    exact hcard
 
 omit [Fintype F] [DecidableEq F] [DecidableEq CheckedMask]
     [Nonempty (SchemeTestedRow CheckedMask nw nq 1)] in
@@ -662,6 +831,163 @@ theorem badWeightsAtAgreement_density_refined
       exact hlocal
   · simp only [selectedMCARefinedFailureProfile, hcutoff, ↓reduceIte]
     exact houter
+
+/-- Route-agnostic density bound for the agreement-local profile. -/
+theorem badWeightsAtAgreement_density_refinedOfLine
+    {outerBound cutoff localBound : ℕ}
+    (respond : Weights F CheckedMask nw nq → EvaluationRow F r w n)
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : LigeroFamily.RefinedSelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d outerBound cutoff localBound)
+    (a : ℕ) :
+    (Fintype.card F - (g + 1)) *
+        (badWeightsAtAgreement (C := C) (oracle := oracle)
+          (e := e) (g := g) respond a).card ≤
+      (selectedMCARefinedFailureProfile n g d
+        outerBound cutoff localBound).labelsAtLeast a *
+        Fintype.card (Weights F CheckedMask nw nq) := by
+  have houter := badWeightsAtAgreement_density
+    (C := C) (oracle := oracle) respond hmin conditions.outer.line
+      conditions.outer.punctured.punctured_three_radius
+      conditions.outer.punctured.field_large a
+  by_cases hcutoff : cutoff ≤ a
+  · have heq := badWeightsAtAgreement_eq_localRadius
+      (C := C) (oracle := oracle) (e := e) (g := g) respond cutoff a
+      conditions.radius_le_cutoff hcutoff
+    have hlocal := badWeightsAtAgreement_density
+      (C := C) (oracle := oracle) (e := n - cutoff) (g := g)
+      respond hmin conditions.localLine conditions.local_three_radius
+      conditions.outer.punctured.field_large a
+    rw [← heq] at hlocal
+    simp only [selectedMCARefinedFailureProfile, hcutoff, ↓reduceIte]
+    by_cases hle :
+        (selectedMCAFailureProfile n g d outerBound).labelsAtLeast a ≤
+        (selectedMCAFailureProfile n g d localBound).labelsAtLeast a
+    · rw [min_eq_left hle]
+      exact houter
+    · rw [min_eq_right (Nat.le_of_not_ge hle)]
+      exact hlocal
+  · simp only [selectedMCARefinedFailureProfile, hcutoff, ↓reduceIte]
+    exact houter
+
+/-- Threshold-free density theorem.  The local radius is specialized to the
+actual tail level `a`, so the resulting profile can be integrated without an
+arbitrary cutoff. -/
+theorem badWeightsAtAgreement_density_integratedOfLine
+    {outerBound : ℕ} {localBound : ℕ → ℕ}
+    (respond : Weights F CheckedMask nw nq → EvaluationRow F r w n)
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : LigeroFamily.IntegratedSelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d outerBound localBound)
+    (a : ℕ) :
+    (Fintype.card F - (g + 1)) *
+        (badWeightsAtAgreement (C := C) (oracle := oracle)
+          (e := e) (g := g) respond a).card ≤
+      (selectedMCAIntegratedFailureProfile n e g d
+        outerBound localBound).labelsAtLeast a *
+        Fintype.card (Weights F CheckedMask nw nq) := by
+  have houter := badWeightsAtAgreement_density
+    (C := C) (oracle := oracle) respond hmin conditions.outer.line
+      conditions.outer.punctured.punctured_three_radius
+      conditions.outer.punctured.field_large a
+  by_cases hrange : n - e ≤ a ∧ a ≤ n
+  · have heq := badWeightsAtAgreement_eq_localRadius
+      (C := C) (oracle := oracle) (e := e) (g := g) respond a a
+      hrange.1 le_rfl
+    have hlocal := badWeightsAtAgreement_density
+      (C := C) (oracle := oracle) (e := n - a) (g := g)
+      respond hmin (conditions.localLine a hrange.1 hrange.2)
+      (conditions.local_three_radius a hrange.1 hrange.2)
+      conditions.outer.punctured.field_large a
+    rw [← heq] at hlocal
+    simp only [selectedMCAIntegratedFailureProfile, hrange]
+    by_cases hle :
+        (selectedMCAFailureProfile n g d outerBound).labelsAtLeast a ≤
+          (selectedMCAFailureProfile n g d (localBound a)).labelsAtLeast a
+    · rw [min_eq_left hle]
+      exact houter
+    · rw [min_eq_right (Nat.le_of_not_ge hle)]
+      exact hlocal
+  · simp only [selectedMCAIntegratedFailureProfile, hrange, ↓reduceIte]
+    exact houter
+
+/-- Threshold-free selected MCA with the exact full-agreement normalization.
+The common denominator keeps a single `AgreementProfile` while changing no
+tail below full agreement. -/
+theorem badWeightsAtAgreement_density_endpointOptimizedIntegratedOfLine
+    {outerBound : ℕ} {localBound : ℕ → ℕ}
+    (respond : Weights F CheckedMask nw nq → EvaluationRow F r w n)
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (conditions : LigeroFamily.IntegratedSelectedMCALineConditions C.baseCode
+      (Fintype.card F) e g d outerBound localBound)
+    (a : ℕ) :
+    (Fintype.card F * (Fintype.card F - (g + 1))) *
+        (badWeightsAtAgreement (C := C) (oracle := oracle)
+          (e := e) (g := g) respond a).card ≤
+      (endpointOptimizedProfile (Fintype.card F) g
+        (selectedMCAIntegratedFailureProfile n e g d
+          outerBound localBound)).labelsAtLeast a *
+        Fintype.card (Weights F CheckedMask nw nq) := by
+  let q := Fintype.card F
+  let selected := badWeightsAtAgreement (C := C) (oracle := oracle)
+    (e := e) (g := g) respond a
+  let profile := selectedMCAIntegratedFailureProfile n e g d
+    outerBound localBound
+  have hgeneric := badWeightsAtAgreement_density_integratedOfLine
+    (C := C) (oracle := oracle) respond hmin conditions a
+  have hgenericScaled :
+      (q * (q - (g + 1))) * selected.card ≤
+        (q * profile.labelsAtLeast a) *
+          Fintype.card (Weights F CheckedMask nw nq) := by
+    calc
+      (q * (q - (g + 1))) * selected.card =
+          q * ((q - (g + 1)) * selected.card) := by ring
+      _ ≤ q * (profile.labelsAtLeast a *
+          Fintype.card (Weights F CheckedMask nw nq)) :=
+        Nat.mul_le_mul_left q (by simpa [q, selected, profile] using hgeneric)
+      _ = (q * profile.labelsAtLeast a) *
+          Fintype.card (Weights F CheckedMask nw nq) := by ring
+  by_cases ha : a = n
+  · subst a
+    have hfull := badWeightsAtFullAgreement_card_le
+      (C := C) (oracle := oracle) (e := e) (g := g)
+      respond hmin conditions.outer.punctured.punctured_three_radius
+        conditions.outer.punctured.field_large
+    let power := q ^
+      (Fintype.card (SchemeTestedRow CheckedMask nw nq 1) - 1)
+    have hweightsCard :
+        Fintype.card (Weights F CheckedMask nw nq) = q * power := by
+      rw [Fintype.card_fun]
+      have hrowpos : 0 <
+          Fintype.card (SchemeTestedRow CheckedMask nw nq 1) :=
+        Fintype.card_pos
+      rw [show Fintype.card (SchemeTestedRow CheckedMask nw nq 1) =
+          (Fintype.card (SchemeTestedRow CheckedMask nw nq 1) - 1) + 1 by
+        omega, pow_succ]
+      ring
+    have hfullDensity : q * selected.card ≤
+        (g + 1) * Fintype.card (Weights F CheckedMask nw nq) := by
+      calc
+        q * selected.card ≤ q * ((g + 1) * power) :=
+          Nat.mul_le_mul_left q (by simpa [selected, power] using hfull)
+        _ = (g + 1) * Fintype.card
+            (Weights F CheckedMask nw nq) := by rw [hweightsCard]; ring
+    have hfullScaled :
+        (q * (q - (g + 1))) * selected.card ≤
+          ((g + 1) * (q - (g + 1))) *
+            Fintype.card (Weights F CheckedMask nw nq) := by
+      calc
+        (q * (q - (g + 1))) * selected.card =
+            (q - (g + 1)) * (q * selected.card) := by ring
+        _ ≤ (q - (g + 1)) *
+            ((g + 1) * Fintype.card (Weights F CheckedMask nw nq)) :=
+          Nat.mul_le_mul_left _ hfullDensity
+        _ = ((g + 1) * (q - (g + 1))) *
+            Fintype.card (Weights F CheckedMask nw nq) := by ring
+    simpa [endpointOptimizedProfile, q, selected, profile] using
+      (le_min hgenericScaled hfullScaled)
+  · simpa [endpointOptimizedProfile, ha, q, selected, profile] using
+      hgenericScaled
 
 /-- The unprofiled density bound is the zero-agreement specialization of the
 profiled theorem. -/

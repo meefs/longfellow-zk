@@ -1,4 +1,5 @@
 import Merkle.ExtractionROM
+import Mathlib.Data.Rat.Cast.Order
 
 /-!
 # Prefix-fixed Merkle binding
@@ -36,7 +37,7 @@ namespace MH
 
 open RandomOracle
 
-universe uSalt uMsg uDigest uEnc uOut uRun
+universe uSalt uMsg uDigest uEnc uOut uRun uIndex
 
 variable {Salt : Type uSalt} {M : Type uMsg} {D : Type uDigest}
 variable {Enc : Type uEnc} {Out : Type uOut} {RunOut : Type uRun}
@@ -240,6 +241,80 @@ theorem bad_card_le [Fintype D]
     _ = (prefixFuel * (prefixFuel - 1) / 2 + T * (2 * prefixFuel + 1)) *
           (Fintype.card D) ^ (T - 1) := by ring
 
+/-- Probability form of `bad_card_le`, with the exact finite answer-tape
+denominator retained.  Downstream Fiat--Shamir compilers can therefore charge
+prefix binding by invoking this theorem, rather than assuming a binding-error
+formula. -/
+theorem bad_ratio_le [Fintype D]
+    (G : PrefixBindingGame (Out := Out) (RunOut := RunOut) C n T prefixFuel runFuel)
+    (dec : RoleDecoders C)
+    (hprefix : prefixFuel ≤ T) [DecidablePred (G.Bad dec)] :
+    ((Finset.filter (G.Bad dec) Finset.univ).card : ℚ) /
+        Fintype.card (Fin T → D) ≤
+      (((prefixFuel * (prefixFuel - 1) / 2 + T * (2 * prefixFuel + 1)) *
+          (Fintype.card D) ^ (T - 1) : ℕ) : ℚ) /
+        Fintype.card (Fin T → D) := by
+  apply div_le_div_of_nonneg_right
+  · exact_mod_cast G.bad_card_le dec hprefix
+  · exact_mod_cast Nat.zero_le (Fintype.card (Fin T → D))
+
 end PrefixBindingGame
+
+/-! ## Query-dependent openings with one shared commitment prefix -/
+
+/-- A family of later Merkle runs and opening claims sharing one
+root-exposure phase.  The index is typically the typed Fiat--Shamir answer
+tape: challenges may select different openings, but they cannot retroactively
+change the phase from which the committed message is extracted. -/
+structure PrefixBindingFamily [Inhabited D] [DecidableEq Enc]
+    (C : Codec Salt M D Enc) (Index : Type uIndex)
+    (n T prefixFuel runFuel : ℕ) where
+  phase : Tree Enc D Out prefixFuel
+  run : Index → Tree Enc D RunOut runFuel
+  rootOf : Out → D
+  claim : Index → (Fin T → D) → OpeningClaim n Salt M D
+  run_fits : runFuel ≤ T
+  prefix_slots : ∀ index answers,
+    (lazyRun answers default phase []).2.1 <+:
+      runSlots T (run index) answers
+  check_in_run : ∀ index answers qa,
+    qa ∈ ((checkPass C n (claim index answers).I (claim index answers).a
+          (claim index answers).pf (2 * n) fun _ ↦ default).run
+        (runOracle T (run index) answers)).2 →
+      qa ∈ ((run index).run (runOracle T (run index) answers)).2
+
+namespace PrefixBindingFamily
+
+variable [Inhabited D] [Inhabited Salt] [Inhabited M]
+variable [DecidableEq D] [DecidableEq Enc]
+variable {C : Codec Salt M D Enc} {Index : Type uIndex}
+variable {n T prefixFuel runFuel : ℕ}
+
+/-- Every index gives a valid ordinary prefix-binding game. -/
+def game
+    (G : PrefixBindingFamily (Out := Out) (RunOut := RunOut)
+      C Index n T prefixFuel runFuel)
+    (index : Index) :
+    PrefixBindingGame (Out := Out) (RunOut := RunOut)
+      C n T prefixFuel runFuel where
+  phase := G.phase
+  run := G.run index
+  rootOf := G.rootOf
+  claim := G.claim index
+  run_fits := G.run_fits
+  prefix_slots := G.prefix_slots index
+  check_in_run := G.check_in_run index
+
+/-- The extracted total message is independent of which later opening run is
+selected.  This is definitional because `boundMessage` reads only the shared
+phase and shared `rootOf`. -/
+theorem boundMessage_game_eq
+    (G : PrefixBindingFamily (Out := Out) (RunOut := RunOut)
+      C Index n T prefixFuel runFuel)
+    (dec : RoleDecoders C) (first second : Index) (answers : Fin T → D) :
+    (G.game first).boundMessage dec answers =
+      (G.game second).boundMessage dec answers := rfl
+
+end PrefixBindingFamily
 end MH
 end Merkle

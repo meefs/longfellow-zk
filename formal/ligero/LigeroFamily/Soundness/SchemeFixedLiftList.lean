@@ -81,6 +81,80 @@ theorem univ_card_le_listBound
   rw [hmatricesCard] at hbound
   exact hbound
 
+omit [Fintype Equations] [DecidableEq Equations] [DecidableEq CheckedMask] in
+/-- Inside half the minimum distance, the complete fixed interleaved lift
+list is a singleton.  This is the genuine unique-decoding argument: it uses
+the triangle inequality for the two column-error sets and does not replace a
+directional selected-MCA failure theorem. -/
+theorem univ_card_le_one_of_two_mul_radius_lt_distance
+    (C : MultiplicativeCode F r w n)
+    (oracle : SchemeOracle F CheckedMask DirectMask nw nq n 1)
+    (hmin : HasMinimumDistanceAtLeast C.baseCode d)
+    (hunique : 2 * radius < d) :
+    (Finset.univ : Finset (SchemeLiftCandidate C oracle radius)).card ≤ 1 := by
+  rw [Finset.card_le_one_iff]
+  intro first second _hfirst _hsecond
+  apply candidateRows_injective
+  by_contra hne
+  have hdistance : d ≤
+      (matrixErrorCoordinates
+        (schemeLiftCandidateRows first.offset first.row)
+        (schemeLiftCandidateRows second.offset second.row)).card :=
+    CodingTheory.InterleavedJohnson.matrixErrorCoordinates_card_ge_distance
+      C.baseCode hmin
+      (fun row ↦ by
+        cases row with
+        | none => exact C.codeword_mem_baseCode first.offset_mem
+        | some index => exact C.codeword_mem_baseCode (first.row_mem index))
+      (fun row ↦ by
+        cases row with
+        | none => exact C.codeword_mem_baseCode second.offset_mem
+        | some index => exact C.codeword_mem_baseCode (second.row_mem index))
+      hne
+  have hsubset :
+      matrixErrorCoordinates
+          (schemeLiftCandidateRows first.offset first.row)
+          (schemeLiftCandidateRows second.offset second.row) ⊆
+        matrixErrorCoordinates (schemeLiftCommittedRows oracle)
+            (schemeLiftCandidateRows first.offset first.row) ∪
+          matrixErrorCoordinates (schemeLiftCommittedRows oracle)
+            (schemeLiftCandidateRows second.offset second.row) := by
+    intro coordinate hcoordinate
+    have hcoordinate' := Finset.mem_filter.mp hcoordinate
+    obtain ⟨row, hrow⟩ := hcoordinate'.2
+    rw [Finset.mem_union]
+    by_cases hfirst :
+        schemeLiftCommittedRows oracle row coordinate =
+          schemeLiftCandidateRows first.offset first.row row coordinate
+    · right
+      apply Finset.mem_filter.mpr
+      refine ⟨Finset.mem_univ _, row, ?_⟩
+      intro hsecond
+      apply hrow
+      exact hfirst.symm.trans hsecond
+    · left
+      apply Finset.mem_filter.mpr
+      exact ⟨Finset.mem_univ _, row, hfirst⟩
+  have hcard :
+      (matrixErrorCoordinates
+        (schemeLiftCandidateRows first.offset first.row)
+        (schemeLiftCandidateRows second.offset second.row)).card ≤
+        2 * radius := by
+    calc
+      _ ≤ (matrixErrorCoordinates (schemeLiftCommittedRows oracle)
+              (schemeLiftCandidateRows first.offset first.row) ∪
+            matrixErrorCoordinates (schemeLiftCommittedRows oracle)
+              (schemeLiftCandidateRows second.offset second.row)).card :=
+        Finset.card_le_card hsubset
+      _ ≤ (matrixErrorCoordinates (schemeLiftCommittedRows oracle)
+              (schemeLiftCandidateRows first.offset first.row)).card +
+            (matrixErrorCoordinates (schemeLiftCommittedRows oracle)
+              (schemeLiftCandidateRows second.offset second.row)).card :=
+        Finset.card_union_le _ _
+      _ ≤ radius + radius := Nat.add_le_add first.close second.close
+      _ = 2 * radius := by omega
+  omega
+
 end SchemeLiftCandidate
 
 end LigeroFamily

@@ -128,6 +128,535 @@ theorem predictable_selection_ratio_le
     _ = (pairBudget : ℚ) *
           (Fintype.card Y * Fintype.card Z * Fintype.card A) := by ring
 
+/-! ## A predictable stopping coordinate -/
+
+/-- A selected sequence coordinate is predictable when its index is fixed by
+the values strictly before it.  In particular its own answer and all later
+answers cannot influence which coordinate is selected. -/
+def IsPredictableSelector
+    {Y Z A : Type*} {N : ℕ}
+    (select : Y → (Fin (N + 1) → Z × A) → Fin (N + 1)) : Prop :=
+  ∀ y xs ys,
+    (∀ k, k < select y xs → xs k = ys k) → select y ys = select y xs
+
+/-- Optional-stopping count for a single predictable fresh answer.  Even
+though `select` may inspect `Y`, all noise coordinates, and earlier `A`
+answers, the selected `A` is still fresh.  Hence a global `pairBudget` on
+successful `(Y,A)` pairs is paid once, with no factor `N+1`.
+
+The proof deletes the adaptively selected `A` coordinate.  Predictability
+makes the deletion injective: if two deletions selected different indices,
+their prefixes up to the earlier index would agree, forcing the same index. -/
+theorem predictable_stopping_card_le
+    {Y Z A : Type*} [Fintype Y] [Fintype Z] [Fintype A]
+    [DecidableEq Y] [DecidableEq Z] [DecidableEq A]
+    {N : ℕ}
+    (select : Y → (Fin (N + 1) → Z × A) → Fin (N + 1))
+    (hselect : IsPredictableSelector select)
+    (success : Y → A → Prop) [DecidableRel success]
+    (pairBudget : ℕ)
+    (hpairs : (Finset.univ.filter fun pair : Y × A =>
+      success pair.1 pair.2).card ≤ pairBudget) :
+    (Finset.univ.filter fun input : Y × (Fin (N + 1) → Z × A) =>
+      success input.1 (input.2 (select input.1 input.2)).2).card ≤
+      pairBudget * Fintype.card Z ^ (N + 1) * Fintype.card A ^ N := by
+  classical
+  let Seq := Fin (N + 1) → Z × A
+  let Data := (Fin (N + 1) → Z) × (Fin N → A)
+  let pairOf : Y × Seq → Y × A := fun input =>
+    (input.1, (input.2 (select input.1 input.2)).2)
+  let dataOf : Y × Seq → Data := fun input =>
+    ((fun k => (input.2 k).1),
+      fun k => (input.2 ((select input.1 input.2).succAbove k)).2)
+  have hencode : Function.Injective (fun input : Y × Seq =>
+      (pairOf input, dataOf input)) := by
+    rintro ⟨y₁, xs⟩ ⟨y₂, ys⟩ heq
+    have hy : y₁ = y₂ := congrArg (fun value => value.1.1) heq
+    subst y₂
+    let jx := select y₁ xs
+    let jy := select y₁ ys
+    have hz : ∀ k, (xs k).1 = (ys k).1 := by
+      intro k
+      exact congrFun (congrArg (fun value => value.2.1) heq) k
+    have herased : ∀ k, (xs (jx.succAbove k)).2 =
+        (ys (jy.succAbove k)).2 := by
+      intro k
+      exact congrFun (congrArg (fun value => value.2.2) heq) k
+    have hselected : (xs jx).2 = (ys jy).2 :=
+      congrArg (fun value => value.1.2) heq
+    have hprefix_xy (hxy : jx < jy) :
+        ∀ k, k < jx → xs k = ys k := by
+      intro k hk
+      apply Prod.ext (hz k)
+      have hklast : k ≠ Fin.last N := by
+        exact ne_of_lt (hk.trans_le (Fin.le_last jx))
+      let l : Fin N := k.castPred hklast
+      have hx : jx.succAbove l = k := by
+        exact Fin.succAbove_castPred_of_lt jx k hk
+      have hy' : jy.succAbove l = k := by
+        exact Fin.succAbove_castPred_of_lt jy k (hk.trans hxy)
+      simpa [hx, hy'] using herased l
+    have hj : jx = jy := by
+      rcases lt_trichotomy jx jy with hxy | hEq | hyx
+      · have hs := hselect y₁ xs ys (hprefix_xy hxy)
+        exact hs.symm
+      · exact hEq
+      · have hprefix_yx : ∀ k, k < jy → ys k = xs k := by
+          intro k hk
+          apply Prod.ext (hz k).symm
+          have hklast : k ≠ Fin.last N :=
+            ne_of_lt (hk.trans_le (Fin.le_last jy))
+          let l : Fin N := k.castPred hklast
+          have hy' : jy.succAbove l = k := by
+            exact Fin.succAbove_castPred_of_lt jy k hk
+          have hx : jx.succAbove l = k := by
+            exact Fin.succAbove_castPred_of_lt jx k (hk.trans hyx)
+          simpa [hx, hy'] using (herased l).symm
+        have hs := hselect y₁ ys xs hprefix_yx
+        exact hs
+    apply Prod.ext
+    · rfl
+    funext k
+    apply Prod.ext (hz k)
+    by_cases hk : k = jx
+    · subst k
+      simpa [hj] using hselected
+    · obtain ⟨l, hl⟩ := Fin.exists_succAbove_eq hk
+      have := herased l
+      have hl' : jy.succAbove l = k := by rw [← hj]; exact hl
+      rw [hl, hl'] at this
+      exact this
+  let goodPairs : Finset (Y × A) := Finset.univ.filter fun pair =>
+    success pair.1 pair.2
+  calc
+    (Finset.univ.filter fun input : Y × Seq =>
+        success input.1 (input.2 (select input.1 input.2)).2).card
+      ≤ (goodPairs ×ˢ (Finset.univ : Finset Data)).card := by
+        apply Finset.card_le_card_of_injOn
+          (fun input => (pairOf input, dataOf input))
+        · intro input hinput
+          exact Finset.mem_product.mpr
+            ⟨Finset.mem_filter.mpr ⟨Finset.mem_univ _,
+              (Finset.mem_filter.mp hinput).2⟩, Finset.mem_univ _⟩
+        · intro first _ second _ heq
+          exact hencode heq
+    _ = goodPairs.card * Fintype.card Data := by simp
+    _ ≤ pairBudget * Fintype.card Data :=
+      Nat.mul_le_mul_right _ (by simpa [goodPairs] using hpairs)
+    _ = pairBudget * Fintype.card Z ^ (N + 1) * Fintype.card A ^ N := by
+      simp [Data, mul_assoc]
+
+/-- Strategy-dependent optional stopping.  After the predictable coordinate
+is deleted, the success relation may depend on *all* retained data: every
+`Z` coordinate and every unselected `A` coordinate.  A uniform pair bound in
+each such fibre still costs `pairBudget` only once.
+
+This is the form needed by Fiat--Shamir.  Fixing the rest of the oracle tape
+fixes an arbitrary response strategy; the fresh selected answer is the only
+coordinate that the strategy cannot inspect. -/
+theorem predictable_stopping_dependent_card_le
+    {Y Z A : Type*} [Fintype Y] [Fintype Z] [Fintype A]
+    [DecidableEq Y] [DecidableEq Z] [DecidableEq A]
+    {N : ℕ}
+    (select : Y → (Fin (N + 1) → Z × A) → Fin (N + 1))
+    (hselect : IsPredictableSelector select)
+    (success : ((Fin (N + 1) → Z) × (Fin N → A)) → Y → A → Prop)
+    [∀ data, DecidableRel (success data)]
+    (pairBudget : ℕ)
+    (hpairs : ∀ data, (Finset.univ.filter fun pair : Y × A ↦
+      success data pair.1 pair.2).card ≤ pairBudget) :
+    (Finset.univ.filter fun input : Y × (Fin (N + 1) → Z × A) ↦
+      let selected := select input.1 input.2
+      let data := ((fun k ↦ (input.2 k).1),
+        fun k ↦ (input.2 (selected.succAbove k)).2)
+      success data input.1 (input.2 selected).2).card ≤
+      pairBudget * Fintype.card Z ^ (N + 1) * Fintype.card A ^ N := by
+  classical
+  let Seq := Fin (N + 1) → Z × A
+  let Data := (Fin (N + 1) → Z) × (Fin N → A)
+  let pairOf : Y × Seq → Y × A := fun input ↦
+    (input.1, (input.2 (select input.1 input.2)).2)
+  let dataOf : Y × Seq → Data := fun input ↦
+    ((fun k ↦ (input.2 k).1),
+      fun k ↦ (input.2 ((select input.1 input.2).succAbove k)).2)
+  have hencode : Function.Injective (fun input : Y × Seq ↦
+      (dataOf input, pairOf input)) := by
+    rintro ⟨y₁, xs⟩ ⟨y₂, ys⟩ heq
+    have hy : y₁ = y₂ := congrArg (fun value ↦ value.2.1) heq
+    subst y₂
+    let jx := select y₁ xs
+    let jy := select y₁ ys
+    have hz : ∀ k, (xs k).1 = (ys k).1 := by
+      intro k
+      exact congrFun (congrArg (fun value ↦ value.1.1) heq) k
+    have herased : ∀ k, (xs (jx.succAbove k)).2 =
+        (ys (jy.succAbove k)).2 := by
+      intro k
+      exact congrFun (congrArg (fun value ↦ value.1.2) heq) k
+    have hselected : (xs jx).2 = (ys jy).2 :=
+      congrArg (fun value ↦ value.2.2) heq
+    have hprefix_xy (hxy : jx < jy) :
+        ∀ k, k < jx → xs k = ys k := by
+      intro k hk
+      apply Prod.ext (hz k)
+      have hklast : k ≠ Fin.last N := by
+        exact ne_of_lt (hk.trans_le (Fin.le_last jx))
+      let l : Fin N := k.castPred hklast
+      have hx : jx.succAbove l = k := by
+        exact Fin.succAbove_castPred_of_lt jx k hk
+      have hy' : jy.succAbove l = k := by
+        exact Fin.succAbove_castPred_of_lt jy k (hk.trans hxy)
+      simpa [hx, hy'] using herased l
+    have hj : jx = jy := by
+      rcases lt_trichotomy jx jy with hxy | hEq | hyx
+      · exact (hselect y₁ xs ys (hprefix_xy hxy)).symm
+      · exact hEq
+      · have hprefix_yx : ∀ k, k < jy → ys k = xs k := by
+          intro k hk
+          apply Prod.ext (hz k).symm
+          have hklast : k ≠ Fin.last N := by
+            exact ne_of_lt (hk.trans_le (Fin.le_last jy))
+          let l : Fin N := k.castPred hklast
+          have hy' : jy.succAbove l = k := by
+            exact Fin.succAbove_castPred_of_lt jy k hk
+          have hx : jx.succAbove l = k := by
+            exact Fin.succAbove_castPred_of_lt jx k (hk.trans hyx)
+          simpa [hx, hy'] using (herased l).symm
+        exact hselect y₁ ys xs hprefix_yx
+    apply Prod.ext
+    · rfl
+    funext k
+    apply Prod.ext (hz k)
+    by_cases hk : k = jx
+    · subst k
+      simpa [hj] using hselected
+    · obtain ⟨l, hl⟩ := Fin.exists_succAbove_eq hk
+      have he := herased l
+      have hl' : jy.succAbove l = k := by rw [← hj]; exact hl
+      rw [hl, hl'] at he
+      exact he
+  let good : Finset (Data × (Y × A)) := Finset.univ.filter fun value ↦
+    success value.1 value.2.1 value.2.2
+  have hgood : good.card ≤ Fintype.card Data * pairBudget := by
+    rw [show good.card = ∑ data : Data,
+        (Finset.univ.filter fun pair : Y × A ↦
+          success data pair.1 pair.2).card by
+      dsimp [good]
+      rw [card_filter_prod_fst]]
+    calc
+      ∑ data : Data, (Finset.univ.filter fun pair : Y × A ↦
+          success data pair.1 pair.2).card
+        ≤ ∑ _data : Data, pairBudget :=
+          Finset.sum_le_sum fun data _ ↦ hpairs data
+      _ = Fintype.card Data * pairBudget := by simp
+  calc
+    (Finset.univ.filter fun input : Y × Seq ↦
+        success (dataOf input) input.1
+          (input.2 (select input.1 input.2)).2).card
+      ≤ good.card := by
+        apply Finset.card_le_card_of_injOn fun input ↦
+          (dataOf input, pairOf input)
+        · intro input hinput
+          exact Finset.mem_filter.mpr ⟨Finset.mem_univ _,
+            (Finset.mem_filter.mp hinput).2⟩
+        · intro first _ second _ heq
+          exact hencode heq
+    _ ≤ Fintype.card Data * pairBudget := hgood
+    _ = pairBudget * Fintype.card Z ^ (N + 1) * Fintype.card A ^ N := by
+      simp [Data]
+      ring
+
+/-- Predictability restricted to an admissible order branch.  This is the
+correct operational notion for first-occurrence arguments: the H₁-after-H₂
+selector need only be a stopping coordinate on Case B, while the reverse
+selector is used only on Case A. -/
+def IsPredictableSelectorOn
+    {Y Z A : Type*} {N : ℕ}
+    (admissible : Y × (Fin (N + 1) → Z × A) → Prop)
+    (select : Y → (Fin (N + 1) → Z × A) → Fin (N + 1)) : Prop :=
+  ∀ y xs ys, admissible (y, xs) → admissible (y, ys) →
+    (∀ k, k < select y xs → xs k = ys k) → select y ys = select y xs
+
+/-- Fibre-uniform optional stopping on an admissible order branch.  The proof
+is the same deletion injection as the global theorem, but injectivity is
+needed only between admissible successful inputs. -/
+theorem predictable_stopping_dependent_on_card_le
+    {Y Z A : Type*} [Fintype Y] [Fintype Z] [Fintype A]
+    [DecidableEq Y] [DecidableEq Z] [DecidableEq A]
+    {N : ℕ}
+    (select : Y → (Fin (N + 1) → Z × A) → Fin (N + 1))
+    (admissible : Y × (Fin (N + 1) → Z × A) → Prop)
+    [DecidablePred admissible]
+    (hselect : IsPredictableSelectorOn admissible select)
+    (success : ((Fin (N + 1) → Z) × (Fin N → A)) → Y → A → Prop)
+    [∀ data, DecidableRel (success data)]
+    (pairBudget : ℕ)
+    (hpairs : ∀ data, (Finset.univ.filter fun pair : Y × A ↦
+      success data pair.1 pair.2).card ≤ pairBudget) :
+    (Finset.univ.filter fun input : Y × (Fin (N + 1) → Z × A) ↦
+      admissible input ∧
+      let selected := select input.1 input.2
+      let data := ((fun k ↦ (input.2 k).1),
+        fun k ↦ (input.2 (selected.succAbove k)).2)
+      success data input.1 (input.2 selected).2).card ≤
+      pairBudget * Fintype.card Z ^ (N + 1) * Fintype.card A ^ N := by
+  classical
+  let Seq := Fin (N + 1) → Z × A
+  let Data := (Fin (N + 1) → Z) × (Fin N → A)
+  let pairOf : Y × Seq → Y × A := fun input ↦
+    (input.1, (input.2 (select input.1 input.2)).2)
+  let dataOf : Y × Seq → Data := fun input ↦
+    ((fun k ↦ (input.2 k).1),
+      fun k ↦ (input.2 ((select input.1 input.2).succAbove k)).2)
+  let domain : Finset (Y × Seq) := Finset.univ.filter fun input ↦
+    admissible input ∧ success (dataOf input) input.1
+      (input.2 (select input.1 input.2)).2
+  have hencode : Set.InjOn (fun input : Y × Seq ↦
+      (dataOf input, pairOf input)) domain := by
+    intro first hfirst second hsecond heq
+    rcases first with ⟨y₁, xs⟩
+    rcases second with ⟨y₂, ys⟩
+    have hadm₁ : admissible (y₁, xs) :=
+      (Finset.mem_filter.mp hfirst).2.1
+    have hadm₂ : admissible (y₂, ys) :=
+      (Finset.mem_filter.mp hsecond).2.1
+    have hy : y₁ = y₂ := congrArg (fun value ↦ value.2.1) heq
+    subst y₂
+    let jx := select y₁ xs
+    let jy := select y₁ ys
+    have hz : ∀ k, (xs k).1 = (ys k).1 := by
+      intro k
+      exact congrFun (congrArg (fun value ↦ value.1.1) heq) k
+    have herased : ∀ k, (xs (jx.succAbove k)).2 =
+        (ys (jy.succAbove k)).2 := by
+      intro k
+      exact congrFun (congrArg (fun value ↦ value.1.2) heq) k
+    have hselected : (xs jx).2 = (ys jy).2 :=
+      congrArg (fun value ↦ value.2.2) heq
+    have hprefix_xy (hxy : jx < jy) :
+        ∀ k, k < jx → xs k = ys k := by
+      intro k hk
+      apply Prod.ext (hz k)
+      have hklast : k ≠ Fin.last N := by
+        exact ne_of_lt (hk.trans_le (Fin.le_last jx))
+      let l : Fin N := k.castPred hklast
+      have hx : jx.succAbove l = k := by
+        exact Fin.succAbove_castPred_of_lt jx k hk
+      have hy' : jy.succAbove l = k := by
+        exact Fin.succAbove_castPred_of_lt jy k (hk.trans hxy)
+      simpa [hx, hy'] using herased l
+    have hj : jx = jy := by
+      rcases lt_trichotomy jx jy with hxy | hEq | hyx
+      · exact (hselect y₁ xs ys hadm₁ hadm₂ (hprefix_xy hxy)).symm
+      · exact hEq
+      · have hprefix_yx : ∀ k, k < jy → ys k = xs k := by
+          intro k hk
+          apply Prod.ext (hz k).symm
+          have hklast : k ≠ Fin.last N := by
+            exact ne_of_lt (hk.trans_le (Fin.le_last jy))
+          let l : Fin N := k.castPred hklast
+          have hy' : jy.succAbove l = k := by
+            exact Fin.succAbove_castPred_of_lt jy k hk
+          have hx : jx.succAbove l = k := by
+            exact Fin.succAbove_castPred_of_lt jx k (hk.trans hyx)
+          simpa [hx, hy'] using (herased l).symm
+        exact hselect y₁ ys xs hadm₂ hadm₁ hprefix_yx
+    apply Prod.ext
+    · rfl
+    funext k
+    apply Prod.ext (hz k)
+    by_cases hk : k = jx
+    · subst k
+      simpa [hj] using hselected
+    · obtain ⟨l, hl⟩ := Fin.exists_succAbove_eq hk
+      have he := herased l
+      have hl' : jy.succAbove l = k := by rw [← hj]; exact hl
+      rw [hl, hl'] at he
+      exact he
+  let good : Finset (Data × (Y × A)) := Finset.univ.filter fun value ↦
+    success value.1 value.2.1 value.2.2
+  have hgood : good.card ≤ Fintype.card Data * pairBudget := by
+    rw [show good.card = ∑ data : Data,
+        (Finset.univ.filter fun pair : Y × A ↦
+          success data pair.1 pair.2).card by
+      dsimp [good]
+      rw [card_filter_prod_fst]]
+    calc
+      ∑ data : Data, (Finset.univ.filter fun pair : Y × A ↦
+          success data pair.1 pair.2).card
+        ≤ ∑ _data : Data, pairBudget :=
+          Finset.sum_le_sum fun data _ ↦ hpairs data
+      _ = Fintype.card Data * pairBudget := by simp
+  calc
+    domain.card ≤ good.card := by
+      apply Finset.card_le_card_of_injOn
+        (fun input ↦ (dataOf input, pairOf input))
+      · intro input hinput
+        exact Finset.mem_filter.mpr ⟨Finset.mem_univ _,
+          (Finset.mem_filter.mp hinput).2.2⟩
+      · exact hencode
+    _ ≤ Fintype.card Data * pairBudget := hgood
+    _ = pairBudget * Fintype.card Z ^ (N + 1) * Fintype.card A ^ N := by
+      simp [Data]
+      ring
+
+/-- Rational optional-stopping theorem with a strategy-uniform pair density.
+
+This is the exact-density form of `predictable_stopping_dependent_on_card_le`:
+it does not round a rational pair bound to an integer cardinality budget. -/
+theorem predictable_stopping_dependent_on_ratio_le
+    {Y Z A : Type*} [Fintype Y] [Fintype Z] [Fintype A]
+    [DecidableEq Y] [DecidableEq Z] [DecidableEq A]
+    [Nonempty Y] [Nonempty Z] [Nonempty A]
+    {N : ℕ}
+    (select : Y → (Fin (N + 1) → Z × A) → Fin (N + 1))
+    (admissible : Y × (Fin (N + 1) → Z × A) → Prop)
+    [DecidablePred admissible]
+    (hselect : IsPredictableSelectorOn admissible select)
+    (success : ((Fin (N + 1) → Z) × (Fin N → A)) → Y → A → Prop)
+    [∀ data, DecidableRel (success data)]
+    (epsilon : ℚ)
+    (hpairs : ∀ data, ((Finset.univ.filter fun pair : Y × A ↦
+      success data pair.1 pair.2).card : ℚ) /
+        (Fintype.card Y * Fintype.card A) ≤ epsilon) :
+    ((Finset.univ.filter fun input : Y × (Fin (N + 1) → Z × A) ↦
+      admissible input ∧
+      let selected := select input.1 input.2
+      let data := ((fun k ↦ (input.2 k).1),
+        fun k ↦ (input.2 (selected.succAbove k)).2)
+      success data input.1 (input.2 selected).2).card : ℚ) /
+        Fintype.card (Y × (Fin (N + 1) → Z × A)) ≤ epsilon := by
+  classical
+  let Seq := Fin (N + 1) → Z × A
+  let Data := (Fin (N + 1) → Z) × (Fin N → A)
+  let pairOf : Y × Seq → Y × A := fun input ↦
+    (input.1, (input.2 (select input.1 input.2)).2)
+  let dataOf : Y × Seq → Data := fun input ↦
+    ((fun k ↦ (input.2 k).1),
+      fun k ↦ (input.2 ((select input.1 input.2).succAbove k)).2)
+  let domain : Finset (Y × Seq) := Finset.univ.filter fun input ↦
+    admissible input ∧ success (dataOf input) input.1
+      (input.2 (select input.1 input.2)).2
+  have hencode : Set.InjOn (fun input : Y × Seq ↦
+      (dataOf input, pairOf input)) domain := by
+    intro first hfirst second hsecond heq
+    rcases first with ⟨y₁, xs⟩
+    rcases second with ⟨y₂, ys⟩
+    have hadm₁ : admissible (y₁, xs) :=
+      (Finset.mem_filter.mp hfirst).2.1
+    have hadm₂ : admissible (y₂, ys) :=
+      (Finset.mem_filter.mp hsecond).2.1
+    have hy : y₁ = y₂ := congrArg (fun value ↦ value.2.1) heq
+    subst y₂
+    let jx := select y₁ xs
+    let jy := select y₁ ys
+    have hz : ∀ k, (xs k).1 = (ys k).1 := by
+      intro k
+      exact congrFun (congrArg (fun value ↦ value.1.1) heq) k
+    have herased : ∀ k, (xs (jx.succAbove k)).2 =
+        (ys (jy.succAbove k)).2 := by
+      intro k
+      exact congrFun (congrArg (fun value ↦ value.1.2) heq) k
+    have hselected : (xs jx).2 = (ys jy).2 :=
+      congrArg (fun value ↦ value.2.2) heq
+    have hprefix_xy (hxy : jx < jy) :
+        ∀ k, k < jx → xs k = ys k := by
+      intro k hk
+      apply Prod.ext (hz k)
+      have hklast : k ≠ Fin.last N := by
+        exact ne_of_lt (hk.trans_le (Fin.le_last jx))
+      let l : Fin N := k.castPred hklast
+      have hx : jx.succAbove l = k := by
+        exact Fin.succAbove_castPred_of_lt jx k hk
+      have hy' : jy.succAbove l = k := by
+        exact Fin.succAbove_castPred_of_lt jy k (hk.trans hxy)
+      simpa [hx, hy'] using herased l
+    have hj : jx = jy := by
+      rcases lt_trichotomy jx jy with hxy | hEq | hyx
+      · exact (hselect y₁ xs ys hadm₁ hadm₂ (hprefix_xy hxy)).symm
+      · exact hEq
+      · have hprefix_yx : ∀ k, k < jy → ys k = xs k := by
+          intro k hk
+          apply Prod.ext (hz k).symm
+          have hklast : k ≠ Fin.last N := by
+            exact ne_of_lt (hk.trans_le (Fin.le_last jy))
+          let l : Fin N := k.castPred hklast
+          have hy' : jy.succAbove l = k := by
+            exact Fin.succAbove_castPred_of_lt jy k hk
+          have hx : jx.succAbove l = k := by
+            exact Fin.succAbove_castPred_of_lt jx k (hk.trans hyx)
+          simpa [hx, hy'] using (herased l).symm
+        exact hselect y₁ ys xs hadm₂ hadm₁ hprefix_yx
+    apply Prod.ext
+    · rfl
+    funext k
+    apply Prod.ext (hz k)
+    by_cases hk : k = jx
+    · subst k
+      simpa [hj] using hselected
+    · obtain ⟨l, hl⟩ := Fin.exists_succAbove_eq hk
+      have he := herased l
+      have hl' : jy.succAbove l = k := by rw [← hj]; exact hl
+      rw [hl, hl'] at he
+      exact he
+  let good : Finset (Data × (Y × A)) := Finset.univ.filter fun value ↦
+    success value.1 value.2.1 value.2.2
+  have hdomain : domain.card ≤ good.card := by
+    apply Finset.card_le_card_of_injOn
+      (fun input ↦ (dataOf input, pairOf input))
+    · intro input hinput
+      exact Finset.mem_filter.mpr ⟨Finset.mem_univ _,
+        (Finset.mem_filter.mp hinput).2.2⟩
+    · exact hencode
+  have hpairDen : (0 : ℚ) < Fintype.card Y * Fintype.card A := by
+    have hY : 0 < Fintype.card Y := Fintype.card_pos
+    have hA : 0 < Fintype.card A := Fintype.card_pos
+    exact_mod_cast Nat.mul_pos hY hA
+  have hpair (data : Data) :
+      ((Finset.univ.filter fun pair : Y × A ↦
+        success data pair.1 pair.2).card : ℚ) ≤
+          epsilon * (Fintype.card Y * Fintype.card A) :=
+    (div_le_iff₀ hpairDen).mp (hpairs data)
+  have hgoodEq : good.card = ∑ data : Data,
+      (Finset.univ.filter fun pair : Y × A ↦
+        success data pair.1 pair.2).card := by
+    dsimp [good]
+    rw [card_filter_prod_fst]
+  have hgood : (good.card : ℚ) ≤
+      Fintype.card Data *
+        (epsilon * (Fintype.card Y * Fintype.card A)) := by
+    rw [hgoodEq]
+    push_cast
+    calc
+      ∑ data : Data, ((Finset.univ.filter fun pair : Y × A ↦
+          success data pair.1 pair.2).card : ℚ)
+        ≤ ∑ _data : Data,
+            epsilon * (Fintype.card Y * Fintype.card A) :=
+          Finset.sum_le_sum (fun data _ ↦ hpair data)
+      _ = Fintype.card Data *
+          (epsilon * (Fintype.card Y * Fintype.card A)) := by simp
+  have htotal : (0 : ℚ) <
+      Fintype.card (Y × (Fin (N + 1) → Z × A)) := by
+    exact_mod_cast Fintype.card_pos
+  rw [div_le_iff₀ htotal]
+  calc
+    ((Finset.univ.filter fun input : Y × (Fin (N + 1) → Z × A) ↦
+        admissible input ∧
+        let selected := select input.1 input.2
+        let data := ((fun k ↦ (input.2 k).1),
+          fun k ↦ (input.2 (selected.succAbove k)).2)
+        success data input.1 (input.2 selected).2).card : ℚ)
+      ≤ (good.card : ℚ) := by
+        exact_mod_cast hdomain
+    _ ≤ Fintype.card Data *
+        (epsilon * (Fintype.card Y * Fintype.card A)) := hgood
+    _ = epsilon *
+        Fintype.card (Y × (Fin (N + 1) → Z × A)) := by
+      simp only [Data, Fintype.card_prod, Fintype.card_fun,
+        Fintype.card_fin, Nat.cast_mul, Nat.cast_pow]
+      rw [mul_pow]
+      ring
+
 /-! ## Ligero's alpha-last incidence count -/
 
 /-- Count the independent `(querySet, alpha)` pairs for which the query set
@@ -184,6 +713,60 @@ theorem alpha_last_pair_card_le
     _ ≤ Fintype.card A * goodCap.choose r +
           badCount * absoluteCap.choose r := by gcongr
 
+/-- Tight alpha-last incidence count.  Exceptional alphas pay only the
+*increment* from the good cap to the absolute cap; the common good baseline
+is not charged a second time. -/
+theorem alpha_last_pair_card_le_tight
+    {A : Type*} [Fintype A] [DecidableEq A]
+    {n r goodCap absoluteCap badCount : ℕ}
+    (bad : Finset A) (allowed : A → Finset (Fin n))
+    (hbad : bad.card ≤ badCount)
+    (hgood : ∀ alpha ∉ bad, (allowed alpha).card ≤ goodCap)
+    (habsolute : ∀ alpha, (allowed alpha).card ≤ absoluteCap)
+    (hcaps : goodCap ≤ absoluteCap) :
+    (Finset.filter (fun p : LigeroFamily.QuerySet n r × A ↦
+        p.1.coordinates ⊆ allowed p.2) Finset.univ).card ≤
+      Fintype.card A * goodCap.choose r +
+        badCount * (absoluteCap.choose r - goodCap.choose r) := by
+  classical
+  have hchoose : goodCap.choose r ≤ absoluteCap.choose r :=
+    Nat.choose_le_choose r hcaps
+  rw [card_filter_prod_snd]
+  calc
+    ∑ alpha : A, (Finset.filter (fun query : LigeroFamily.QuerySet n r ↦
+          query.coordinates ⊆ allowed alpha) Finset.univ).card
+      ≤ ∑ alpha : A, (goodCap.choose r +
+          if alpha ∈ bad then absoluteCap.choose r - goodCap.choose r else 0) := by
+        apply Finset.sum_le_sum
+        intro alpha _
+        by_cases ha : alpha ∈ bad
+        · calc
+            (Finset.filter (fun query : LigeroFamily.QuerySet n r ↦
+                query.coordinates ⊆ allowed alpha) Finset.univ).card
+                = (LigeroFamily.queriesWithin (r := r) (allowed alpha)).card := rfl
+            _ ≤ absoluteCap.choose r :=
+                LigeroFamily.card_queriesWithin_le (allowed alpha) (habsolute alpha)
+            _ = goodCap.choose r +
+                (absoluteCap.choose r - goodCap.choose r) := by omega
+            _ = goodCap.choose r +
+                (if alpha ∈ bad then
+                  absoluteCap.choose r - goodCap.choose r else 0) := by simp [ha]
+        · calc
+            (Finset.filter (fun query : LigeroFamily.QuerySet n r ↦
+                query.coordinates ⊆ allowed alpha) Finset.univ).card
+                = (LigeroFamily.queriesWithin (r := r) (allowed alpha)).card := rfl
+            _ ≤ goodCap.choose r :=
+                LigeroFamily.card_queriesWithin_le (allowed alpha) (hgood alpha ha)
+            _ ≤ goodCap.choose r +
+                (if alpha ∈ bad then
+                  absoluteCap.choose r - goodCap.choose r else 0) := by simp [ha]
+    _ = Fintype.card A * goodCap.choose r +
+          bad.card * (absoluteCap.choose r - goodCap.choose r) := by
+        rw [Finset.sum_add_distrib]
+        simp [Finset.sum_const]
+    _ ≤ Fintype.card A * goodCap.choose r +
+          badCount * (absoluteCap.choose r - goodCap.choose r) := by gcongr
+
 /-- Alpha-last with the adaptive continuation included.  This is the exact
 composition of `alpha_last_pair_card_le` and
 `predictable_selection_card_le`; in particular `occurs` may select on the
@@ -226,8 +809,54 @@ theorem alpha_last_predictable_card_le
         intro query _
         simp [Finset.sum_const]
     _ ≤ Fintype.card Z *
-          (Fintype.card A * goodCap.choose r + badCount * absoluteCap.choose r) :=
-        Nat.mul_le_mul_left _ hpairs
+        (Fintype.card A * goodCap.choose r + badCount * absoluteCap.choose r) :=
+      Nat.mul_le_mul_left _ hpairs
+
+/-- Predictable alpha-last count with the tight exceptional increment. -/
+theorem alpha_last_predictable_card_le_tight
+    {A Z : Type*} [Fintype A] [Fintype Z] [DecidableEq A] [DecidableEq Z]
+    {n r goodCap absoluteCap badCount : ℕ}
+    (bad : Finset A) (allowed : A → Finset (Fin n))
+    (occurs : LigeroFamily.QuerySet n r → Z → Prop)
+    (hbad : bad.card ≤ badCount)
+    (hgood : ∀ alpha ∉ bad, (allowed alpha).card ≤ goodCap)
+    (habsolute : ∀ alpha, (allowed alpha).card ≤ absoluteCap)
+    (hcaps : goodCap ≤ absoluteCap) :
+    (Finset.filter (fun p : (LigeroFamily.QuerySet n r × Z) × A ↦
+        occurs p.1.1 p.1.2 ∧ p.1.1.coordinates ⊆ allowed p.2)
+      Finset.univ).card ≤
+      Fintype.card Z *
+        (Fintype.card A * goodCap.choose r +
+          badCount * (absoluteCap.choose r - goodCap.choose r)) := by
+  classical
+  have hpairs := alpha_last_pair_card_le_tight (r := r) bad allowed
+    hbad hgood habsolute hcaps
+  rw [card_filter_prod_fst] at hpairs ⊢
+  calc
+    ∑ qz : LigeroFamily.QuerySet n r × Z,
+        (Finset.filter (fun alpha : A ↦
+          occurs qz.1 qz.2 ∧ qz.1.coordinates ⊆ allowed alpha) Finset.univ).card
+      ≤ ∑ qz : LigeroFamily.QuerySet n r × Z,
+          (Finset.filter (fun alpha : A ↦
+            qz.1.coordinates ⊆ allowed alpha) Finset.univ).card := by
+        apply Finset.sum_le_sum
+        intro qz _
+        apply Finset.card_le_card
+        intro alpha ha
+        simp only [Finset.mem_filter, Finset.mem_univ, true_and] at ha ⊢
+        exact ha.2
+    _ = Fintype.card Z * ∑ query : LigeroFamily.QuerySet n r,
+          (Finset.filter (fun alpha : A ↦
+            query.coordinates ⊆ allowed alpha) Finset.univ).card := by
+        simp only [Fintype.sum_prod_type]
+        rw [Finset.mul_sum]
+        apply Finset.sum_congr rfl
+        intro query _
+        simp [Finset.sum_const]
+    _ ≤ Fintype.card Z *
+        (Fintype.card A * goodCap.choose r +
+          badCount * (absoluteCap.choose r - goodCap.choose r)) :=
+      Nat.mul_le_mul_left _ hpairs
 
 /-! ## Query-slot attribution and the compiler union bound -/
 
@@ -281,6 +910,20 @@ namespace FirstOccurrenceTrace
 variable {Ω Query : Type*} [Fintype Ω] [BEq Query] [LawfulBEq Query]
 variable {querySlots : ℕ}
 
+/-- Pull a first-occurrence trace back along a deterministic map of sample
+spaces.  This is used to add independent Merkle randomness without changing
+the two Fiat--Shamir defining queries or their order. -/
+def comap {Ω' : Type*}
+    (F : FirstOccurrenceTrace Ω Query querySlots) (f : Ω' → Ω) :
+    FirstOccurrenceTrace Ω' Query querySlots where
+  trace ω := F.trace (f ω)
+  alphaQuery ω := F.alphaQuery (f ω)
+  subsetQuery ω := F.subsetQuery (f ω)
+  alpha_mem ω := F.alpha_mem (f ω)
+  subset_mem ω := F.subset_mem (f ω)
+  separated ω := F.separated (f ω)
+  trace_length ω := F.trace_length (f ω)
+
 /-- Case A: `H₁` occurred first.  The caller partitions query success into a
 canonical floor-sized baseline and a high-agreement excess.  Baseline
 executions are charged to the first `H₂` slot, where the subset answer is
@@ -331,6 +974,51 @@ omit [Fintype Ω] in
 theorem alpha_idx_lt (F : FirstOccurrenceTrace Ω Query querySlots) (ω : Ω) :
     (F.trace ω).idxOf (F.alphaQuery ω) < querySlots :=
   lt_of_lt_of_le (List.idxOf_lt_length_of_mem (F.alpha_mem ω)) (F.trace_length ω)
+
+/-- The actual first-occurrence slot of the defining batching query. -/
+def alphaSlot (F : FirstOccurrenceTrace Ω Query querySlots) (ω : Ω) :
+    Fin querySlots :=
+  ⟨(F.trace ω).idxOf (F.alphaQuery ω), F.alpha_idx_lt ω⟩
+
+/-- The actual first-occurrence slot of the defining subset query. -/
+def subsetSlot (F : FirstOccurrenceTrace Ω Query querySlots) (ω : Ω) :
+    Fin querySlots :=
+  ⟨(F.trace ω).idxOf (F.subsetQuery ω), F.subset_idx_lt ω⟩
+
+omit [Fintype Ω] in
+theorem alphaSlot_ne_subsetSlot
+    (F : FirstOccurrenceTrace Ω Query querySlots) (ω : Ω) :
+    F.alphaSlot ω ≠ F.subsetSlot ω := by
+  intro heq
+  exact F.idxOf_ne ω (Fin.ext_iff.mp heq)
+
+omit [Fintype Ω] in
+theorem subsetSlot_eq_of_caseB
+    (F : FirstOccurrenceTrace Ω Query querySlots)
+    (win bindBreak : Ω → Prop) (i : Fin querySlots) (ω : Ω)
+    (hcase : F.caseB win bindBreak i ω) :
+    F.subsetSlot ω = i := by
+  exact Fin.ext hcase.2.2.1
+
+omit [Fintype Ω] in
+theorem alphaSlot_eq_of_caseA_listed
+    (F : FirstOccurrenceTrace Ω Query querySlots)
+    (listed win bindBreak : Ω → Prop) (i : Fin querySlots) (ω : Ω)
+    (hcase : F.caseA listed win bindBreak i ω) (hlisted : listed ω) :
+    F.alphaSlot ω = i := by
+  rcases hcase.2.2.2 with hfloor | hexcess
+  · exact absurd hlisted hfloor.1
+  · exact Fin.ext hexcess.2
+
+omit [Fintype Ω] in
+theorem subsetSlot_eq_of_caseA_floor
+    (F : FirstOccurrenceTrace Ω Query querySlots)
+    (listed win bindBreak : Ω → Prop) (i : Fin querySlots) (ω : Ω)
+    (hcase : F.caseA listed win bindBreak i ω) (hunlisted : ¬listed ω) :
+    F.subsetSlot ω = i := by
+  rcases hcase.2.2.2 with hfloor | hexcess
+  · exact Fin.ext hfloor.2
+  · exact absurd hexcess.1 hunlisted
 
 /-- Build the compiler attribution from the canonical first-occurrence
 partition.  The only remaining inputs are the three event counts: the
@@ -575,6 +1263,380 @@ theorem rom_compiler_ratio_le [Nonempty Ω] (R : RigidAttribution Ω querySlots)
     (by exact_mod_cast R.rom_compiler_card_le) (le_of_lt hΩ)
 
 end RigidAttribution
+
+/-! ## Tight first-occurrence ledger
+
+The original compatibility ledger stores Case-A floor and Case B separately,
+which necessarily adds their two query-cover baselines.  Operationally both
+are charged to the same fresh `H₂` slot and are disjoint prefix cases, so a
+tight theorem stores their union as one subset-slot event. -/
+
+structure TightRigidAttribution (Ω : Type*) (querySlots : ℕ) [Fintype Ω] where
+  win : Ω → Prop
+  bindBreak : Ω → Prop
+  subsetCase : Fin querySlots → Ω → Prop
+  listedCase : Fin querySlots → Ω → Prop
+  bindBudget : ℕ
+  subsetBudget : ℕ
+  listedBudget : ℕ
+  cover : ∀ ω, win ω → bindBreak ω ∨
+    (∃ i, subsetCase i ω) ∨ (∃ i, listedCase i ω)
+  bind_card : (Finset.filter bindBreak Finset.univ).card ≤ bindBudget
+  subset_card : ∀ i,
+    (Finset.filter (subsetCase i) Finset.univ).card ≤ subsetBudget
+  listed_card : ∀ i,
+    (Finset.filter (listedCase i) Finset.univ).card ≤ listedBudget
+
+namespace FirstOccurrenceTrace
+
+variable {Ω Query : Type*} [Fintype Ω] [BEq Query] [LawfulBEq Query]
+variable {querySlots : ℕ}
+
+/-- Tight operational adapter.  Case-A floor and Case B are combined before
+counting because both are charged to the defining subset-query slot; listed
+Case A alone is charged to the defining alpha-query slot. -/
+def toTightRigidAttribution
+    (F : FirstOccurrenceTrace Ω Query querySlots)
+    (listed win bindBreak : Ω → Prop)
+    (bindBudget subsetBudget listedBudget : ℕ)
+    (hbind : (Finset.filter bindBreak Finset.univ).card ≤ bindBudget)
+    (hsubset : ∀ i, (Finset.filter (fun ω =>
+      (F.caseA listed win bindBreak i ω ∧ ¬listed ω) ∨
+        F.caseB win bindBreak i ω) Finset.univ).card ≤ subsetBudget)
+    (hlisted : ∀ i, (Finset.filter (fun ω =>
+      F.caseA listed win bindBreak i ω ∧ listed ω)
+      Finset.univ).card ≤ listedBudget) :
+    TightRigidAttribution Ω querySlots where
+  win := win
+  bindBreak := bindBreak
+  subsetCase i ω :=
+    (F.caseA listed win bindBreak i ω ∧ ¬listed ω) ∨
+      F.caseB win bindBreak i ω
+  listedCase i ω := F.caseA listed win bindBreak i ω ∧ listed ω
+  bindBudget := bindBudget
+  subsetBudget := subsetBudget
+  listedBudget := listedBudget
+  cover ω hwin := by
+    by_cases hbindω : bindBreak ω
+    · exact Or.inl hbindω
+    right
+    rcases lt_or_gt_of_ne (F.idxOf_ne ω) with hbefore | hafter
+    · by_cases hlistedω : listed ω
+      · right
+        let i : Fin querySlots := F.alphaSlot ω
+        exact ⟨i, ⟨hwin, hbindω, hbefore,
+          Or.inr ⟨hlistedω, rfl⟩⟩, hlistedω⟩
+      · left
+        let i : Fin querySlots := F.subsetSlot ω
+        exact ⟨i, Or.inl ⟨⟨hwin, hbindω, hbefore,
+          Or.inl ⟨hlistedω, rfl⟩⟩, hlistedω⟩⟩
+    · left
+      let i : Fin querySlots := F.subsetSlot ω
+      exact ⟨i, Or.inr ⟨hwin, hbindω, rfl, hafter⟩⟩
+  bind_card := hbind
+  subset_card := by
+    intro i
+    convert hsubset i using 1
+    congr 1
+    ext ω
+    simp
+  listed_card := by
+    intro i
+    convert hlisted i using 1
+    congr 1
+    ext ω
+    simp
+
+end FirstOccurrenceTrace
+
+namespace TightRigidAttribution
+
+variable {Ω : Type*} [Fintype Ω] {querySlots : ℕ}
+
+/-- Tight ROM union: one outer first-occurrence factor, with the two H₂ order
+branches already combined before their common baseline is charged. -/
+theorem rom_compiler_card_le (R : TightRigidAttribution Ω querySlots) :
+    (Finset.filter R.win Finset.univ).card ≤
+      R.bindBudget + querySlots * (R.subsetBudget + R.listedBudget) := by
+  classical
+  let subsets : Finset Ω := Finset.biUnion Finset.univ
+    (fun i => Finset.filter (R.subsetCase i) Finset.univ)
+  let listed : Finset Ω := Finset.biUnion Finset.univ
+    (fun i => Finset.filter (R.listedCase i) Finset.univ)
+  calc
+    (Finset.filter R.win Finset.univ).card ≤
+        ((Finset.filter R.bindBreak Finset.univ ∪ subsets) ∪ listed).card := by
+      apply Finset.card_le_card
+      intro ω hω
+      rcases R.cover ω (Finset.mem_filter.mp hω).2 with hbind | hsubset | hlisted
+      · exact Finset.mem_union_left _
+          (Finset.mem_union_left _ (Finset.mem_filter.mpr ⟨Finset.mem_univ _, hbind⟩))
+      · obtain ⟨i, hi⟩ := hsubset
+        exact Finset.mem_union_left _ (Finset.mem_union_right _
+          (Finset.mem_biUnion.mpr ⟨i, Finset.mem_univ _,
+            Finset.mem_filter.mpr ⟨Finset.mem_univ _, hi⟩⟩))
+      · obtain ⟨i, hi⟩ := hlisted
+        exact Finset.mem_union_right _
+          (Finset.mem_biUnion.mpr ⟨i, Finset.mem_univ _,
+            Finset.mem_filter.mpr ⟨Finset.mem_univ _, hi⟩⟩)
+    _ ≤ (Finset.filter R.bindBreak Finset.univ).card +
+          subsets.card + listed.card := by
+      exact (Finset.card_union_le _ _).trans
+        (Nat.add_le_add_right (Finset.card_union_le _ _) _)
+    _ ≤ R.bindBudget + querySlots * R.subsetBudget +
+          querySlots * R.listedBudget := by
+      apply Nat.add_le_add
+      · exact Nat.add_le_add R.bind_card (by
+          calc
+            subsets.card ≤ ∑ i ∈ Finset.univ,
+                (Finset.filter (R.subsetCase i) Finset.univ).card :=
+              Finset.card_biUnion_le
+            _ ≤ ∑ _i : Fin querySlots, R.subsetBudget :=
+              Finset.sum_le_sum fun i _ => R.subset_card i
+            _ = querySlots * R.subsetBudget := by simp)
+      · calc
+          listed.card ≤ ∑ i ∈ Finset.univ,
+              (Finset.filter (R.listedCase i) Finset.univ).card :=
+            Finset.card_biUnion_le
+          _ ≤ ∑ _i : Fin querySlots, R.listedBudget :=
+            Finset.sum_le_sum fun i _ => R.listed_card i
+          _ = querySlots * R.listedBudget := by simp
+    _ = R.bindBudget + querySlots * (R.subsetBudget + R.listedBudget) := by ring
+
+end TightRigidAttribution
+
+/-! ## Fully unified query-slot ledger
+
+At a fixed lazy-sampling slot, the query's domain is determined before its
+answer is read.  Hence the H₁-charged and H₂-charged branches are a
+prefix-measurable case split, not two independent bad events.  A tight
+protocol proof supplies one bound for their union and pays it once. -/
+
+structure UnifiedRigidAttribution (Ω : Type*) (querySlots : ℕ) [Fintype Ω] where
+  win : Ω → Prop
+  bindBreak : Ω → Prop
+  queryCase : Fin querySlots → Ω → Prop
+  bindBudget : ℕ
+  queryBudget : ℕ
+  cover : ∀ ω, win ω → bindBreak ω ∨ ∃ i, queryCase i ω
+  bind_card : (Finset.filter bindBreak Finset.univ).card ≤ bindBudget
+  query_card : ∀ i,
+    (Finset.filter (queryCase i) Finset.univ).card ≤ queryBudget
+
+namespace FirstOccurrenceTrace
+
+variable {Ω Query : Type*} [Fintype Ω] [BEq Query] [LawfulBEq Query]
+variable {querySlots : ℕ}
+
+/-- Canonical first-occurrence adapter with all three order/response branches
+combined before counting. -/
+def toUnifiedRigidAttribution
+    (F : FirstOccurrenceTrace Ω Query querySlots)
+    (listed win bindBreak : Ω → Prop)
+    (bindBudget queryBudget : ℕ)
+    (hbind : (Finset.filter bindBreak Finset.univ).card ≤ bindBudget)
+    (hquery : ∀ i, (Finset.filter (fun ω ↦
+      F.caseA listed win bindBreak i ω ∨
+        F.caseB win bindBreak i ω) Finset.univ).card ≤ queryBudget) :
+    UnifiedRigidAttribution Ω querySlots where
+  win := win
+  bindBreak := bindBreak
+  queryCase i ω := F.caseA listed win bindBreak i ω ∨
+    F.caseB win bindBreak i ω
+  bindBudget := bindBudget
+  queryBudget := queryBudget
+  cover ω hwin := by
+    by_cases hbindω : bindBreak ω
+    · exact Or.inl hbindω
+    right
+    rcases lt_or_gt_of_ne (F.idxOf_ne ω) with hbefore | hafter
+    · by_cases hlisted : listed ω
+      · exact ⟨F.alphaSlot ω, Or.inl
+          ⟨hwin, hbindω, hbefore, Or.inr ⟨hlisted, rfl⟩⟩⟩
+      · exact ⟨F.subsetSlot ω, Or.inl
+          ⟨hwin, hbindω, hbefore, Or.inl ⟨hlisted, rfl⟩⟩⟩
+    · exact ⟨F.subsetSlot ω, Or.inr ⟨hwin, hbindω, rfl, hafter⟩⟩
+  bind_card := hbind
+  query_card := by
+    intro i
+    convert hquery i using 1
+    congr 1
+    ext ω
+    simp
+
+end FirstOccurrenceTrace
+
+namespace UnifiedRigidAttribution
+
+variable {Ω : Type*} [Fintype Ω] {querySlots : ℕ}
+
+/-- Fully tight outer ROM union: binding once, then one unified budget for
+each possible first-occurrence slot. -/
+theorem rom_compiler_card_le (R : UnifiedRigidAttribution Ω querySlots) :
+    (Finset.filter R.win Finset.univ).card ≤
+      R.bindBudget + querySlots * R.queryBudget := by
+  classical
+  let cases : Finset Ω := Finset.biUnion Finset.univ
+    (fun i ↦ Finset.filter (R.queryCase i) Finset.univ)
+  calc
+    (Finset.filter R.win Finset.univ).card ≤
+        (Finset.filter R.bindBreak Finset.univ ∪ cases).card := by
+      apply Finset.card_le_card
+      intro ω hω
+      rcases R.cover ω (Finset.mem_filter.mp hω).2 with hbind | hcase
+      · exact Finset.mem_union_left _
+          (Finset.mem_filter.mpr ⟨Finset.mem_univ _, hbind⟩)
+      · obtain ⟨i, hi⟩ := hcase
+        exact Finset.mem_union_right _
+          (Finset.mem_biUnion.mpr ⟨i, Finset.mem_univ _,
+            Finset.mem_filter.mpr ⟨Finset.mem_univ _, hi⟩⟩)
+    _ ≤ (Finset.filter R.bindBreak Finset.univ).card + cases.card :=
+      Finset.card_union_le _ _
+    _ ≤ R.bindBudget + querySlots * R.queryBudget := by
+      apply Nat.add_le_add R.bind_card
+      calc
+        cases.card ≤ ∑ i ∈ Finset.univ,
+            (Finset.filter (R.queryCase i) Finset.univ).card :=
+          Finset.card_biUnion_le
+        _ ≤ ∑ _i : Fin querySlots, R.queryBudget :=
+          Finset.sum_le_sum fun i _ ↦ R.query_card i
+        _ = querySlots * R.queryBudget := by simp
+
+theorem rom_compiler_ratio_le [Nonempty Ω]
+    (R : UnifiedRigidAttribution Ω querySlots) :
+    ((Finset.filter R.win Finset.univ).card : ℚ) / Fintype.card Ω ≤
+      (R.bindBudget + querySlots * R.queryBudget : ℕ) /
+        (Fintype.card Ω : ℚ) := by
+  have hΩ : (0 : ℚ) < Fintype.card Ω := by exact_mod_cast Fintype.card_pos
+  exact div_le_div_of_nonneg_right
+    (by exact_mod_cast R.rom_compiler_card_le) hΩ.le
+
+end UnifiedRigidAttribution
+
+/-! ## Exact-density unified query-slot ledger -/
+
+/-- Rational form of the unified ledger.  It accepts exact per-slot densities,
+so profile integrals need not be rounded to natural cardinality budgets. -/
+structure UnifiedRigidRatioAttribution
+    (Ω : Type*) (querySlots : ℕ) [Fintype Ω] where
+  winSet : Finset Ω
+  bindSet : Finset Ω
+  querySet : Fin querySlots → Finset Ω
+  bindEpsilon : ℚ
+  queryEpsilon : ℚ
+  cover : ∀ ω ∈ winSet, ω ∈ bindSet ∨ ∃ i, ω ∈ querySet i
+  bind_ratio : (bindSet.card : ℚ) / Fintype.card Ω ≤ bindEpsilon
+  query_ratio : ∀ i, ((querySet i).card : ℚ) /
+    Fintype.card Ω ≤ queryEpsilon
+
+namespace FirstOccurrenceTrace
+
+variable {Ω Query : Type*} [Fintype Ω] [BEq Query] [LawfulBEq Query]
+variable {querySlots : ℕ}
+
+/-- Canonical first-occurrence adapter for exact per-slot densities. -/
+def toUnifiedRigidRatioAttribution [Nonempty Ω]
+    (F : FirstOccurrenceTrace Ω Query querySlots)
+    (listed win bindBreak : Ω → Prop)
+    (queryCase : Fin querySlots → Ω → Prop)
+    (winSet bindSet : Finset Ω) (querySet : Fin querySlots → Finset Ω)
+    (hwinSet : ∀ ω, ω ∈ winSet ↔ win ω)
+    (hbindSet : ∀ ω, ω ∈ bindSet ↔ bindBreak ω)
+    (hquerySet : ∀ i ω, ω ∈ querySet i ↔ queryCase i ω)
+    (hcase : ∀ i ω, queryCase i ω ↔
+      F.caseA listed win bindBreak i ω ∨ F.caseB win bindBreak i ω)
+    (bindEpsilon queryEpsilon : ℚ)
+    (hbind : (bindSet.card : ℚ) / Fintype.card Ω ≤ bindEpsilon)
+    (hquery : ∀ i, ((querySet i).card : ℚ) /
+      Fintype.card Ω ≤ queryEpsilon) :
+    UnifiedRigidRatioAttribution Ω querySlots where
+  winSet := winSet
+  bindSet := bindSet
+  querySet := querySet
+  bindEpsilon := bindEpsilon
+  queryEpsilon := queryEpsilon
+  cover ω hω := by
+    have hwin := (hwinSet ω).1 hω
+    by_cases hbindω : bindBreak ω
+    · exact Or.inl ((hbindSet ω).2 hbindω)
+    right
+    rcases lt_or_gt_of_ne (F.idxOf_ne ω) with hbefore | hafter
+    · by_cases hlisted : listed ω
+      · exact ⟨F.alphaSlot ω, (hquerySet (F.alphaSlot ω) ω).2
+          ((hcase (F.alphaSlot ω) ω).2 (Or.inl
+            ⟨hwin, hbindω, hbefore, Or.inr ⟨hlisted, rfl⟩⟩))⟩
+      · exact ⟨F.subsetSlot ω, (hquerySet (F.subsetSlot ω) ω).2
+          ((hcase (F.subsetSlot ω) ω).2 (Or.inl
+            ⟨hwin, hbindω, hbefore, Or.inl ⟨hlisted, rfl⟩⟩))⟩
+    · exact ⟨F.subsetSlot ω, (hquerySet (F.subsetSlot ω) ω).2
+        ((hcase (F.subsetSlot ω) ω).2
+          (Or.inr ⟨hwin, hbindω, rfl, hafter⟩))⟩
+  bind_ratio := hbind
+  query_ratio := hquery
+
+end FirstOccurrenceTrace
+
+namespace UnifiedRigidRatioAttribution
+
+variable {Ω : Type*} [Fintype Ω] [Nonempty Ω] {querySlots : ℕ}
+
+/-- Exact rational ROM union: binding once and one unified A/B density per
+possible first-occurrence slot. -/
+theorem rom_compiler_ratio_le
+    (R : UnifiedRigidRatioAttribution Ω querySlots) :
+    (R.winSet.card : ℚ) / Fintype.card Ω ≤
+      R.bindEpsilon + querySlots * R.queryEpsilon := by
+  classical
+  let cases : Finset Ω := Finset.biUnion Finset.univ
+    (fun i ↦ R.querySet i)
+  have hcover : R.winSet.card ≤ R.bindSet.card + cases.card := by
+    calc
+      R.winSet.card ≤ (R.bindSet ∪ cases).card := by
+        apply Finset.card_le_card
+        intro ω hω
+        rcases R.cover ω hω with hbind | ⟨i, hi⟩
+        · exact Finset.mem_union_left _ hbind
+        · exact Finset.mem_union_right _
+            (Finset.mem_biUnion.mpr ⟨i, Finset.mem_univ _, hi⟩)
+      _ ≤ R.bindSet.card + cases.card :=
+        Finset.card_union_le _ _
+  have hcases : ((cases.card : ℚ) / Fintype.card Ω) ≤
+      querySlots * R.queryEpsilon := by
+    have hcard : cases.card ≤ ∑ i : Fin querySlots,
+        (R.querySet i).card := by
+      exact Finset.card_biUnion_le
+    have hΩ : (0 : ℚ) < Fintype.card Ω := by
+      exact_mod_cast Fintype.card_pos
+    calc
+      (cases.card : ℚ) / Fintype.card Ω ≤
+          ((∑ i : Fin querySlots,
+            (R.querySet i).card : ℕ) : ℚ) /
+              Fintype.card Ω :=
+        div_le_div_of_nonneg_right (by exact_mod_cast hcard) hΩ.le
+      _ = ∑ i : Fin querySlots,
+          ((R.querySet i).card : ℚ) /
+            Fintype.card Ω := by
+        push_cast
+        simp only [div_eq_mul_inv]
+        rw [Finset.sum_mul]
+      _ ≤ ∑ _i : Fin querySlots, R.queryEpsilon :=
+        Finset.sum_le_sum (fun i _ ↦ R.query_ratio i)
+      _ = querySlots * R.queryEpsilon := by simp
+  have hΩ : (0 : ℚ) < Fintype.card Ω := by
+    exact_mod_cast Fintype.card_pos
+  calc
+    (R.winSet.card : ℚ) / Fintype.card Ω ≤
+        ((R.bindSet.card + cases.card : ℕ) : ℚ) /
+          Fintype.card Ω :=
+      div_le_div_of_nonneg_right (by exact_mod_cast hcover) hΩ.le
+    _ = (R.bindSet.card : ℚ) /
+          Fintype.card Ω + (cases.card : ℚ) / Fintype.card Ω := by
+      push_cast
+      ring
+    _ ≤ R.bindEpsilon + querySlots * R.queryEpsilon :=
+      add_le_add R.bind_ratio hcases
+
+end UnifiedRigidRatioAttribution
 
 /-! ## The chained compiler bound
 

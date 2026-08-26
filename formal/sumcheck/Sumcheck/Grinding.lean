@@ -54,15 +54,15 @@ namespace Sumcheck
 /-! ## The tape and its prefixes -/
 
 /-- The first `i` slots of a tape. -/
-abbrev Prefix (C : Type) (i : ℕ) := Fin i → C
+abbrev Prefix (C : Type*) (i : ℕ) := Fin i → C
 
 /-- The prefix of `cs` strictly before slot `i`. -/
-def extract_prefix {n : ℕ} {C : Type} (cs : Fin n → C) (i : Fin n) : Prefix C i.val :=
+def extract_prefix {n : ℕ} {C : Type*} (cs : Fin n → C) (i : Fin n) : Prefix C i.val :=
   fun j => cs ⟨j.val, by omega⟩
 
 section Fiber
 
-variable {C : Type} [Fintype C] [DecidableEq C]
+variable {C : Type*} [Fintype C] [DecidableEq C]
 
 /-- Slot `i + 1 + j`: the `j`-th slot strictly after `i`. -/
 def right_index {n : ℕ} {i : Fin n} (j : Fin (n - 1 - i.val)) : Fin n :=
@@ -164,7 +164,7 @@ end Fiber
 
 section Grinding
 
-variable {C : Type} [Fintype C] [DecidableEq C]
+variable {C : Type*} [Fintype C] [DecidableEq C]
 
 /--
 **One slot.**  If, from every prefix, at most `beta` values of slot `i` are bad, then at most

@@ -28,6 +28,11 @@ variable {n : ℕ}
 def tail (q : ℕ) (profile : AgreementProfile n) (a : ℕ) : ℚ :=
   min 1 ((profile.labelsAtLeast a : ℚ) / q)
 
+theorem tail_nonnegative (q : ℕ) (profile : AgreementProfile n) (a : ℕ) :
+    0 ≤ profile.tail q a := by
+  unfold tail
+  exact le_min (by norm_num) (div_nonneg (by positivity) (by positivity))
+
 /-- Query success for either the far-proximity cover or the arithmetic cover
 with residual size `g` and mask agreement `a`.  Encoding the alternative
 covers by a maximum avoids an artificial union bound. -/
@@ -79,6 +84,15 @@ def contribution (q n e g queryCount : ℕ)
     (profile : AgreementProfile n) : ℚ :=
   ∑ a ∈ Finset.range (n + 1),
     coverIncrement n e g queryCount a * profile.tail q a
+
+theorem contribution_nonnegative (q n e g queryCount : ℕ)
+    (profile : AgreementProfile n) :
+    0 ≤ profile.contribution q n e g queryCount := by
+  unfold contribution
+  apply Finset.sum_nonneg
+  intro a _
+  exact mul_nonneg (coverIncrement_nonnegative n e g queryCount a)
+    (tail_nonnegative q profile a)
 
 /-- The same contribution written by summation by parts.  The guard is
 computationally important: evaluating the expression requires a binomial
