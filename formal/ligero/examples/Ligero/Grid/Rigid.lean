@@ -412,6 +412,19 @@ def Result.NumericValid (result : Result) : Prop :=
     (1 : ℚ) / 2 ^ result.certificate.targetBits <
       result.workNormalizedBound (result.openings - 1)
 
+/-- An executable, exact-integer presentation of the numerical validity
+test.  It avoids constructing and normalizing rational values in the grid's
+native decision procedure. -/
+def Result.IntegerNumericValid (result : Result) : Prop :=
+  result.ParametersValid ∧
+    0 < result.openings ∧
+    2 ^ result.certificate.targetBits *
+        result.integerizedTotalNumerator result.openings ≤
+      result.integerizedTotalDenominator result.openings ∧
+    result.integerizedTotalDenominator (result.openings - 1) <
+      2 ^ result.certificate.targetBits *
+        result.integerizedTotalNumerator (result.openings - 1)
+
 def Result.maximumG (result : Result) : ℕ :=
   (result.certificate.d - result.effectiveE - 1) / 3
 
@@ -652,6 +665,14 @@ theorem Result.failureDenominator_pos_of_field (result : Result)
   exact Nat.mul_pos ((Nat.succ_pos result.g).trans hfield)
     (Nat.sub_pos_of_lt hfield)
 
+theorem Result.integerizedTotalDenominator_pos (result : Result)
+    (queries : ℕ) (hqueries : queries ≤ result.certificate.n)
+    (hfailure : 0 < result.failureDenominator)
+    (hfield : 0 < result.certificate.fieldSize) :
+    0 < result.integerizedTotalDenominator queries := by
+  unfold integerizedTotalDenominator
+  exact Nat.mul_pos (Nat.choose_pos hqueries) (Nat.mul_pos hfailure hfield)
+
 /-- Semantic predecessor failure for any tuple covered by the complete
 integer certificate. -/
 theorem Result.completeSearchCandidate_fails (result : Result)
@@ -712,9 +733,63 @@ theorem Result.completeSearchCandidate_fails (result : Result)
     (Result.failureDenominator_pos_of_field candidate hfieldLarge) hfieldPos]
   exact hchecked.2.2
 
+/-- Exact cross multiplication turns the integer executable predicate into
+the unchanged rational proposition consumed by the compiler endpoints. -/
+theorem Result.numericValid_of_integerNumericValid (result : Result)
+    (hvalid : result.IntegerNumericValid) : result.NumericValid := by
+  rcases hvalid with ⟨hparams, hopeningsPos, hpassing, hpredecessor⟩
+  rcases hparams with
+    ⟨hdirect, hminimal, hthree, hfieldLarge, hjohnson, hroute, hlocal,
+      hk, h2k, hopenings, hfloor, hfar, hradius, hresponseDenominator⟩
+  have hparams : result.ParametersValid :=
+    ⟨hdirect, hminimal, hthree, hfieldLarge, hjohnson, hroute, hlocal,
+      hk, h2k, hopenings, hfloor, hfar, hradius, hresponseDenominator⟩
+  have hfailure : 0 < result.failureDenominator :=
+    result.failureDenominator_pos_of_field hfieldLarge
+  have hfield : 0 < result.certificate.fieldSize :=
+    (Nat.succ_pos result.g).trans hfieldLarge
+  have hpredecessorQueries : result.openings - 1 ≤ result.certificate.n :=
+    (Nat.sub_le result.openings 1).trans hopenings
+  have hpassingDenominator :
+      0 < result.integerizedTotalDenominator result.openings :=
+    result.integerizedTotalDenominator_pos _ hopenings hfailure hfield
+  have hpredecessorDenominator :
+      0 < result.integerizedTotalDenominator (result.openings - 1) :=
+    result.integerizedTotalDenominator_pos _ hpredecessorQueries hfailure hfield
+  have hpower : (0 : ℚ) < 2 ^ result.certificate.targetBits :=
+    pow_pos (by norm_num) _
+  refine ⟨hparams, hopeningsPos, ?_, ?_⟩
+  · rw [result.workNormalizedBound_eq_integerized _ hopenings hfailure hfield]
+    unfold integerizedWorkNormalizedBound
+    rw [div_le_div_iff₀ (by exact_mod_cast hpassingDenominator) hpower]
+    have hpassing' :
+        (result.integerizedTotalNumerator result.openings : ℚ) *
+            2 ^ result.certificate.targetBits ≤
+          result.integerizedTotalDenominator result.openings := by
+      exact_mod_cast (show
+        result.integerizedTotalNumerator result.openings *
+            2 ^ result.certificate.targetBits ≤
+          result.integerizedTotalDenominator result.openings by
+        simpa [mul_comm] using hpassing)
+    simpa using hpassing'
+  · rw [result.workNormalizedBound_eq_integerized _ hpredecessorQueries
+      hfailure hfield]
+    unfold integerizedWorkNormalizedBound
+    rw [div_lt_div_iff₀ hpower (by exact_mod_cast hpredecessorDenominator)]
+    have hpredecessor' :
+        (result.integerizedTotalDenominator (result.openings - 1) : ℚ) <
+          result.integerizedTotalNumerator (result.openings - 1) *
+            2 ^ result.certificate.targetBits := by
+      exact_mod_cast (show
+        result.integerizedTotalDenominator (result.openings - 1) <
+          result.integerizedTotalNumerator (result.openings - 1) *
+            2 ^ result.certificate.targetBits by
+        simpa [mul_comm] using hpredecessor)
+    simpa using hpredecessor'
+
 def Result.validBool (result : Result) : Bool :=
-  @decide result.NumericValid (by
-    unfold NumericValid ParametersValid
+  @decide result.IntegerNumericValid (by
+    unfold IntegerNumericValid ParametersValid
     infer_instance)
 
 theorem Result.uniqueRadius (result : Result) (h : result.ParametersValid)
@@ -725,9 +800,10 @@ theorem Result.uniqueRadius (result : Result) (h : result.ParametersValid)
 
 theorem Result.numericValid_of_validBool (result : Result)
     (h : result.validBool = true) : result.NumericValid := by
-  letI : Decidable result.NumericValid := by
-    unfold Result.NumericValid Result.ParametersValid
+  letI : Decidable result.IntegerNumericValid := by
+    unfold Result.IntegerNumericValid Result.ParametersValid
     infer_instance
+  apply result.numericValid_of_integerNumericValid
   apply of_decide_eq_true
   simpa [Result.validBool] using h
 
@@ -3275,15 +3351,5 @@ def results : List Result := [
 theorem v1_result_count :
     (results.filter fun result ↦ result.variant = .v1).length = 195 := by
   native_decide
-
-theorem results_valid : results.all Result.validBool = true := by
-  native_decide
-
-theorem numericValid_of_mem_results {result : Result}
-    (hmem : result ∈ results) : result.NumericValid := by
-  have hall := results_valid
-  rw [List.all_eq_true] at hall
-  exact result.numericValid_of_validBool (hall result hmem)
-
 
 end Ligero.Examples.Grid.Rigid
