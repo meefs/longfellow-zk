@@ -166,9 +166,11 @@ theorem bad_cover
     (dec : RoleDecoders C)
     (answers : Fin T → D) (hbad : G.Bad dec answers) :
     ¬ CollisionFree (G.prefixTrace answers) ∨
-      HitFamily T (extractionHits T prefixFuel) Prod.fst
-        (fun p ↦ hitTargetOf C dec prefixFuel T G.phase G.rootOf p.1 p.2) answers := by
-  apply cover_of_failure_generic C n prefixFuel T G.phase G.run answers dec
+      HitFamily T (extractionHits runFuel prefixFuel)
+        (fun p => (⟨p.1.val, lt_of_lt_of_le p.1.isLt G.run_fits⟩ : Fin T))
+        (fun p ↦ hitTargetOf C dec prefixFuel T G.phase G.rootOf
+          ⟨p.1.val, lt_of_lt_of_le p.1.isLt G.run_fits⟩ p.2) answers := by
+  apply cover_of_failure_generic_eligible C n prefixFuel T G.phase G.run answers dec
     G.rootOf (G.root answers) (G.claim answers) G.run_fits
     (G.prefix_slots answers) rfl (G.check_in_run answers) hbad.1
   intro hexplains
@@ -179,7 +181,7 @@ theorem bad_cover
 opening can disagree with the total message extracted before root exposure on
 at most
 
-`(t(t-1)/2 + T(2t+1)) * |D|^(T-1)`
+`(t(t-1)/2 + runFuel(2t+1)) * |D|^(T-1)`
 
 tapes, where `t = prefixFuel`.  This is the same collision/fresh-hit cost as
 two-stage extraction, but the opening may occur in an arbitrary larger run.
@@ -189,15 +191,17 @@ theorem bad_card_le [Fintype D]
     (dec : RoleDecoders C)
     (hprefix : prefixFuel ≤ T) [DecidablePred (G.Bad dec)] :
     (Finset.filter (G.Bad dec) Finset.univ).card ≤
-      (prefixFuel * (prefixFuel - 1) / 2 + T * (2 * prefixFuel + 1)) *
+      (prefixFuel * (prefixFuel - 1) / 2 + runFuel * (2 * prefixFuel + 1)) *
         (Fintype.card D) ^ (T - 1) := by
   classical
   calc
     (Finset.filter (G.Bad dec) Finset.univ).card
         ≤ ((Finset.filter (fun answers : Fin T → D ↦
               ¬ CollisionFree (G.prefixTrace answers)) Finset.univ) ∪
-            (Finset.filter (HitFamily (D := D) T (extractionHits T prefixFuel) Prod.fst
-              (fun p ↦ hitTargetOf C dec prefixFuel T G.phase G.rootOf p.1 p.2))
+            (Finset.filter (HitFamily (D := D) T (extractionHits runFuel prefixFuel)
+              (fun p => (⟨p.1.val, lt_of_lt_of_le p.1.isLt G.run_fits⟩ : Fin T))
+              (fun p ↦ hitTargetOf C dec prefixFuel T G.phase G.rootOf
+                ⟨p.1.val, lt_of_lt_of_le p.1.isLt G.run_fits⟩ p.2))
               Finset.univ)).card := by
           apply Finset.card_le_card
           intro answers ha
@@ -209,11 +213,13 @@ theorem bad_card_le [Fintype D]
               (Finset.mem_filter.mpr ⟨Finset.mem_univ _, hhit⟩)
     _ ≤ (Finset.filter (fun answers : Fin T → D ↦
               ¬ CollisionFree (G.prefixTrace answers)) Finset.univ).card +
-            (Finset.filter (HitFamily (D := D) T (extractionHits T prefixFuel) Prod.fst
-              (fun p ↦ hitTargetOf C dec prefixFuel T G.phase G.rootOf p.1 p.2))
+            (Finset.filter (HitFamily (D := D) T (extractionHits runFuel prefixFuel)
+              (fun p => (⟨p.1.val, lt_of_lt_of_le p.1.isLt G.run_fits⟩ : Fin T))
+              (fun p ↦ hitTargetOf C dec prefixFuel T G.phase G.rootOf
+                ⟨p.1.val, lt_of_lt_of_le p.1.isLt G.run_fits⟩ p.2))
               Finset.univ).card := Finset.card_union_le _ _
     _ ≤ prefixFuel * (prefixFuel - 1) / 2 * (Fintype.card D) ^ (T - 1) +
-          T * (2 * prefixFuel + 1) * (Fintype.card D) ^ (T - 1) := by
+          runFuel * (2 * prefixFuel + 1) * (Fintype.card D) ^ (T - 1) := by
         apply Nat.add_le_add
         · calc
             (Finset.filter (fun answers : Fin T → D ↦
@@ -234,11 +240,14 @@ theorem bad_card_le [Fintype D]
                   (Fintype.card D) ^ (T - 1) :=
                 Nat.mul_le_mul_right _ (slotPairs_card_le T prefixFuel)
         · have h := answerTape_hitFamily_card_le (D := D) T
-              (extractionHits T prefixFuel) Prod.fst
-              (fun p ↦ hitTargetOf C dec prefixFuel T G.phase G.rootOf p.1 p.2)
-              (fun p _ ↦ hitTarget_hitTargetOf C dec prefixFuel T G.phase G.rootOf p.1 p.2)
+              (extractionHits runFuel prefixFuel)
+              (fun p => (⟨p.1.val, lt_of_lt_of_le p.1.isLt G.run_fits⟩ : Fin T))
+              (fun p ↦ hitTargetOf C dec prefixFuel T G.phase G.rootOf
+                ⟨p.1.val, lt_of_lt_of_le p.1.isLt G.run_fits⟩ p.2)
+              (fun p _ ↦ hitTarget_hitTargetOf C dec prefixFuel T G.phase G.rootOf
+                ⟨p.1.val, lt_of_lt_of_le p.1.isLt G.run_fits⟩ p.2)
           simpa [extractionHits_card] using h
-    _ = (prefixFuel * (prefixFuel - 1) / 2 + T * (2 * prefixFuel + 1)) *
+    _ = (prefixFuel * (prefixFuel - 1) / 2 + runFuel * (2 * prefixFuel + 1)) *
           (Fintype.card D) ^ (T - 1) := by ring
 
 /-- Probability form of `bad_card_le`, with the exact finite answer-tape

@@ -197,7 +197,7 @@ theorem run_slot_of_trace [Inhabited D] [DecidableEq Enc] {A : Type uRun} {F : �
     (R : Tree Enc D A F) (answers : Fin T → D) (x : Enc) (y : D) (hFT : F ≤ T)
     (hx : (x, y) ∈ (R.run (runOracle T R answers)).2) :
     ∃ j : Fin T, (runSlots T R answers).idxOf x = j.val ∧
-      runOracle T R answers x = answers j := by
+      runOracle T R answers x = answers j ∧ j.val < F := by
   have hrun : R.run (runOracle T R answers) =
       ((lazyRun answers default R []).1, (lazyRun answers default R []).2.2) :=
     lazyRun_eq_run answers default R [] (runOracle T R answers) fun _ => rfl
@@ -207,7 +207,7 @@ theorem run_slot_of_trace [Inhabited D] [DecidableEq Enc] {A : Type uRun} {F : �
     have h := lazyRun_slot_lt answers default R [] x hmem
     simpa [runSlots] using h
   have hltT : (runSlots T R answers).idxOf x < T := by omega
-  refine ⟨⟨_, hltT⟩, rfl, ?_⟩
+  refine ⟨⟨_, hltT⟩, rfl, ?_, hlt⟩
   rw [runOracle, tapeAt, dif_pos hltT]
 
 /-- **Events 2 and 3, for an arbitrary experiment.**  If the check accepts but presents an input the
@@ -222,7 +222,7 @@ answer is its slot's tape entry: the slot carries the label.
 No collision-freeness is needed: the parent's input decodes to the children by the decoder's
 round-trip law alone, which is why this is independent of the commitment-collision event rather than
 layered on it. -/
-theorem hitFamily_of_fresh_generic [Inhabited D] [DecidableEq Enc]
+theorem hitFamily_of_fresh_generic_eligible [Inhabited D] [DecidableEq Enc]
     (C : Codec Salt M D Enc) (dec : RoleDecoders C) (n t₁ T : ℕ)
     {Out : Type uAux} (commit : Tree Enc D Out t₁) (rootOf : Out → D)
     {A : Type uRun} {F : ℕ} (R : Tree Enc D A F) (answers : Fin T → D)
@@ -234,8 +234,10 @@ theorem hitFamily_of_fresh_generic [Inhabited D] [DecidableEq Enc]
     (hacc : Accepts (C.withOracle (runOracle T R answers)) n rt cl.I cl.a cl.pf)
     (hfresh : ∃ x ∈ checkTraceQueries (C.withOracle (runOracle T R answers)) n cl.I cl.a cl.pf,
       x ∉ (lazyRun answers default commit []).2.1) :
-    HitFamily T (extractionHits T t₁) Prod.fst
-      (fun p => hitTargetOf C dec t₁ T commit rootOf p.1 p.2) answers := by
+    HitFamily T (extractionHits F t₁)
+      (fun p => (⟨p.1.val, lt_of_lt_of_le p.1.isLt hFT⟩ : Fin T))
+      (fun p => hitTargetOf C dec t₁ T commit rootOf
+        ⟨p.1.val, lt_of_lt_of_le p.1.isLt hFT⟩ p.2) answers := by
   classical
   obtain ⟨x₀, hx₀mem, hx₀fresh⟩ := hfresh
   set S := C.withOracle (runOracle T R answers) with hS
@@ -253,8 +255,12 @@ theorem hitFamily_of_fresh_generic [Inhabited D] [DecidableEq Enc]
   have hwlt : w < 2 * n := Finset.mem_range.mp hwrange
   obtain ⟨yw, hyw⟩ := mem_checkPass_trace_of_vertexQuery C n cl.I cl.a cl.pf
     (runOracle T R answers) w xw hwpos hwlt hxwq
-  obtain ⟨j, hjidx, hjval⟩ :=
+  obtain ⟨j, hjidx, hjval, hjlt⟩ :=
     run_slot_of_trace T R answers xw yw hFT (hcheck (xw, yw) hyw)
+  let jf : Fin F := ⟨j.val, hjlt⟩
+  have hjf : (⟨jf.val, lt_of_lt_of_le jf.isLt hFT⟩ : Fin T) = j := by
+    apply Fin.ext
+    rfl
   have hjge : seenC.length ≤ j.val := by
     rw [← hjidx]
     obtain ⟨rest, hrest⟩ := hpref
@@ -267,10 +273,10 @@ theorem hitFamily_of_fresh_generic [Inhabited D] [DecidableEq Enc]
     rw [← hjval]
     exact vertexQuery_answer S n cl.I cl.a cl.pf w xw hxwq
   by_cases hw1 : w = 1
-  · refine ⟨(j, 0), Finset.mem_product.mpr ⟨Finset.mem_univ _,
-      Finset.mem_range.mpr (by omega)⟩, ?_⟩
+  · refine ⟨(jf, 0), Finset.mem_product.mpr ⟨Finset.mem_univ _,
+        Finset.mem_range.mpr (by omega)⟩, ?_⟩
     dsimp only
-    rw [hans, hw1, hacc.2, hitTargetOf, hneutral, candidateLabel_zero, hrt]
+    rw [hjf, hans, hw1, hacc.2, hitTargetOf, hneutral, candidateLabel_zero, hrt]
   · have hwpath : w ∈ Heap.pathSet n cl.I :=
       mem_pathSet_of_vertexQuery S n cl.I cl.a cl.pf w xw hxwq
     obtain ⟨i₀, hi₀, hwpathOf⟩ := Heap.mem_pathSet.mp hwpath
@@ -297,18 +303,56 @@ theorem hitFamily_of_fresh_generic [Inhabited D] [DecidableEq Enc]
       rw [hget]
       exact dec.node_roundTrip _
     rcases Nat.mod_two_eq_zero_or_one w with hpar | hpar
-    · refine ⟨(j, 2 * i + 1), Finset.mem_product.mpr ⟨Finset.mem_univ _,
+    · refine ⟨(jf, 2 * i + 1), Finset.mem_product.mpr ⟨Finset.mem_univ _,
         Finset.mem_range.mpr (by omega)⟩, ?_⟩
       dsimp only
-      rw [hans, hitTargetOf, hneutral,
+      rw [hjf, hans, hitTargetOf, hneutral,
         candidateLabel_left C dec rootOf _ i (by rw [← hseenC]; exact hilen) _ _ hdec,
         show 2 * (w / 2) = w by omega]
-    · refine ⟨(j, 2 * i + 2), Finset.mem_product.mpr ⟨Finset.mem_univ _,
+    · refine ⟨(jf, 2 * i + 2), Finset.mem_product.mpr ⟨Finset.mem_univ _,
         Finset.mem_range.mpr (by omega)⟩, ?_⟩
       dsimp only
-      rw [hans, hitTargetOf, hneutral,
+      rw [hjf, hans, hitTargetOf, hneutral,
         candidateLabel_right C dec rootOf _ i (by rw [← hseenC]; exact hilen) _ _ hdec,
         show 2 * (w / 2) + 1 = w by omega]
+
+/-- Embed an eligible-run fresh-hit family into the historical full-tape family.  This is a pure
+relaxation used by compatibility callers; concrete staged composition should retain the eligible
+family and its smaller cardinality. -/
+theorem hitFamily_extractionHits_mono [Inhabited D] [DecidableEq Enc]
+    (C : Codec Salt M D Enc) (dec : RoleDecoders C) (t₁ F T : ℕ)
+    {Out : Type uAux} (commit : Tree Enc D Out t₁) (rootOf : Out → D)
+    (answers : Fin T → D) (hFT : F ≤ T)
+    (h : HitFamily T (extractionHits F t₁)
+      (fun p => (⟨p.1.val, lt_of_lt_of_le p.1.isLt hFT⟩ : Fin T))
+      (fun p => hitTargetOf C dec t₁ T commit rootOf
+        ⟨p.1.val, lt_of_lt_of_le p.1.isLt hFT⟩ p.2) answers) :
+    HitFamily T (extractionHits T t₁) Prod.fst
+      (fun p => hitTargetOf C dec t₁ T commit rootOf p.1 p.2) answers := by
+  rcases h with ⟨p, hp, heq⟩
+  have hp2 := (Finset.mem_product.mp hp).2
+  let j : Fin T := ⟨p.1.val, lt_of_lt_of_le p.1.isLt hFT⟩
+  refine ⟨(j, p.2), Finset.mem_product.mpr ⟨Finset.mem_univ _, hp2⟩, ?_⟩
+  simpa [j] using heq
+
+/-- Backwards-compatible full-tape relaxation of `hitFamily_of_fresh_generic_eligible`. -/
+theorem hitFamily_of_fresh_generic [Inhabited D] [DecidableEq Enc]
+    (C : Codec Salt M D Enc) (dec : RoleDecoders C) (n t₁ T : ℕ)
+    {Out : Type uAux} (commit : Tree Enc D Out t₁) (rootOf : Out → D)
+    {A : Type uRun} {F : ℕ} (R : Tree Enc D A F) (answers : Fin T → D)
+    (cl : OpeningClaim n Salt M D) (rt : D) (hFT : F ≤ T)
+    (hpref : (lazyRun answers default commit []).2.1 <+: runSlots T R answers)
+    (hrt : rt = rootOf (lazyRun answers default commit []).1)
+    (hcheck : ∀ qa ∈ ((checkPass C n cl.I cl.a cl.pf (2 * n) fun _ => default).run
+        (runOracle T R answers)).2, qa ∈ (R.run (runOracle T R answers)).2)
+    (hacc : Accepts (C.withOracle (runOracle T R answers)) n rt cl.I cl.a cl.pf)
+    (hfresh : ∃ x ∈ checkTraceQueries (C.withOracle (runOracle T R answers)) n cl.I cl.a cl.pf,
+      x ∉ (lazyRun answers default commit []).2.1) :
+    HitFamily T (extractionHits T t₁) Prod.fst
+      (fun p => hitTargetOf C dec t₁ T commit rootOf p.1 p.2) answers := by
+  apply hitFamily_extractionHits_mono C dec t₁ F T commit rootOf answers hFT
+  exact hitFamily_of_fresh_generic_eligible C dec n t₁ T commit rootOf R answers cl rt hFT
+    hpref hrt hcheck hacc hfresh
 
 
 /-! ### The rest of the cover, generically -/
@@ -373,6 +417,37 @@ theorem explains_of_commitQueries_generic (rt : D) (cl : OpeningClaim n Salt M D
 
 /-- **The failure cover, generically.**  An accepted claim that the phase's extraction does not
 explain forces a collision in that phase's trace, or a slot carrying one of its candidate labels. -/
+theorem cover_of_failure_generic_eligible (rootOf : Out → D) (rt : D)
+    (cl : OpeningClaim n Salt M D)
+    (hFT : F ≤ T) (hpref : (lazyRun answers default commit []).2.1 <+: runSlots T R answers)
+    (hrt : rt = rootOf (lazyRun answers default commit []).1)
+    (hcheck : ∀ qa ∈ ((checkPass C n cl.I cl.a cl.pf (2 * n) fun _ => default).run
+        (runOracle T R answers)).2, qa ∈ (R.run (runOracle T R answers)).2)
+    (hacc : Accepts (C.withOracle (runOracle T R answers)) n rt cl.I cl.a cl.pf)
+    (hfail : ¬ ∃ out : Extracted n Salt M D,
+      extract dec n rt (commit.run (runOracle T R answers)).2 = some out ∧
+        (∀ j ∈ cl.I, out.message j = cl.a j) ∧
+        openFromTrapdoor out.trapdoor cl.I = cl.pf) :
+    ¬ CollisionFree ((commit.run (runOracle T R answers)).2) ∨
+      HitFamily T (extractionHits F t₁)
+        (fun p => (⟨p.1.val, lt_of_lt_of_le p.1.isLt hFT⟩ : Fin T))
+        (fun p => hitTargetOf C dec t₁ T commit rootOf
+          ⟨p.1.val, lt_of_lt_of_le p.1.isLt hFT⟩ p.2) answers := by
+  classical
+  by_cases hfree : CollisionFree ((commit.run (runOracle T R answers)).2)
+  · refine Or.inr (hitFamily_of_fresh_generic_eligible C dec n t₁ T commit rootOf R answers cl rt hFT
+      hpref hrt hcheck hacc ?_)
+    by_contra hq
+    push Not at hq
+    refine hfail (explains_of_commitQueries_generic C n (t₁ := t₁) (T := T) commit R answers dec
+      rt cl hfree hacc fun x hx => ?_)
+    by_contra hc
+    push Not at hc
+    exact absurd (hq x hx) (not_mem_seen_of_not_mem_trace (commit := commit) (R := R)
+      (answers := answers) (hpref := hpref) (x := x) (hx := hc))
+  · exact Or.inl hfree
+
+/-- Backwards-compatible full-tape relaxation of `cover_of_failure_generic_eligible`. -/
 theorem cover_of_failure_generic (rootOf : Out → D) (rt : D) (cl : OpeningClaim n Salt M D)
     (hFT : F ≤ T) (hpref : (lazyRun answers default commit []).2.1 <+: runSlots T R answers)
     (hrt : rt = rootOf (lazyRun answers default commit []).1)
@@ -386,19 +461,10 @@ theorem cover_of_failure_generic (rootOf : Out → D) (rt : D) (cl : OpeningClai
     ¬ CollisionFree ((commit.run (runOracle T R answers)).2) ∨
       HitFamily T (extractionHits T t₁) Prod.fst
         (fun p => hitTargetOf C dec t₁ T commit rootOf p.1 p.2) answers := by
-  classical
-  by_cases hfree : CollisionFree ((commit.run (runOracle T R answers)).2)
-  · refine Or.inr (hitFamily_of_fresh_generic C dec n t₁ T commit rootOf R answers cl rt hFT
-      hpref hrt hcheck hacc ?_)
-    by_contra hq
-    push Not at hq
-    refine hfail (explains_of_commitQueries_generic C n (t₁ := t₁) (T := T) commit R answers dec
-      rt cl hfree hacc fun x hx => ?_)
-    by_contra hc
-    push Not at hc
-    exact absurd (hq x hx) (not_mem_seen_of_not_mem_trace (commit := commit) (R := R)
-      (answers := answers) (hpref := hpref) (x := x) (hx := hc))
-  · exact Or.inl hfree
+  rcases cover_of_failure_generic_eligible C n t₁ T commit R answers dec rootOf rt cl hFT
+      hpref hrt hcheck hacc hfail with hcollision | hhit
+  · exact Or.inl hcollision
+  · exact Or.inr (hitFamily_extractionHits_mono C dec t₁ F T commit rootOf answers hFT hhit)
 
 end GenericCover
 
@@ -548,7 +614,8 @@ theorem extraction_slot_of_trace (answers : Fin T → D) (x : Enc) (y : D)
       (extractionOracle C n t₁ t₂ T commit opening answers)).2) :
     ∃ j : Fin T,
       (extractionSlots C n t₁ t₂ T commit opening answers).idxOf x = j.val ∧
-      extractionOracle C n t₁ t₂ T commit opening answers x = answers j :=
+      extractionOracle C n t₁ t₂ T commit opening answers x = answers j ∧
+      j.val < 2 * n + t₂ + t₁ :=
   run_slot_of_trace T (extractionRun C n t₁ t₂ commit opening) answers x y hT hx
 
 /-- **Events 2 and 3.**  If the check accepts but presents an input the commitment stage never
@@ -574,10 +641,12 @@ theorem hitFamily_of_fresh (dec : RoleDecoders C) (answers : Fin T → D)
         (openingClaim C n t₁ t₂ T commit opening answers).a
         (openingClaim C n t₁ t₂ T commit opening answers).pf,
       ∀ y, (x, y) ∉ commitTrace C n t₁ t₂ T commit opening answers) :
-    HitFamily T (extractionHits T t₁) Prod.fst
-      (fun p => hitTargetOf C dec t₁ T commit Prod.fst p.1 p.2) answers := by
+    HitFamily T (extractionHits (2 * n + t₂ + t₁) t₁)
+      (fun p => (⟨p.1.val, lt_of_lt_of_le p.1.isLt hT⟩ : Fin T))
+      (fun p => hitTargetOf C dec t₁ T commit Prod.fst
+        ⟨p.1.val, lt_of_lt_of_le p.1.isLt hT⟩ p.2) answers := by
   obtain ⟨x₀, hx₀mem, hx₀fresh⟩ := hfresh
-  refine hitFamily_of_fresh_generic C dec n t₁ T commit Prod.fst
+  refine hitFamily_of_fresh_generic_eligible C dec n t₁ T commit Prod.fst
     (extractionRun C n t₁ t₂ commit opening) answers
     (openingClaim C n t₁ t₂ T commit opening answers)
     (commitRoot C n t₁ t₂ T commit opening answers) hT
@@ -657,8 +726,10 @@ theorem cover_of_extractionFailure (answers : Fin T → D) (hT : 2 * n + t₂ + 
       (openingClaim C n t₁ t₂ T commit opening answers).pf)
     (hfail : ¬ ExtractionExplains C dec n t₁ t₂ T commit opening answers) :
     ¬ CollisionFree (commitTrace C n t₁ t₂ T commit opening answers) ∨
-      HitFamily T (extractionHits T t₁) Prod.fst
-        (fun p => hitTargetOf C dec t₁ T commit Prod.fst p.1 p.2) answers := by
+      HitFamily T (extractionHits (2 * n + t₂ + t₁) t₁)
+        (fun p => (⟨p.1.val, lt_of_lt_of_le p.1.isLt hT⟩ : Fin T))
+        (fun p => hitTargetOf C dec t₁ T commit Prod.fst
+          ⟨p.1.val, lt_of_lt_of_le p.1.isLt hT⟩ p.2) answers := by
   classical
   by_cases hfree : CollisionFree (commitTrace C n t₁ t₂ T commit opening answers)
   · refine Or.inr (hitFamily_of_fresh C n t₁ t₂ T commit opening dec answers hT hacc ?_)
@@ -671,13 +742,80 @@ theorem cover_of_extractionFailure (answers : Fin T → D) (hT : 2 * n + t₂ + 
 /-- **ROM extraction, counted.**  Over uniform answer tapes, an accepted opening is explained by the
 commitment-stage extraction except on at most
 
-`(t₁(t₁−1)/2 + T(2t₁+1)) · |D|^(T−1)`
+`(t₁(t₁−1)/2 + (2n+t₂+t₁)(2t₁+1)) · |D|^(T−1)`
 
 of the `|D|^T` tapes: the sharp birthday term for the commitment stage, plus one fresh-hit term per
-slot per candidate label.  The `2t₁+1` is the book's `L(t₁, n)`; the `T` is looser than the book's
-`t₂ + heapDepth n + 1`, because the slot a fresh query occupies is only bounded by the tape length
-— it is not confined to the opening stage's range when the commitment stage queries fewer distinct
-inputs than its budget. -/
+eligible extraction-program slot per candidate label.  The eligible range is the actual combined
+commitment/opening/check fuel, not the ambient tape length. -/
+theorem mh_extract_rom_card_le_eligible [Fintype D] (ht₁ : t₁ ≤ T)
+    (hT : 2 * n + t₂ + t₁ ≤ T)
+    [DecidablePred fun answers : Fin T → D =>
+      ¬ CollisionFree (commitTrace C n t₁ t₂ T commit opening answers)]
+    [DecidablePred fun answers : Fin T → D =>
+      Accepts (C.withOracle (extractionOracle C n t₁ t₂ T commit opening answers)) n
+          (commitRoot C n t₁ t₂ T commit opening answers)
+          (openingClaim C n t₁ t₂ T commit opening answers).I
+          (openingClaim C n t₁ t₂ T commit opening answers).a
+          (openingClaim C n t₁ t₂ T commit opening answers).pf ∧
+        ¬ ExtractionExplains C dec n t₁ t₂ T commit opening answers] :
+    (Finset.filter (fun answers : Fin T → D =>
+        Accepts (C.withOracle (extractionOracle C n t₁ t₂ T commit opening answers)) n
+            (commitRoot C n t₁ t₂ T commit opening answers)
+            (openingClaim C n t₁ t₂ T commit opening answers).I
+            (openingClaim C n t₁ t₂ T commit opening answers).a
+            (openingClaim C n t₁ t₂ T commit opening answers).pf ∧
+          ¬ ExtractionExplains C dec n t₁ t₂ T commit opening answers)
+      Finset.univ).card ≤
+      (t₁ * (t₁ - 1) / 2 + (2 * n + t₂ + t₁) * (2 * t₁ + 1)) *
+        (Fintype.card D) ^ (T - 1) := by
+  calc
+    (Finset.filter (fun answers : Fin T → D =>
+        Accepts (C.withOracle (extractionOracle C n t₁ t₂ T commit opening answers)) n
+            (commitRoot C n t₁ t₂ T commit opening answers)
+            (openingClaim C n t₁ t₂ T commit opening answers).I
+            (openingClaim C n t₁ t₂ T commit opening answers).a
+            (openingClaim C n t₁ t₂ T commit opening answers).pf ∧
+          ¬ ExtractionExplains C dec n t₁ t₂ T commit opening answers)
+      Finset.univ).card
+        ≤ ((Finset.filter (fun answers : Fin T → D =>
+              ¬ CollisionFree (commitTrace C n t₁ t₂ T commit opening answers))
+            Finset.univ) ∪
+          (Finset.filter (HitFamily (D := D) T (extractionHits (2 * n + t₂ + t₁) t₁)
+              (fun p => (⟨p.1.val, lt_of_lt_of_le p.1.isLt hT⟩ : Fin T))
+              (fun p => hitTargetOf C dec t₁ T commit Prod.fst
+                ⟨p.1.val, lt_of_lt_of_le p.1.isLt hT⟩ p.2))
+            Finset.univ)).card := by
+      apply Finset.card_le_card
+      intro answers ha
+      simp only [Finset.mem_filter, Finset.mem_univ, true_and] at ha
+      rcases cover_of_extractionFailure C dec n t₁ t₂ T commit opening answers hT ha.1 ha.2 with
+        h | h
+      · exact Finset.mem_union_left _ (Finset.mem_filter.mpr ⟨Finset.mem_univ _, h⟩)
+      · exact Finset.mem_union_right _ (Finset.mem_filter.mpr ⟨Finset.mem_univ _, h⟩)
+    _ ≤ (Finset.filter (fun answers : Fin T → D =>
+            ¬ CollisionFree (commitTrace C n t₁ t₂ T commit opening answers))
+          Finset.univ).card +
+        (Finset.filter (HitFamily (D := D) T (extractionHits (2 * n + t₂ + t₁) t₁)
+            (fun p => (⟨p.1.val, lt_of_lt_of_le p.1.isLt hT⟩ : Fin T))
+            (fun p => hitTargetOf C dec t₁ T commit Prod.fst
+              ⟨p.1.val, lt_of_lt_of_le p.1.isLt hT⟩ p.2))
+          Finset.univ).card := Finset.card_union_le _ _
+    _ ≤ t₁ * (t₁ - 1) / 2 * (Fintype.card D) ^ (T - 1) +
+        (2 * n + t₂ + t₁) * (2 * t₁ + 1) * (Fintype.card D) ^ (T - 1) := by
+      refine Nat.add_le_add (commitCollision_card_le C n t₁ t₂ T commit opening ht₁) ?_
+      have h := answerTape_hitFamily_card_le (D := D) T
+        (extractionHits (2 * n + t₂ + t₁) t₁)
+        (fun p => (⟨p.1.val, lt_of_lt_of_le p.1.isLt hT⟩ : Fin T))
+        (fun p => hitTargetOf C dec t₁ T commit Prod.fst
+          ⟨p.1.val, lt_of_lt_of_le p.1.isLt hT⟩ p.2)
+        (fun p _ => hitTarget_hitTargetOf C dec t₁ T commit Prod.fst
+          ⟨p.1.val, lt_of_lt_of_le p.1.isLt hT⟩ p.2)
+      rwa [extractionHits_card] at h
+    _ = (t₁ * (t₁ - 1) / 2 + (2 * n + t₂ + t₁) * (2 * t₁ + 1)) *
+        (Fintype.card D) ^ (T - 1) := by ring
+
+/-- Backwards-compatible tape-length relaxation of `mh_extract_rom_card_le_eligible`.  Concrete
+composition should use the eligible-range theorem so unused tape padding is not charged. -/
 theorem mh_extract_rom_card_le [Fintype D] (ht₁ : t₁ ≤ T) (hT : 2 * n + t₂ + t₁ ≤ T)
     [DecidablePred fun answers : Fin T → D =>
       ¬ CollisionFree (commitTrace C n t₁ t₂ T commit opening answers)]
@@ -697,42 +835,8 @@ theorem mh_extract_rom_card_le [Fintype D] (ht₁ : t₁ ≤ T) (hT : 2 * n + t�
           ¬ ExtractionExplains C dec n t₁ t₂ T commit opening answers)
       Finset.univ).card ≤
       (t₁ * (t₁ - 1) / 2 + T * (2 * t₁ + 1)) * (Fintype.card D) ^ (T - 1) := by
-  calc
-    (Finset.filter (fun answers : Fin T → D =>
-        Accepts (C.withOracle (extractionOracle C n t₁ t₂ T commit opening answers)) n
-            (commitRoot C n t₁ t₂ T commit opening answers)
-            (openingClaim C n t₁ t₂ T commit opening answers).I
-            (openingClaim C n t₁ t₂ T commit opening answers).a
-            (openingClaim C n t₁ t₂ T commit opening answers).pf ∧
-          ¬ ExtractionExplains C dec n t₁ t₂ T commit opening answers)
-      Finset.univ).card
-        ≤ ((Finset.filter (fun answers : Fin T → D =>
-              ¬ CollisionFree (commitTrace C n t₁ t₂ T commit opening answers))
-            Finset.univ) ∪
-          (Finset.filter (HitFamily (D := D) T (extractionHits T t₁) Prod.fst
-              (fun p => hitTargetOf C dec t₁ T commit Prod.fst p.1 p.2))
-            Finset.univ)).card := by
-      apply Finset.card_le_card
-      intro answers ha
-      simp only [Finset.mem_filter, Finset.mem_univ, true_and] at ha
-      rcases cover_of_extractionFailure C dec n t₁ t₂ T commit opening answers hT ha.1 ha.2 with
-        h | h
-      · exact Finset.mem_union_left _ (Finset.mem_filter.mpr ⟨Finset.mem_univ _, h⟩)
-      · exact Finset.mem_union_right _ (Finset.mem_filter.mpr ⟨Finset.mem_univ _, h⟩)
-    _ ≤ (Finset.filter (fun answers : Fin T → D =>
-            ¬ CollisionFree (commitTrace C n t₁ t₂ T commit opening answers))
-          Finset.univ).card +
-        (Finset.filter (HitFamily (D := D) T (extractionHits T t₁) Prod.fst
-            (fun p => hitTargetOf C dec t₁ T commit Prod.fst p.1 p.2))
-          Finset.univ).card := Finset.card_union_le _ _
-    _ ≤ t₁ * (t₁ - 1) / 2 * (Fintype.card D) ^ (T - 1) +
-        T * (2 * t₁ + 1) * (Fintype.card D) ^ (T - 1) := by
-      refine Nat.add_le_add (commitCollision_card_le C n t₁ t₂ T commit opening ht₁) ?_
-      have h := answerTape_hitFamily_card_le (D := D) T (extractionHits T t₁) Prod.fst
-        (fun p => hitTargetOf C dec t₁ T commit Prod.fst p.1 p.2)
-        (fun p _ => hitTarget_hitTargetOf C dec t₁ T commit Prod.fst p.1 p.2)
-      rwa [extractionHits_card] at h
-    _ = (t₁ * (t₁ - 1) / 2 + T * (2 * t₁ + 1)) * (Fintype.card D) ^ (T - 1) := by ring
+  refine (mh_extract_rom_card_le_eligible C dec n t₁ t₂ T commit opening ht₁ hT).trans ?_
+  gcongr
 
 end Explains
 
