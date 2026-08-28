@@ -8,5 +8,3 @@ import LigeroFamily.Soundness.RigidCompiler
 import LigeroFamily.Soundness.SchemePolicyExtractor
 import LigeroFamily.Soundness.RoundByRound
 import LigeroFamily.Soundness.PolicyEventPartition
-
-/-! Public facade for mask-scheme-generic soundness. -/
