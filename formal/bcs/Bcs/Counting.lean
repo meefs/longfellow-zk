@@ -36,4 +36,59 @@ theorem card_filter_prod_snd {α β : Type*} [Fintype α] [Fintype β]
   simp only [Finset.card_filter, Fintype.sum_prod_type]
   exact Finset.sum_comm
 
+/-- A uniform probability bound on every second-coordinate fiber remains
+valid after adjoining an independent first coordinate. -/
+theorem product_ratio_le_of_fst_fiber
+    {α β : Type*} [Fintype α] [Fintype β] [Nonempty α] [Nonempty β]
+    (event : α → β → Prop) [∀ a, DecidablePred (event a)]
+    (epsilon : ℚ)
+    (hfiber : ∀ a, ((univ.filter (event a)).card : ℚ) /
+      Fintype.card β ≤ epsilon) :
+    ((univ.filter fun value : α × β ↦ event value.1 value.2).card : ℚ) /
+        Fintype.card (α × β) ≤ epsilon := by
+  classical
+  have hα : (0 : ℚ) < Fintype.card α := by
+    exact_mod_cast Fintype.card_pos
+  have hβ : (0 : ℚ) < Fintype.card β := by
+    exact_mod_cast Fintype.card_pos
+  rw [card_filter_prod_fst, Fintype.card_prod]
+  push_cast
+  rw [div_le_iff₀ (mul_pos hα hβ)]
+  calc
+    (∑ a : α, ((univ.filter (event a)).card : ℚ))
+        ≤ ∑ _a : α, epsilon * Fintype.card β := by
+          apply Finset.sum_le_sum
+          intro a _
+          exact (div_le_iff₀ hβ).mp (hfiber a)
+    _ = epsilon * (Fintype.card α * Fintype.card β) := by
+      simp
+      ring
+
+/-- Symmetric product-space averaging, slicing on the second coordinate. -/
+theorem product_ratio_le_of_snd_fiber
+    {α β : Type*} [Fintype α] [Fintype β] [Nonempty α] [Nonempty β]
+    (event : α → β → Prop) [∀ b, DecidablePred (fun a ↦ event a b)]
+    (epsilon : ℚ)
+    (hfiber : ∀ b, ((univ.filter fun a ↦ event a b).card : ℚ) /
+      Fintype.card α ≤ epsilon) :
+    ((univ.filter fun value : α × β ↦ event value.1 value.2).card : ℚ) /
+        Fintype.card (α × β) ≤ epsilon := by
+  classical
+  have hα : (0 : ℚ) < Fintype.card α := by
+    exact_mod_cast Fintype.card_pos
+  have hβ : (0 : ℚ) < Fintype.card β := by
+    exact_mod_cast Fintype.card_pos
+  rw [card_filter_prod_snd, Fintype.card_prod]
+  push_cast
+  rw [div_le_iff₀ (mul_pos hα hβ)]
+  calc
+    (∑ b : β, ((univ.filter fun a : α ↦ event a b).card : ℚ))
+        ≤ ∑ _b : β, epsilon * Fintype.card α := by
+          apply Finset.sum_le_sum
+          intro b _
+          exact (div_le_iff₀ hα).mp (hfiber b)
+    _ = epsilon * (Fintype.card α * Fintype.card β) := by
+      simp
+      ring
+
 end Bcs
