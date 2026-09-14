@@ -264,7 +264,11 @@ theorem bad_ratio_le [Fintype D]
           (Fintype.card D) ^ (T - 1) : ℕ) : ℚ) /
         Fintype.card (Fin T → D) := by
   apply div_le_div_of_nonneg_right
-  · exact_mod_cast G.bad_card_le dec hprefix
+  · have hcard := G.bad_card_le dec hprefix
+    have hbudget := Nat.mul_le_mul_right ((Fintype.card D) ^ (T - 1))
+      (Nat.add_le_add_left (Nat.mul_le_mul_right (2 * prefixFuel + 1) G.run_fits)
+        (prefixFuel * (prefixFuel - 1) / 2))
+    exact_mod_cast hcard.trans hbudget
   · exact_mod_cast Nat.zero_le (Fintype.card (Fin T → D))
 
 end PrefixBindingGame
