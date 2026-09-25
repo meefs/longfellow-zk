@@ -910,6 +910,71 @@ theorem descend_recovers_checkValues [DecidableEq D] [DecidableEq Enc]
       rw [step_label_of_ne dec tr n (k + 1) v _ hne]
       exact ih v hv (by omega)
 
+/-- **Recovery along one path.**  `descend_recovers_checkValues` asks for the check's *whole* trace
+inside `tr`.  To recover the value at one opened-path vertex `v` it is enough that the node query of
+every proper ancestor of `v` is there: the descent reaches `v` through those alone.  This is what lets
+a fresh-hit target be indexed by heap vertex — the extractor's label at the first fresh vertex is the
+value the fresh answer has to hit. -/
+theorem descend_recovers_checkValues_of_ancestors [DecidableEq D] [DecidableEq Enc]
+    (S : Scheme Salt M D Enc) (dec : RoleDecoders S.toCodec)
+    (n : ℕ) (I : Finset (Fin n)) (a : Fin n → M) (pf : Opening n I Salt D)
+    (rt : D) (tr : List (Enc × D))
+    (hfree : CollisionFree tr)
+    (hroot : checkValues S n I a pf 1 = rt) :
+    ∀ k v, v ∈ Heap.pathSet n I → v / 2 ≤ k →
+      (∀ u m, 0 < m → v / 2 ^ m = u → 0 < u →
+        (S.nodeEnc (checkValues S n I a pf (2 * u), checkValues S n I a pf (2 * u + 1)),
+          checkValues S n I a pf u) ∈ tr) →
+      (descend dec n tr k (initialState n Salt D M rt)).label v =
+        some (checkValues S n I a pf v) := by
+  intro k
+  induction k with
+  | zero =>
+    intro v hv hle _
+    have hv1 : v = 1 := by
+      have := Heap.pathSet_subset_nodes n I hv
+      rw [Heap.mem_nodes] at this
+      omega
+    subst hv1
+    dsimp [descend, initialState]
+    rw [hroot]
+  | succ k ih =>
+    intro v hv hle hanc
+    show (ExtractState.step dec tr n (k + 1) (descend dec n tr k
+        (initialState n Salt D M rt))).label v =
+      some (checkValues S n I a pf v)
+    by_cases hchild : v = 2 * (k + 1) ∨ v = 2 * (k + 1) + 1
+    · have hdiv : v / 2 = k + 1 := by rcases hchild with h | h <;> omega
+      have hk1path : k + 1 ∈ Heap.pathSet n I := by
+        have hv1 : 1 < v := by rcases hchild with h | h <;> omega
+        rw [Heap.mem_pathSet] at hv ⊢
+        rcases hv with ⟨i, hi, hvi⟩
+        exact ⟨i, hi, by simpa [hdiv] using Heap.parent_mem_pathOf hvi hv1⟩
+      have hk1n : k + 1 < n := by
+        have := Heap.pathSet_subset_nodes n I hv
+        rw [Heap.mem_nodes] at this
+        rcases hchild with hchild | hchild <;> omega
+      have hanc' : ∀ u m, 0 < m → (k + 1) / 2 ^ m = u → 0 < u →
+          (S.nodeEnc (checkValues S n I a pf (2 * u), checkValues S n I a pf (2 * u + 1)),
+            checkValues S n I a pf u) ∈ tr := by
+        intro u m hm hu hu0
+        refine hanc u (m + 1) (by omega) ?_ hu0
+        rw [pow_succ, Nat.mul_comm, ← Nat.div_div_eq_div_mul, hdiv, hu]
+      have hplabel := ih (k + 1) hk1path (by omega) hanc'
+      have hnode_tr := hanc (k + 1) 1 (by omega) (by simpa using hdiv) (by omega)
+      have hstep := step_sets_children S dec n (k + 1)
+        (checkValues S n I a pf (2 * (k + 1)))
+        (checkValues S n I a pf (2 * (k + 1) + 1))
+        (checkValues S n I a pf (k + 1)) tr hfree hnode_tr hk1n
+        (descend dec n tr k (initialState n Salt D M rt)) hplabel
+      rcases hchild with rfl | rfl
+      · exact hstep.1
+      · exact hstep.2
+    · have hne : v ≠ 2 * (k + 1) ∧ v ≠ 2 * (k + 1) + 1 :=
+        ⟨fun h => hchild (Or.inl h), fun h => hchild (Or.inr h)⟩
+      rw [step_label_of_ne dec tr n (k + 1) v _ hne]
+      exact ih v hv (by omega) hanc
+
 /-- The leaf query–answer of an opened index belongs to the materialized check
 trace, with the answer the verifier's reconstructed leaf value. -/
 private lemma checkTraceList_leaf_mem [DecidableEq Enc]
