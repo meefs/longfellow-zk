@@ -124,7 +124,6 @@ theorem hitTarget_hitTargetOf [Inhabited D] [DecidableEq Enc] {Out : Type uAux}
   hitTarget_of_neutralize j default fun tape =>
     candidateLabel C dec rootOf (lazyRun tape default commit []) m
 
-
 /-! ## From queries to pairs
 
 The deterministic theorem wants the check's *query-answer pairs* inside the commitment trace, while
@@ -335,26 +334,6 @@ theorem hitFamily_extractionHits_mono [Inhabited D] [DecidableEq Enc]
   refine ⟨(j, p.2), Finset.mem_product.mpr ⟨Finset.mem_univ _, hp2⟩, ?_⟩
   simpa [j] using heq
 
-/-- Backwards-compatible full-tape relaxation of `hitFamily_of_fresh_generic_eligible`. -/
-theorem hitFamily_of_fresh_generic [Inhabited D] [DecidableEq Enc]
-    (C : Codec Salt M D Enc) (dec : RoleDecoders C) (n t₁ T : ℕ)
-    {Out : Type uAux} (commit : Tree Enc D Out t₁) (rootOf : Out → D)
-    {A : Type uRun} {F : ℕ} (R : Tree Enc D A F) (answers : Fin T → D)
-    (cl : OpeningClaim n Salt M D) (rt : D) (hFT : F ≤ T)
-    (hpref : (lazyRun answers default commit []).2.1 <+: runSlots T R answers)
-    (hrt : rt = rootOf (lazyRun answers default commit []).1)
-    (hcheck : ∀ qa ∈ ((checkPass C n cl.I cl.a cl.pf (2 * n) fun _ => default).run
-        (runOracle T R answers)).2, qa ∈ (R.run (runOracle T R answers)).2)
-    (hacc : Accepts (C.withOracle (runOracle T R answers)) n rt cl.I cl.a cl.pf)
-    (hfresh : ∃ x ∈ checkTraceQueries (C.withOracle (runOracle T R answers)) n cl.I cl.a cl.pf,
-      x ∉ (lazyRun answers default commit []).2.1) :
-    HitFamily T (extractionHits T t₁) Prod.fst
-      (fun p => hitTargetOf C dec t₁ T commit rootOf p.1 p.2) answers := by
-  apply hitFamily_extractionHits_mono C dec t₁ F T commit rootOf answers hFT
-  exact hitFamily_of_fresh_generic_eligible C dec n t₁ T commit rootOf R answers cl rt hFT
-    hpref hrt hcheck hacc hfresh
-
-
 /-! ### The rest of the cover, generically -/
 
 section GenericCover
@@ -496,15 +475,6 @@ def openingClaim (answers : Fin T → D) : OpeningClaim n Salt M D :=
   ((opening (commit.run (extractionOracle C n t₁ t₂ T commit opening answers)).1.2).run
     (extractionOracle C n t₁ t₂ T commit opening answers)).1
 
-/-- The experiment against its own lazy oracle is the lazy execution. -/
-theorem extractionRun_eq (answers : Fin T → D) :
-    (extractionRun C n t₁ t₂ commit opening).run
-        (extractionOracle C n t₁ t₂ T commit opening answers) =
-      ((lazyRun answers default (extractionRun C n t₁ t₂ commit opening) []).1,
-        (lazyRun answers default (extractionRun C n t₁ t₂ commit opening) []).2.2) :=
-  lazyRun_eq_run answers default (extractionRun C n t₁ t₂ commit opening) []
-    (extractionOracle C n t₁ t₂ T commit opening answers) fun _ => rfl
-
 /-- Every pair of the commitment trace is answered by the experiment's oracle.  A real execution
 supplies this; the deterministic theorems take it as a hypothesis. -/
 theorem commitTrace_sound (answers : Fin T → D) :
@@ -574,19 +544,6 @@ queried input rather than read off the tape, so `FreshHit.lean` rather than
 `HitTarget`: a query the commitment stage never made sits at or after the commitment stage's slots,
 and the commitment stage's run is unchanged by neutralizing any slot it never reached. -/
 
-/-- A query absent from the commitment stage occupies a slot at or after its range. -/
-theorem commitSlots_length_le_idxOf (answers : Fin T → D) (x : Enc)
-    (hx : x ∉ (lazyRun answers default commit []).2.1) :
-    (lazyRun answers default commit []).2.1.length ≤
-      (extractionSlots C n t₁ t₂ T commit opening answers).idxOf x := by
-  obtain ⟨rest, hrest⟩ :
-      (lazyRun answers default commit []).2.1 <+:
-        extractionSlots C n t₁ t₂ T commit opening answers :=
-    lazyRun_seen_prefix_bind answers default _ commit []
-  rw [← hrest]
-  exact le_idxOf_of_not_mem_prefix x hx
-
-
 /-- An input absent from the commitment stage's trace is absent from its slots. -/
 theorem not_mem_commitSeen (answers : Fin T → D) (x : Enc)
     (hx : ∀ y, (x, y) ∉ commitTrace C n t₁ t₂ T commit opening answers) :
@@ -606,17 +563,6 @@ theorem mem_extractionRun_trace_of_checkPass (answers : Fin T → D) (qa : Enc �
   rw [extractionRun, Tree.run_bind, Tree.run_bind, Tree.run_map]
   dsimp only
   exact List.mem_append.mpr (Or.inr (List.mem_append.mpr (Or.inr h)))
-
-/-- Every input the experiment queries sits at a slot the oracle answers from. -/
-theorem extraction_slot_of_trace (answers : Fin T → D) (x : Enc) (y : D)
-    (hT : 2 * n + t₂ + t₁ ≤ T)
-    (hx : (x, y) ∈ ((extractionRun C n t₁ t₂ commit opening).run
-      (extractionOracle C n t₁ t₂ T commit opening answers)).2) :
-    ∃ j : Fin T,
-      (extractionSlots C n t₁ t₂ T commit opening answers).idxOf x = j.val ∧
-      extractionOracle C n t₁ t₂ T commit opening answers x = answers j ∧
-      j.val < 2 * n + t₂ + t₁ :=
-  run_slot_of_trace T (extractionRun C n t₁ t₂ commit opening) answers x y hT hx
 
 /-- **Events 2 and 3.**  If the check accepts but presents an input the commitment stage never
 queried, some slot of the fixed family carries a commitment-determined candidate label.
@@ -656,7 +602,6 @@ theorem hitFamily_of_fresh (dec : RoleDecoders C) (answers : Fin T → D)
   rw [commitRoot, commitRun_eq C n t₁ t₂ T commit opening answers]
 
 end Experiment
-
 
 /-! ## The reduction -/
 

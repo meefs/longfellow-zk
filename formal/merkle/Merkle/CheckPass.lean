@@ -174,20 +174,6 @@ theorem mem_pathSet_of_vertexQuery (n : ℕ) (I : Finset (Fin n)) (a : Fin n →
       exact hpath.2.2
     · exact absurd h (by simp)
 
-/-- Every input `InIndexTrace` can present at an opened index is presented at a vertex of that
-index's path. -/
-theorem vertexQuery_of_inIndexTrace (n : ℕ) (I : Finset (Fin n)) (a : Fin n → M)
-    (pf : Opening n I Salt D) (i : Fin n) (hi : i ∈ I) (x : Enc) (y : D)
-    (hxy : InIndexTrace S n I a pf i hi x y) :
-    ∃ w, 0 < w ∧ w < 2 * n ∧ vertexQuery S n I a pf w = some x := by
-  rcases hxy with ⟨rfl, -⟩ | ⟨v, hvpath, hvlt, rfl, -⟩
-  · have hlt := i.isLt
-    exact ⟨n + i.val, by omega, by omega, vertexQuery_leaf_pos S n I a pf i hi⟩
-  · have hvpos : 0 < v := (Heap.mem_pathOf.mp hvpath).1
-    exact ⟨v, hvpos, by omega, vertexQuery_node S n I a pf v
-      ⟨hvpos, hvlt, Heap.mem_pathSet.mpr ⟨i, hi, hvpath⟩⟩⟩
-
-
 /-! ## The pass -/
 
 variable {S}
@@ -455,18 +441,6 @@ theorem mem_checkPass_trace_of_vertexQuery [DecidableEq Enc] (C : Codec Salt M D
   exact (checkPass_run C n I a pf H (2 * n) (fun _ => default) hinit).2 w x hw
     (by omega) hq
 
-/-- The corollary the reduction uses: every input the reconstruction presents at an opened index is
-in its trace. -/
-theorem mem_checkPass_trace_of_inIndexTrace [DecidableEq Enc] (C : Codec Salt M D Enc)
-    (n : ℕ) (I : Finset (Fin n)) (a : Fin n → M) (pf : Opening n I Salt D) (H : Enc → D)
-    (i : Fin n) (hi : i ∈ I) (x : Enc) (y : D)
-    (hxy : InIndexTrace (C.withOracle H) n I a pf i hi x y) :
-    ∃ y', (x, y') ∈
-      ((checkPass C n I a pf (2 * n) (fun _ => default)).run H).2 := by
-  obtain ⟨w, hwpos, hwlt, hq⟩ :=
-    vertexQuery_of_inIndexTrace (C.withOracle H) n I a pf i hi x y hxy
-  exact mem_checkPass_trace_of_vertexQuery C n I a pf H w x hwpos hwlt hq
-
 /-! ## The honest commitment as a bounded execution
 
 Root hiding needs the *committer* inside the lazy execution too, and it needs it to run **first** —
@@ -580,15 +554,6 @@ theorem commitPass_run [DecidableEq Enc] (C : Codec Salt M D Enc) (n : ℕ) (non
         rw [hstep, Tree.run_weaken]
         exact ih (Function.update vals (k + 1) default) hinv' v hv
 
-/-- The commitment pass over the whole heap computes the honest root. -/
-theorem commitPass_root [DecidableEq Enc] (C : Codec Salt M D Enc) (n : ℕ) (hn : 0 < n)
-    (nonce : Fin n → Salt) (m : Fin n → M) (H : Enc → D) :
-    ((commitPass C n nonce m (2 * n - 1) fun _ => default).run H).1 1 =
-      root (C.withOracle H) n nonce m := by
-  refine commitPass_run C n nonce m H (2 * n - 1) (fun _ => default) (fun v hv => ?_) 1 (by omega)
-  exact (commitLabels_of_ge (S := C.withOracle H) n nonce m v (by omega)).symm
-
-
 /-- Every heap vertex in `[1, 2n-1]` makes exactly one query, so a pass over `k ≤ 2n-1` of them
 records exactly `k`.  Vertex `2n` is the only one in range that hashes nothing. -/
 theorem commitPass_trace_length [DecidableEq Enc] (C : Codec Salt M D Enc) (n : ℕ) (hn : 0 < n)
@@ -697,8 +662,6 @@ theorem commitPass_trace_getLast [DecidableEq Enc] (C : Codec Salt M D Enc) (n :
         rw [List.getLast?_cons_of_ne_nil hne]
         exact ih _ (by omega) (by omega) hinv'
 
-
-
 /-- Step equations for the commitment pass, one per branch. -/
 theorem commitPass_step_leaf [DecidableEq Enc] (C : Codec Salt M D Enc) (n : ℕ)
     (nonce : Fin n → Salt) (m : Fin n → M) (k : ℕ) (vals : ℕ → D)
@@ -739,16 +702,10 @@ theorem commitPass_invariant_update [DecidableEq Enc] (C : Codec Salt M D Enc) (
 /-! ### The commitment's inputs are pairwise distinct
 
 Commit-first fixes the commitment's slot indices only if its own queries never repeat, so the whole
-question is whether two heap vertices can present the same oracle input.  Three ways they can, and
-each is an event to be bounded rather than a fact:
-
-* two leaves — the same nonce-message pair (`nonceCollision`, `Hiding.lean`);
-* two internal vertices — the same pair of child labels (`nodeCollision`);
-* a leaf and an internal vertex — possible because the encoding *ranges* may overlap, which this
-  development deliberately permits (`concrete_ranges_overlap_iff`) (`crossCollision`).
-
-`commitInputsInjective` is what the slot argument actually consumes, and
-`commitInputsInjective_of_no_collision` derives it from the absence of all three. -/
+question is whether two heap vertices can present the same oracle input: two leaves with the same
+nonce-message pair, two internal vertices with the same child labels, or a leaf and an internal
+vertex (the two encodings' *ranges* may overlap).  `commitInputsInjective` is what the slot argument
+consumes; `CommitCollision.lean` costs its failure. -/
 
 /-- The oracle input the honest commitment presents at vertex `v`, if any. -/
 def commitInput [DecidableEq Enc] (C : Codec Salt M D Enc) (n : ℕ) (nonce : Fin n → Salt)
@@ -760,67 +717,11 @@ def commitInput [DecidableEq Enc] (C : Codec Salt M D Enc) (n : ℕ) (nonce : Fi
       commitLabels (C.withOracle H) n nonce m (2 * v + 1)))
   else none
 
-/-- Two internal vertices present the same node input. -/
-def nodeCollision [DecidableEq Enc] (C : Codec Salt M D Enc) (n : ℕ) (nonce : Fin n → Salt)
-    (m : Fin n → M) (H : Enc → D) : Prop :=
-  ∃ v w : ℕ, 0 < v ∧ v < n ∧ 0 < w ∧ w < n ∧ v ≠ w ∧
-    C.nodeEnc (commitLabels (C.withOracle H) n nonce m (2 * v),
-        commitLabels (C.withOracle H) n nonce m (2 * v + 1)) =
-      C.nodeEnc (commitLabels (C.withOracle H) n nonce m (2 * w),
-        commitLabels (C.withOracle H) n nonce m (2 * w + 1))
-
-/-- A leaf and an internal vertex present the same input — possible only because leaf and node
-encoding ranges are permitted to overlap. -/
-def crossCollision [DecidableEq Enc] (C : Codec Salt M D Enc) (n : ℕ) (nonce : Fin n → Salt)
-    (m : Fin n → M) (H : Enc → D) : Prop :=
-  ∃ (i : Fin n) (v : ℕ), 0 < v ∧ v < n ∧
-    C.leafEnc (nonce i, m i) =
-      C.nodeEnc (commitLabels (C.withOracle H) n nonce m (2 * v),
-        commitLabels (C.withOracle H) n nonce m (2 * v + 1))
-
 /-- What the slot argument consumes: distinct vertices present distinct inputs. -/
 def commitInputsInjective [DecidableEq Enc] (C : Codec Salt M D Enc) (n : ℕ)
     (nonce : Fin n → Salt) (m : Fin n → M) (H : Enc → D) : Prop :=
   ∀ v w : ℕ, 0 < v → v < 2 * n → 0 < w → w < 2 * n → v ≠ w →
     ∀ x, commitInput C n nonce m H v = some x → commitInput C n nonce m H w ≠ some x
-
-/-- Off all three collision events the commitment's inputs are pairwise distinct. -/
-theorem commitInputsInjective_of_no_collision [DecidableEq Enc] (C : Codec Salt M D Enc) (n : ℕ)
-    (nonce : Fin n → Salt) (m : Fin n → M) (H : Enc → D)
-    (hleafcol : ∀ i j : Fin n, i ≠ j → C.leafEnc (nonce i, m i) ≠ C.leafEnc (nonce j, m j))
-    (hnodecol : ¬ nodeCollision C n nonce m H)
-    (hcross : ¬ crossCollision C n nonce m H) :
-    commitInputsInjective C n nonce m H := by
-  intro v w hv hvlt hw hwlt hvw x hxv hxw
-  unfold commitInput at hxv hxw
-  split at hxv
-  · rename_i hvleaf
-    split at hxw
-    · -- two leaves
-      rename_i hwleaf
-      refine hleafcol ⟨v - n, by omega⟩ ⟨w - n, by omega⟩ (fun hij => ?_) ?_
-      · exact hvw (by have := Fin.mk.inj_iff.mp hij; omega)
-      · exact (Option.some_inj.mp hxv).trans (Option.some_inj.mp hxw).symm
-    · -- leaf then internal
-      split at hxw
-      · rename_i hwint
-        exact hcross ⟨⟨v - n, by omega⟩, w, hwint.1, hwint.2,
-          (Option.some_inj.mp hxv).trans (Option.some_inj.mp hxw).symm⟩
-      · exact absurd hxw (by simp)
-  · split at hxv
-    · rename_i hvint
-      split at hxw
-      · -- internal then leaf
-        rename_i hwleaf
-        exact hcross ⟨⟨w - n, by omega⟩, v, hvint.1, hvint.2,
-          (Option.some_inj.mp hxw).trans (Option.some_inj.mp hxv).symm⟩
-      · split at hxw
-        · -- two internal
-          rename_i hwint
-          exact hnodecol ⟨v, w, hvint.1, hvint.2, hwint.1, hwint.2, hvw,
-            (Option.some_inj.mp hxv).trans (Option.some_inj.mp hxw).symm⟩
-        · exact absurd hxw (by simp)
-    · exact absurd hxv (by simp)
 
 /-- Every input the pass queries is the input of one of the vertices it processed. -/
 theorem mem_commitPass_trace_vertex [DecidableEq Enc] (C : Codec Salt M D Enc) (n : ℕ)
@@ -914,7 +815,6 @@ theorem commitPass_trace_nodup [DecidableEq Enc] (C : Codec Salt M D Enc) (n : �
           rw [commitLabels, dif_neg hleaf, dif_neg hint]
         rw [commitPass_step_none C n nonce m k vals hleaf hint, Tree.run_weaken]
         exact ih _ (by omega) (commitPass_invariant_update C n nonce m H k vals hinv _ hcv)
-
 
 /-! ### The root sits at a fixed slot
 
@@ -1123,7 +1023,6 @@ theorem commitLabels_eq_tape [DecidableEq Enc] (C : Codec Salt M D Enc) (n : ℕ
     (commitPass C n nonce m (2 * n - 1) fun _ => default) [] qa
     (by rw [← htr]; exact List.mem_of_getElem? hqamem)
   rw [← hqasnd, hslot.2, hidx, tapeAt, dif_pos hT]
-
 
 end MH
 

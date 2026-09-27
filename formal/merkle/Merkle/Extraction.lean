@@ -15,13 +15,9 @@ extraction result downstream needs:
 
 * **`checkTraceQueries` / `checkTraceList`** — the materialized query trace of a core
   check: every oracle input `checkValues` can present, as data rather than as the
-  predicate `InIndexTrace`.  `mem_checkTraceQueries_of_inIndexTrace` is the bridge
-  from the predicate to the list, and `checkTraceQueries_card_le` bounds the check's
-  total oracle budget by `|I| + |pathSet n I| ≤ |I| · (heapDepth n + 2)`.
+  predicate `InIndexTrace`.
 
-This is the vocabulary the `ROMBindingGame` inhabitation needs in order to place the
-check's trace queries at dedicated tape slots, and the vocabulary `ExtractionROM`'s
-three-event cover counts.
+This is the vocabulary `ExtractionROM`'s three-event cover counts.
 -/
 
 open Finset Nat Heap
@@ -68,21 +64,6 @@ theorem RoleDecoders.inj {C : Codec Salt M D Enc} (dec : RoleDecoders C) :
     rw [dec.node_roundTrip, dec.node_roundTrip] at h₀
     exact Option.some_inj.mp h₀
 
-/-- A successful leaf decode is a genuine preimage, restated as an equality of
-the decoded pair with the unique preimage of the input. -/
-theorem RoleDecoders.leaf_preimage {C : Codec Salt M D Enc}
-    (dec : RoleDecoders C) {x : Enc} {sm : Salt × M}
-    (hdec : dec.leafDec x = some sm) :
-    C.leafEnc sm = x :=
-  dec.leaf_sound x sm hdec
-
-/-- A successful node decode is a genuine preimage. -/
-theorem RoleDecoders.node_preimage {C : Codec Salt M D Enc}
-    (dec : RoleDecoders C) {x : Enc} {dd : D × D}
-    (hdec : dec.nodeDec x = some dd) :
-    C.nodeEnc dd = x :=
-  dec.node_sound x dd hdec
-
 variable (S : Scheme Salt M D Enc) [Inhabited D]
 
 /-! ## The materialized check trace -/
@@ -98,89 +79,12 @@ def checkTraceQueries [DecidableEq Enc]
       S.nodeEnc (checkValues S n I a pf (2 * v),
         checkValues S n I a pf (2 * v + 1))
 
-/-- Every query presented by `InIndexTrace` at any opened index is a member of
-the materialized check trace. -/
-theorem mem_checkTraceQueries_of_inIndexTrace [DecidableEq Enc]
-    (n : ℕ) (I : Finset (Fin n)) (a : Fin n → M)
-    (pf : Opening n I Salt D) (i : Fin n) (hi : i ∈ I)
-    (x : Enc) (y : D) (hxy : InIndexTrace S n I a pf i hi x y) :
-    x ∈ checkTraceQueries S n I a pf := by
-  rcases hxy with ⟨rfl, _⟩ | ⟨v, hvpath, hvlt, rfl, _⟩
-  · rw [checkTraceQueries]
-    apply Finset.mem_union_left
-    refine Finset.mem_image.mpr ⟨⟨i, hi⟩, Finset.mem_attach I ⟨i, hi⟩, rfl⟩
-  · rw [checkTraceQueries]
-    refine Finset.mem_union_right _ (Finset.mem_image.mpr ⟨v, ?_, rfl⟩)
-    exact Finset.mem_filter.mpr
-      ⟨Heap.mem_pathSet.mpr ⟨i, hi, hvpath⟩,
-        ⟨(Heap.mem_pathOf.mp hvpath).1, hvlt⟩⟩
-
-/-- The check's total oracle budget: at most one leaf query per opened index plus
-one node query per internal path vertex. -/
-theorem checkTraceQueries_card_le [DecidableEq Enc]
-    (n : ℕ) (I : Finset (Fin n)) (a : Fin n → M)
-    (pf : Opening n I Salt D) :
-    (checkTraceQueries S n I a pf).card ≤ I.card + (Heap.pathSet n I).card := by
-  classical
-  calc (checkTraceQueries S n I a pf).card
-      ≤ (I.attach.image fun ⟨i, hi⟩ => S.leafEnc (pf.nonce ⟨i, hi⟩, a i)).card +
-          (((Heap.pathSet n I).filter (fun v => 0 < v ∧ v < n)).image fun v =>
-            S.nodeEnc (checkValues S n I a pf (2 * v),
-              checkValues S n I a pf (2 * v + 1))).card :=
-        Finset.card_union_le _ _
-    _ ≤ I.card + (Heap.pathSet n I).card := by
-        gcongr
-        · calc (I.attach.image fun ⟨i, hi⟩ =>
-              S.leafEnc (pf.nonce ⟨i, hi⟩, a i)).card
-              ≤ I.attach.card := Finset.card_image_le
-          _ = I.card := Finset.card_attach
-        · exact (Finset.card_image_le).trans (Finset.card_le_card
-            (Finset.filter_subset _ _))
-
-/-- The budget in heap-depth form: `|I| · (heapDepth n + 2)`. -/
-theorem checkTraceQueries_card_le_depth [DecidableEq Enc]
-    (n : ℕ) (I : Finset (Fin n)) (a : Fin n → M)
-    (pf : Opening n I Salt D) :
-    (checkTraceQueries S n I a pf).card ≤ I.card * (Heap.heapDepth n + 2) := by
-  calc (checkTraceQueries S n I a pf).card
-      ≤ I.card + (Heap.pathSet n I).card :=
-        checkTraceQueries_card_le S n I a pf
-    _ ≤ I.card + I.card * (Heap.heapDepth n + 1) := by
-        gcongr
-        exact Heap.pathSet_card_le n I
-    _ = I.card * (Heap.heapDepth n + 2) := by ring
-
 /-- The materialized check trace as a list of query-answer pairs: every trace
 query paired with the answer the scheme's hash gives it. -/
 noncomputable def checkTraceList [DecidableEq Enc]
     (n : ℕ) (I : Finset (Fin n)) (a : Fin n → M)
     (pf : Opening n I Salt D) : List (Enc × D) :=
   (checkTraceQueries S n I a pf).toList.map fun q => (q, S.H q)
-
-/-- Every pair in the materialized trace is answered by the scheme's hash. -/
-theorem checkTraceList_answer_sound [DecidableEq Enc]
-    (n : ℕ) (I : Finset (Fin n)) (a : Fin n → M)
-    (pf : Opening n I Salt D)
-    (qa : Enc × D) (hqa : qa ∈ checkTraceList S n I a pf) :
-    qa.2 = S.H qa.1 := by
-  rcases List.mem_map.mp hqa with ⟨q, hq, rfl⟩
-  rfl
-
-/-- The materialized trace covers `InIndexTrace`: a query-answer pair presented
-at any opened index appears in `checkTraceList`, with the answer the predicate
-asserts. -/
-theorem mem_checkTraceList_of_inIndexTrace [DecidableEq Enc]
-    (n : ℕ) (I : Finset (Fin n)) (a : Fin n → M)
-    (pf : Opening n I Salt D) (i : Fin n) (hi : i ∈ I)
-    (x : Enc) (y : D) (hxy : InIndexTrace S n I a pf i hi x y) :
-    (x, y) ∈ checkTraceList S n I a pf := by
-  have hy : y = S.H x := indexTrace_sound S n I a pf i hi x y hxy
-  subst hy
-  have hmem : x ∈ checkTraceQueries S n I a pf :=
-    mem_checkTraceQueries_of_inIndexTrace S n I a pf i hi x (S.H x) hxy
-  rw [checkTraceList]
-  refine List.mem_map.mpr ⟨x, ?_, rfl⟩
-  rwa [Finset.mem_toList]
 
 /-! ## The partial-tree extractor -/
 
@@ -263,16 +167,6 @@ noncomputable def extract (dec : RoleDecoders C) [DecidableEq D]
     some { trapdoor := td, message := fun i => (s.message i).elim default id }
   else none
 
-/-- A label *derived from the root*: it is `rt` at the root, or it was decoded
-from a trace pair carrying a derived parent label. -/
-inductive Derives (dec : RoleDecoders C) (tr : List (Enc × D)) (rt : D) :
-    ℕ → D → Prop where
-  | root : Derives dec tr rt 1 rt
-  | nodeLeft {v d q l r} : Derives dec tr rt v d → (q, d) ∈ tr →
-      dec.nodeDec q = some (l, r) → Derives dec tr rt (2 * v) l
-  | nodeRight {v d q l r} : Derives dec tr rt v d → (q, d) ∈ tr →
-      dec.nodeDec q = some (l, r) → Derives dec tr rt (2 * v + 1) r
-
 omit [Inhabited D] in
 /-- The extractor is sound on labels: every label the descent knows is derived
 from the root by a chain of trace decodings.  This is the invariant everything
@@ -289,50 +183,9 @@ private theorem find?_answer_mem [DecidableEq D] (tr : List (Enc × D)) (d : D)
   exact ⟨hget ▸ List.getElem_mem hi, by simpa using hpred⟩
 
 omit [Inhabited D] in
-private theorem step_label_cases (dec : RoleDecoders C) [DecidableEq D]
-    (tr : List (Enc × D)) (n v v' : ℕ) (s : ExtractState n Salt D M) (d : D)
-    (h : (ExtractState.step dec tr n v s).label v' = some d) :
-    s.label v' = some d ∨
-    ∃ dpar q l r, s.label v = some dpar ∧ (q, dpar) ∈ tr ∧
-      dec.nodeDec q = some (l, r) ∧
-      ((v' = 2 * v ∧ d = l) ∨ (v' = 2 * v + 1 ∧ d = r)) := by
-  dsimp [ExtractState.step] at h
-  split at h
-  · exact Or.inl h
-  · rename_i dpar hdpar
-    split at h
-    · exact Or.inl h
-    · rename_i qa hfind
-      have ⟨hqamem, hqans⟩ := find?_answer_mem tr dpar qa hfind
-      have hqamem' : (qa.1, dpar) ∈ tr := by
-        rw [← hqans]; simpa using hqamem
-      split at h
-      · split at h
-        · rename_i l r hdec
-          dsimp at h
-          rw [Function.update_apply] at h
-          split_ifs at h with hright
-          · apply Or.inr
-            refine ⟨dpar, qa.1, l, r, hdpar, hqamem', hdec,
-              Or.inr ⟨hright, Option.some_inj.mp h.symm⟩⟩
-          · rw [Function.update_apply] at h
-            split_ifs at h with hleft
-            · apply Or.inr
-              refine ⟨dpar, qa.1, l, r, hdpar, hqamem', hdec,
-                Or.inl ⟨hleft, Option.some_inj.mp h.symm⟩⟩
-            · exact Or.inl h
-        · exact Or.inl h
-      · split at h
-        · split at h
-          · dsimp at h
-            exact Or.inl h
-          · exact Or.inl h
-        · exact Or.inl h
-
-omit [Inhabited D] in
 /-- Away from the two children of the processed vertex, a step leaves every
-label unchanged.  Together with `step_label_cases` this says the descent only
-ever *adds* child labels, never disturbs existing knowledge. -/
+label unchanged: the descent only ever *adds* child labels, never disturbs
+existing knowledge. -/
 private theorem step_label_of_ne (dec : RoleDecoders C) [DecidableEq D]
     (tr : List (Enc × D)) (n v u : ℕ) (s : ExtractState n Salt D M)
     (hu : u ≠ 2 * v ∧ u ≠ 2 * v + 1) :
@@ -356,51 +209,6 @@ private theorem step_label_of_ne (dec : RoleDecoders C) [DecidableEq D]
           · rfl
           · rfl
         · rfl
-
-omit [Inhabited D] in
-/-- The root label survives the whole descent: the descent only writes child
-labels `2v, 2v+1` for `v ≥ 1`, so position `1` is never touched. -/
-theorem descend_root_label (dec : RoleDecoders C) [DecidableEq D]
-    (n : ℕ) (tr : List (Enc × D)) (rt : D) (k : ℕ) :
-    (descend dec n tr k
-        ({ label := fun v => if v = 1 then some rt else none
-           nonce := fun _ => none
-           message := fun _ => none } :
-          ExtractState n Salt D M)).label 1 = some rt := by
-  induction k with
-  | zero => simp [descend]
-  | succ k ih =>
-    dsimp [descend]
-    rw [step_label_of_ne dec tr n (k + 1) 1 _ ⟨by omega, by omega⟩]
-    exact ih
-
-omit [Inhabited D] in
-/-- The extractor is sound on labels: every label the descent knows is derived
-from the root by a chain of trace decodings. -/
-theorem descend_label_derived (dec : RoleDecoders C) [DecidableEq D]
-    (n : ℕ) (tr : List (Enc × D)) (rt : D) :
-    ∀ (k : ℕ) (s : ExtractState n Salt D M),
-      (∀ v d, s.label v = some d → Derives dec tr rt v d) →
-      ∀ v d, (descend dec n tr k s).label v = some d →
-        Derives dec tr rt v d := by
-  intro k
-  induction k with
-  | zero =>
-    intro s hs v d hd
-    dsimp [descend] at hd
-    exact hs v d hd
-  | succ k ih =>
-    intro s hs v d hd
-    dsimp [descend] at hd
-    rcases step_label_cases dec tr n (k + 1) v
-        (descend dec n tr k s) d hd with hkeep | ⟨dpar, q, l, r, hdpar, hqmem,
-          hdec, hv'⟩
-    · exact ih s hs v d hkeep
-    · have hpar : Derives dec tr rt (k + 1) dpar :=
-        ih s hs (k + 1) dpar hdpar
-      rcases hv' with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
-      · exact Derives.nodeLeft hpar hqmem hdec
-      · exact Derives.nodeRight hpar hqmem hdec
 
 /-! ## Complete honest traces: the deterministic core
 
@@ -445,16 +253,6 @@ theorem find?_answer_unique [DecidableEq D] (tr : List (Enc × D))
     qa'.1 = qa.1 := by
   have ⟨hqamem, hqans⟩ := find?_answer_mem tr d qa hfind
   exact hfree qa' hqa' qa hqamem (by rw [hans, hqans])
-
-omit [Inhabited D] in
-/-- Under a sound trace, the query found for an answer really hashes to that
-answer. -/
-theorem find?_answer_hashes [DecidableEq D] (S : Scheme Salt M D Enc)
-    (tr : List (Enc × D)) (hsound : TraceSound S tr) (d : D) (qa : Enc × D)
-    (hfind : List.find? (fun qa : Enc × D => qa.2 = d) tr = some qa) :
-    S.H qa.1 = d := by
-  have ⟨hqamem, hqans⟩ := find?_answer_mem tr d qa hfind
-  exact (hsound qa hqamem).symm.trans hqans
 
 omit [Inhabited D] in
 /-- Reduction of `step` when the label is present, the trace lookup succeeds,

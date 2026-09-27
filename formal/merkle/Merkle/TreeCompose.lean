@@ -4,10 +4,9 @@ import Merkle.FreshHit
 /-!
 # Composing bounded executions, and lazy sampling as a total oracle
 
-`ROMBindingGame` fixes one adaptive execution and one slot layout.  Its inhabitant has to run
-*two* things against the same oracle — the binder and the verifier's reconstruction — because the
-collision the binding reduction extracts consists of one query from each accepting check, and only
-queried inputs occupy slots.  This file supplies the two missing pieces.
+The binding and extraction games run *two* things against the same oracle — the adversary and the
+verifier's reconstruction — because the events they cost involve queries from both, and only
+queried inputs occupy slots.  This file supplies the two pieces that needs.
 
 **Composition.**  `Tree.bind` runs one bounded execution and then another, adding the query budgets;
 `Tree.map` and `Tree.weaken`/`Tree.weakenAdd` are the bookkeeping around it.  The fuel of
@@ -20,8 +19,7 @@ coincides — same output, same trace — with the ordinary execution against th
     H x = tape (slot of x in the final seen-list)
 
 This is what makes the lazy model faithful rather than merely convenient: a game may sample the
-oracle lazily and still be *stated* with a total oracle, which is exactly what `ROMBindingGame`
-does (`oracle : (Fin T → D) → Enc → D`, with acceptance evaluated against it).
+oracle lazily and still be *stated* with a total oracle, with acceptance evaluated against it.
 -/
 
 open Finset
@@ -169,88 +167,6 @@ theorem lazyRun_congr_of_agree (tape tape' : Fin T → D) (dflt : D) :
       have hrec := lazyRun_congr_of_agree tape tape' dflt (next y) seen' hagree'
       rw [lazyRun_query, lazyRun_query]
       simp only [← hseen', hy', ← hy, hrec]
-
-/-- **Locality below a slot.**  A run whose own slots all lie below `j` cannot notice a change at slot
-`j` or above.  Sharper than `lazyRun_congr_of_agree`, which asks about the *final* seen-list length,
-because the trace-length bound replaces fuel by the number of queries actually made.
-
-This is the form a fresh-hit argument needs: the target a fresh slot must land on has to be a function
-of the tape *off* that slot, and this is what says an earlier phase computes such a function. -/
-theorem lazyRun_congr_of_agree_below (tape tape' : Fin T → D) (dflt : D) (j : ℕ) {fuel : ℕ}
-    (c : Tree Q D A fuel) (seen : List Q)
-    (hlen : seen.length + (lazyRun tape dflt c seen).2.2.length ≤ j)
-    (hagree : ∀ i : Fin T, i.val < j → tape i = tape' i) :
-    lazyRun tape' dflt c seen = lazyRun tape dflt c seen :=
-  lazyRun_congr_of_agree tape tape' dflt c seen fun i hi =>
-    hagree i (lt_of_lt_of_le hi (le_trans (lazyRun_seen_length_le_trace tape dflt c seen) hlen))
-
-/-! ### The prefix kernel: charging a collision by query position
-
-`answerTape_pairCollision_card_le` charges a collision to a *pair of slots*, so covering "one binder
-query, one reconstruction query" costs `t · (reconstruction range)`.  Chapter 18's Lemma 18.4.1 has no
-such term because it charges to a *pair of queries*, using that at least one of the two is fresh when
-the collision is forced.
-
-These two lemmas are that argument's kernel.  `lazyRun_take_congr_of_agree_below` says a run's first
-`N+1` trace entries are a function of the tape below `seen.length + N + 1`; `hitTarget_trace_prefix`
-turns that into the `HitTarget` obligation of `FreshHit.lean`.  Together: **a value read off a run's
-first `N` queries is a legitimate fresh-hit target for every slot at or beyond `seen.length + N`** — so
-such a collision costs `1/|D|` per (slot, position) pair rather than per slot pair, and the `t` factor
-disappears. -/
-
-theorem lazyRun_take_congr_of_agree_below (tape tape' : Fin T → D) (dflt : D) (j : ℕ)
-    (hagree : ∀ i : Fin T, i.val < j → tape i = tape' i) :
-    ∀ {f : ℕ} (c : Tree Q D A f) (seen : List Q) (N : ℕ), seen.length + N + 1 ≤ j →
-      (lazyRun tape dflt c seen).2.2.take (N + 1) =
-        (lazyRun tape' dflt c seen).2.2.take (N + 1)
-  | _, .done _, _, _, _ => by simp
-  | _, .query q next, seen, N, hj => by
-      rw [lazyRun_query, lazyRun_query]
-      dsimp only
-      set seen' := if q ∈ seen then seen else seen ++ [q] with hseen'
-      have hidx : seen'.idxOf q ≤ seen.length := by
-        by_cases h : q ∈ seen
-        · simp only [hseen', if_pos h]
-          exact le_of_lt (List.idxOf_lt_length_of_mem h)
-        · simp only [hseen', if_neg h, List.idxOf_append_of_notMem h]
-          simp
-      have hseenlen : seen'.length ≤ seen.length + 1 := by
-        by_cases h : q ∈ seen
-        · simp [hseen', h]
-        · simp [hseen', h]
-      have hy : tapeAt tape dflt (seen'.idxOf q) = tapeAt tape' dflt (seen'.idxOf q) := by
-        rw [tapeAt, tapeAt]
-        by_cases hlt : seen'.idxOf q < T
-        · rw [dif_pos hlt, dif_pos hlt]
-          exact hagree ⟨seen'.idxOf q, hlt⟩ (by show seen'.idxOf q < j; omega)
-        · rw [dif_neg hlt, dif_neg hlt]
-      cases N with
-      | zero => simp [hy]
-      | succ N =>
-        rw [List.take_succ_cons, List.take_succ_cons, hy]
-        refine congrArg _ ?_
-        exact lazyRun_take_congr_of_agree_below tape tape' dflt j hagree
-          (next (tapeAt tape' dflt (seen'.idxOf q))) seen' N (by omega)
-
-/-- **A value read off a run's first `N` queries is a fresh-hit target for slot `j`.**  This is the
-`HitTarget` obligation `answerTape_hitFamily_card_le` consumes, discharged by prefix locality rather
-than by neutralizing the tape — so the target is the *real* value, not a re-run of the experiment. -/
-theorem hitTarget_trace_prefix (dflt : D) {f : ℕ} (c : Tree Q D A f) (seen : List Q)
-    (N : ℕ) (j : Fin T) (hj : seen.length + N + 1 ≤ j.val) (p : ℕ) (φ : Q × D → D) :
-    HitTarget (D := D) j (fun tape : Fin T → D =>
-      ((lazyRun tape dflt c seen).2.2.take (N + 1))[p]?.elim dflt φ) := by
-  intro tape d
-  have hagree : ∀ i : Fin T, i.val < j.val →
-      Function.update tape j d i = tape i := by
-    intro i hi
-    rw [Function.update_apply]
-    split_ifs with hij
-    · exact absurd hi (by rw [hij]; omega)
-    · rfl
-  show ((lazyRun (Function.update tape j d) dflt c seen).2.2.take (N + 1))[p]?.elim dflt φ
-      = ((lazyRun tape dflt c seen).2.2.take (N + 1))[p]?.elim dflt φ
-  rw [lazyRun_take_congr_of_agree_below (Function.update tape j d) tape dflt j.val hagree
-    c seen N hj]
 
 /-! ### Lazy runs compose
 
@@ -495,7 +411,6 @@ theorem lazyRun_slot_eq_of_take_nodup (tape : Fin T → D) (dflt : D) {f : ℕ} 
   rw [← hrest, List.idxOf_append_of_mem (hgetl ▸ hmem), ← hgetl]
   exact (List.Nodup.getElem_inj_iff hnodup).mp
     (List.getElem_idxOf (List.idxOf_lt_length_of_mem hmem))
-
 
 /-! ### Identical-until-bad for two slot layouts
 
@@ -940,73 +855,6 @@ theorem lazyRun_shift_take_congr (tape : Fin T → D) (dflt : D) (base : List Q)
         refine hsub r ?_
         simp only [if_neg hnmem, hidx, happ]
         exact hr
-
-/-- **The first hit is common to both runs.**  Counterpart to `lazyRun_congr_of_base`: that lemma
-says two executions agree while they avoid both bases, this one says a *hit* transfers.  Up to the
-first query landing in either base the two runs step in lockstep, and that query is made by both.
-
-This is what lets an adaptive query set be counted against a *reference* layout: whatever the real
-run hits, the reference run hits too, and the reference run's query set does not depend on the real
-one's secrets. -/
-theorem lazyRun_hits_of_base (tape : Fin T → D) (dflt : D) (base₀ base₁ : List Q)
-    (hlen : base₀.length = base₁.length) :
-    ∀ {f : ℕ} (c : Tree Q D A f) (tail : List Q),
-      (∃ qa ∈ (lazyRun tape dflt c (base₀ ++ tail)).2.2, qa.1 ∈ base₀ ∨ qa.1 ∈ base₁) →
-      (∃ qa ∈ (lazyRun tape dflt c (base₁ ++ tail)).2.2, qa.1 ∈ base₀ ∨ qa.1 ∈ base₁)
-  | _, .done _, _, hhit => by
-      obtain ⟨qa, hqa, -⟩ := hhit
-      simp at hqa
-  | _, .query q next, tail, hhit => by
-      by_cases hqb : q ∈ base₀ ∨ q ∈ base₁
-      · -- the head already hits, and the other run makes the same query
-        refine ⟨(q, tapeAt tape dflt
-          ((if q ∈ base₁ ++ tail then base₁ ++ tail else (base₁ ++ tail) ++ [q]).idxOf q)), ?_,
-          hqb⟩
-        rw [lazyRun_query]
-        simp
-      · -- no hit yet: the two runs agree on this step, so recurse
-        push Not at hqb
-        obtain ⟨hq₀, hq₁⟩ := hqb
-        by_cases hqt : q ∈ tail
-        · have hmem : ∀ b : List Q, q ∈ b ++ tail := fun b =>
-            List.mem_append.mpr (Or.inr hqt)
-          have hidx : ∀ b : List Q, q ∉ b →
-              (b ++ tail).idxOf q = b.length + tail.idxOf q := fun b hb =>
-            List.idxOf_append_of_notMem hb
-          rw [lazyRun_query] at hhit ⊢
-          simp only [if_pos (hmem base₀), hidx base₀ hq₀] at hhit
-          simp only [if_pos (hmem base₁), hidx base₁ hq₁]
-          rw [← hlen]
-          obtain ⟨qa, hqa, hqab⟩ := hhit
-          rcases List.mem_cons.mp hqa with rfl | hqa
-          · exact absurd hqab (by simpa using ⟨hq₀, hq₁⟩)
-          · obtain ⟨qa', hqa', hqab'⟩ := lazyRun_hits_of_base tape dflt base₀ base₁ hlen
-              (next (tapeAt tape dflt (base₀.length + tail.idxOf q))) tail ⟨qa, hqa, hqab⟩
-            exact ⟨qa', List.mem_cons_of_mem _ hqa', hqab'⟩
-        · have hnmem : ∀ b : List Q, q ∉ b → q ∉ b ++ tail := by
-            intro b hb hc
-            rcases List.mem_append.mp hc with h | h
-            · exact hb h
-            · exact hqt h
-          have hidx : ∀ b : List Q, q ∉ b →
-              (b ++ (tail ++ [q])).idxOf q = b.length + tail.length := by
-            intro b hb
-            rw [List.idxOf_append_of_notMem hb, List.idxOf_append_of_notMem hqt]
-            simp
-          have happ : ∀ b : List Q, (b ++ tail) ++ [q] = b ++ (tail ++ [q]) := fun b =>
-            List.append_assoc b tail [q]
-          rw [lazyRun_query] at hhit ⊢
-          simp only [if_neg (hnmem base₀ hq₀), happ base₀, hidx base₀ hq₀] at hhit
-          simp only [if_neg (hnmem base₁ hq₁), happ base₁, hidx base₁ hq₁]
-          rw [← hlen]
-          obtain ⟨qa, hqa, hqab⟩ := hhit
-          rcases List.mem_cons.mp hqa with rfl | hqa
-          · exact absurd hqab (by simpa using ⟨hq₀, hq₁⟩)
-          · obtain ⟨qa', hqa', hqab'⟩ := lazyRun_hits_of_base tape dflt base₀ base₁ hlen
-              (next (tapeAt tape dflt (base₀.length + tail.length))) (tail ++ [q])
-              ⟨qa, hqa, hqab⟩
-            exact ⟨qa', List.mem_cons_of_mem _ hqa', hqab'⟩
-
 
 end Lazy
 

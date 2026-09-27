@@ -9,10 +9,9 @@ Fiat--Shamir: extraction is performed from a distinguished execution prefix,
 while the accepted opening may be produced anywhere later in a larger lazy-ROM
 execution.
 
-The important point is definitional.  `boundMessage` reads only
-`prefixRun`; it does not inspect the suffix, the final opening, or any
-challenge-oracle answer issued after the prefix.  `boundMessage_eq_of_prefixRun_eq`
-makes that non-correlation property explicit.  The counted theorem then says
+The important point is definitional.  `boundMessage` reads only the prefix
+run; it does not inspect the suffix, the final opening, or any
+challenge-oracle answer issued after the prefix.  The counted theorem then says
 that an accepted later opening disagrees with this prefix-fixed total message
 only on the standard commitment-collision/fresh-hit event.
 
@@ -106,18 +105,6 @@ noncomputable def boundMessage
     (G : PrefixBindingGame (Out := Out) (RunOut := RunOut) C n T prefixFuel runFuel)
     (dec : RoleDecoders C) (answers : Fin T → D) : Fin n → M :=
   G.messageOfPrefixRun dec (lazyRun answers default G.phase [])
-
-/-- Prefix locality, in its strongest and most useful form: equal prefix runs
-give literally equal bound messages, regardless of the suffixes of the two
-answer tapes. -/
-theorem boundMessage_eq_of_prefixRun_eq
-    (G : PrefixBindingGame (Out := Out) (RunOut := RunOut) C n T prefixFuel runFuel)
-    (dec : RoleDecoders C)
-    {answers answers' : Fin T → D}
-    (h : lazyRun answers default G.phase [] =
-      lazyRun answers' default G.phase []) :
-    G.boundMessage dec answers = G.boundMessage dec answers' := by
-  simp only [boundMessage, h]
 
 omit [Inhabited Salt] [Inhabited M] [DecidableEq D] in
 /-- The prefix trace evaluated in the whole run's oracle is exactly the trace

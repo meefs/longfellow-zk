@@ -57,9 +57,6 @@ lemma internals_disjoint_leaves (n : ℕ) : Disjoint (internals n) (leaves n) :=
   rw [Finset.disjoint_left]; intro v hv hi
   simp [mem_internals, mem_leaves] at hv hi; omega
 
-lemma leaf_pos_mem_leaves (n : ℕ) (i : Fin n) : n + i.val ∈ leaves n := by
-  simp [mem_leaves]; omega
-
 lemma leaf_pos_inj {n : ℕ} {i j : Fin n} (h : n + i.val = n + j.val) : i = j := by
   ext; omega
 
@@ -68,19 +65,11 @@ lemma pos_of_mem_nodes {n v : ℕ} (hv : v ∈ nodes n) : 0 < v := by
 
 /-! ## Children, parent, sibling -/
 
-def leftChild (v : ℕ) : ℕ := 2 * v
-
-def rightChild (v : ℕ) : ℕ := 2 * v + 1
-
-def parent (v : ℕ) : ℕ := v / 2
-
 /-- The sibling of a node. For `v > 1` this is the other child of `parent v`. -/
 def sibling (v : ℕ) : ℕ := if v % 2 = 0 then v + 1 else v - 1
 
 /-- Maximum depth of any node of `T_n` (`⌈log₂ n⌉` for `n ≥ 2`). -/
 def heapDepth (n : ℕ) : ℕ := Nat.log2 (2 * n - 1)
-
-lemma child_lt_of_internal {n v : ℕ} (hv : v < n) : 2 * v + 1 < 2 * n := by omega
 
 lemma parent_lt (v : ℕ) (hv : 2 ≤ v) : v / 2 < v := by omega
 
@@ -98,10 +87,6 @@ lemma sibling_parent (v : ℕ) : (sibling v) / 2 = v / 2 := by
   by_cases h : v % 2 = 0
   · rw [sibling_of_even _ h]; exact div2_of_even _ h
   · rw [sibling_of_odd _ (by omega)]; exact div2_of_odd _ (by omega)
-
-lemma sibling_pos (v : ℕ) (hv : 1 < v) : 0 < sibling v := by
-  by_cases h : v % 2 = 0 <;> simp [sibling, h]
-  omega
 
 lemma sibling_gt_one (v : ℕ) (hv : 1 < v) : 1 < sibling v := by
   by_cases h : v % 2 = 0 <;> simp [sibling, h] <;> omega
@@ -309,17 +294,6 @@ theorem pathSet_subset_nodes (n : ℕ) (I : Finset (Fin n)) : pathSet n I ⊆ no
   intro u hu
   rcases mem_pathSet.mp hu with ⟨i, _, hi⟩
   exact pathOf_subset_nodes n i hi
-
-/-- A path has at most `n + i` vertices (crude bound, sufficient for the
-trace-size estimates in `Binding.lean`). -/
-theorem pathOf_card_le (n : ℕ) (i : Fin n) : (pathOf n i).card ≤ n + i.val := by
-  calc (pathOf n i).card
-      ≤ (Icc 1 (n + i.val)).card := by
-        apply Finset.card_le_card
-        intro u hu
-        exact pathOf_mem_nodes_iff hu
-    _ = n + i.val := by
-      simp
 
 /-- Exact number of vertices on a leaf-to-root path. -/
 theorem pathOf_card (n : ℕ) (i : Fin n) :
@@ -628,169 +602,5 @@ theorem mem_pathSet_iff_subtree_meets {n v : ℕ} {I : Finset (Fin n)} :
   · rintro ⟨i, hi⟩
     rcases Finset.mem_inter.mp hi with ⟨hv, hI⟩
     exact mem_pathSet.mpr ⟨i, hI, mem_subtreeLeaves.mp hv⟩
-
-/-- Leaf-layer positions on the path union are precisely the opened leaves. -/
-theorem leaf_mem_pathSet_iff {n c : ℕ} {I : Finset (Fin n)}
-    (hc : n ≤ c) :
-    c ∈ pathSet n I ↔ ∃ i ∈ I, c = n + i.val := by
-  constructor
-  · exact fun h => leaf_pos_of_mem_pathSet h hc
-  · rintro ⟨i, hi, rfl⟩
-    exact mem_pathSet.mpr ⟨i, hi, leaf_mem_pathOf n i⟩
-
-/-! ## Frontier partition and independence (`SPEC` Lemmas 2.4, 2.5) -/
-
-/-- An unopened leaf is not on any opened path. -/
-lemma unopened_leaf_not_in_pathSet {n : ℕ} {I : Finset (Fin n)} {j : Fin n}
-    (hj : j ∉ I) : n + j.val ∉ pathSet n I := by
-  intro h
-  rcases mem_pathSet.mp h with ⟨i, hi, hipath⟩
-  rcases mem_pathOf.mp hipath with ⟨_, k, hk⟩
-  have hk0 : k = 0 := by
-    by_contra hkz
-    have hkpos : 0 < k := by omega
-    have : (n + i.val) / 2 ^ k < n := by
-      calc (n + i.val) / 2 ^ k
-          = ((n + i.val) / 2) / 2 ^ (k - 1) := by
-            rw [show 2 ^ k = 2 * 2 ^ (k - 1) by
-              calc 2 ^ k = 2 ^ ((k - 1) + 1) := by rw [Nat.sub_add_cancel hkpos]
-                _ = 2 ^ (k - 1) * 2 := pow_succ _ _
-                _ = 2 * 2 ^ (k - 1) := by rw [Nat.mul_comm]]
-            rw [← Nat.div_div_eq_div_mul]
-        _ ≤ (n + i.val) / 2 := Nat.div_le_self _ _
-        _ < n := by
-          have : i.val < n := i.isLt
-          omega
-    omega
-  simp [hk0] at hk
-  have hij : i = j := leaf_pos_inj (by omega)
-  exact hj (hij ▸ hi)
-
-/-- The frontier subtrees cover exactly the unopened leaves
-(`SPEC` Lemma 2.4, covering direction). -/
-theorem unopened_leaf_in_frontier_subtree {n : ℕ} {I : Finset (Fin n)} {j : Fin n}
-    (hn : 0 < n) (hI : I.Nonempty) (hj : j ∉ I) :
-    ∃ v ∈ frontier n I, j ∈ subtreeLeaves n v := by
-  -- Walk up from leaf ℓ = n+j: ℓ itself is off the opened paths, the root is
-  -- on them, so there is a first level (from the root down) whose ancestor of
-  -- ℓ is back off the paths; its parent is on the paths, so it is frontier.
-  set ℓ := n + j.val
-  have hleaf : ℓ ∉ pathSet n I := unopened_leaf_not_in_pathSet hj
-  have hex : ∃ k, ℓ / 2 ^ k ∈ pathSet n I := by
-    rcases exists_div_pow_eq_one ℓ (by omega) with ⟨k, hk⟩
-    exact ⟨k, by rw [hk]; exact root_mem_pathSet n hI⟩
-  let k := Nat.find hex
-  have hk : ℓ / 2 ^ k ∈ pathSet n I := Nat.find_spec hex
-  have hkmin : ∀ m < k, ℓ / 2 ^ m ∉ pathSet n I :=
-    fun m hm => Nat.find_min hex hm
-  have hkpos : 0 < k := by
-    by_contra hz
-    simp at hz
-    exact hleaf (by simpa [hz] using hk)
-  set v := ℓ / 2 ^ (k - 1) with hvdef
-  have hvoff : v ∉ pathSet n I := hkmin (k - 1) (by omega)
-  have hvpar : v / 2 ∈ pathSet n I := by
-    have : ℓ / 2 ^ k = v / 2 := by
-      rw [hvdef, Nat.div_div_eq_div_mul, ← pow_succ,
-        Nat.sub_add_cancel (by omega : 1 ≤ k)]
-    rwa [← this]
-  have hvgt1 : 1 < v := by
-    rcases mem_pathSet.mp hvpar with ⟨i, hi, hi'⟩
-    have := pathOf_subset_nodes n i hi'
-    simp [mem_nodes] at this
-    omega
-  have hvfront : v ∈ frontier n I := by
-    rw [mem_frontier_iff]
-    refine ⟨hvgt1, ?_, hvoff, hvpar⟩
-    rw [mem_nodes, hvdef]
-    exact ⟨by omega, le_trans (Nat.div_le_self ℓ (2 ^ (k - 1))) (by omega)⟩
-  exact ⟨v, hvfront, by
-    rw [mem_subtreeLeaves, mem_pathOf]
-    refine ⟨by omega, k - 1, ?_⟩
-    rw [hvdef]⟩
-
-/-- The frontier subtrees are pairwise disjoint (`SPEC` Lemma 2.5 = notes
-Claim 18.6.7; holds for any binary tree). -/
-theorem frontier_subtrees_disjoint {n : ℕ} {I : Finset (Fin n)} {v₁ v₂ : ℕ}
-    (h₁ : v₁ ∈ frontier n I) (h₂ : v₂ ∈ frontier n I) (hne : v₁ ≠ v₂) :
-    Disjoint (subtreeLeaves n v₁) (subtreeLeaves n v₂) := by
-  rw [Finset.disjoint_left]
-  intro j hj₁ hj₂
-  simp [mem_subtreeLeaves] at hj₁ hj₂
-  rcases mem_frontier_iff.mp h₁ with ⟨hgt₁, _, hnpath₁, _⟩
-  rcases mem_frontier_iff.mp h₂ with ⟨hgt₂, _, hnpath₂, _⟩
-  -- both v₁ and v₂ are ancestors of leaf n+j, hence comparable
-  rcases comparable_of_mem_pathOf hj₁ hj₂ with ⟨m, hm⟩ | ⟨m, hm⟩
-  · -- v₁ is an ancestor of v₂, properly (v₁ ≠ v₂), hence an ancestor of
-    -- the parent of v₂, which lies on the opened paths: contradiction.
-    have hm0 : 0 < m := by
-      by_contra hz
-      simp at hz
-      rw [hz, pow_zero, Nat.div_one] at hm
-      exact hne hm
-    rcases mem_frontier_iff.mp h₂ with ⟨_, _, _, hpar₂⟩
-    rcases mem_pathSet.mp hpar₂ with ⟨i, hi, hi₂⟩
-    have hv₁par : v₁ ∈ pathOf n i := by
-      apply ancestor_mem_pathOf hi₂ ⟨m - 1, ?_⟩ (by omega)
-      have hpow : 2 ^ m = 2 * 2 ^ (m - 1) := by
-        have : m = 1 + (m - 1) := by omega
-        nth_rw 1 [this]
-        rw [pow_add, pow_one]
-      rw [hm, hpow, ← Nat.div_div_eq_div_mul]
-    exact hnpath₁ (mem_pathSet.mpr ⟨i, hi, hv₁par⟩)
-  · -- symmetric
-    have hm0 : 0 < m := by
-      by_contra hz
-      simp at hz
-      rw [hz, pow_zero, Nat.div_one] at hm
-      exact hne hm.symm
-    rcases mem_frontier_iff.mp h₁ with ⟨_, _, _, hpar₁⟩
-    rcases mem_pathSet.mp hpar₁ with ⟨i, hi, hi₁⟩
-    have hv₂par : v₂ ∈ pathOf n i := by
-      apply ancestor_mem_pathOf hi₁ ⟨m - 1, ?_⟩ (by omega)
-      have hpow : 2 ^ m = 2 * 2 ^ (m - 1) := by
-        have : m = 1 + (m - 1) := by omega
-        nth_rw 1 [this]
-        rw [pow_add, pow_one]
-      rw [hm, hpow, ← Nat.div_div_eq_div_mul]
-    exact hnpath₂ (mem_pathSet.mpr ⟨i, hi, hv₂par⟩)
-
-/-- The frontier partition (`SPEC` Lemma 2.4): the subtrees rooted at the
-frontier vertices partition the unopened leaves. -/
-theorem frontier_partition (n : ℕ) (I : Finset (Fin n)) (hn : 0 < n) (hI : I.Nonempty) :
-    (frontier n I).biUnion (subtreeLeaves n) =
-      Finset.univ.filter (fun i : Fin n => i ∉ I) := by
-  ext j
-  simp
-  constructor
-  · rintro ⟨v, hvf, hjv⟩ hjI
-    simp [mem_subtreeLeaves] at hjv
-    have : v ∈ pathSet n I := mem_pathSet.mpr ⟨j, hjI, hjv⟩
-    exact (mem_frontier_iff.mp hvf).2.2.1 this
-  · intro hjI
-    rcases unopened_leaf_in_frontier_subtree hn hI hjI with ⟨v, hvf, hjv⟩
-    exact ⟨v, hvf, hjv⟩
-
-/-- The sum of the frontier subtree leaf-counts is `n - |I|` (the number of
-unopened leaves). Used for the tight `(n - q)` coefficient in the hiding
-bound (`SPEC` Theorem 9.2). -/
-theorem frontier_leaf_sum (n : ℕ) (I : Finset (Fin n)) (hn : 0 < n)
-    (hI : I.Nonempty) :
-    ∑ v ∈ frontier n I, (subtreeLeaves n v).card = n - I.card := by
-  have hpart := frontier_partition n I hn hI
-  calc ∑ v ∈ frontier n I, (subtreeLeaves n v).card
-      = ((frontier n I).biUnion (subtreeLeaves n)).card := by
-        have hdisj : Set.PairwiseDisjoint (↑(frontier n I)) (subtreeLeaves n) := by
-          intro v hv v' hv' hne
-          exact frontier_subtrees_disjoint hv hv' hne
-        rw [← Finset.card_biUnion hdisj]
-    _ = (Finset.univ.filter (fun i : Fin n => i ∉ I)).card := by rw [hpart]
-    _ = n - I.card := by
-      classical
-      have : Finset.univ.filter (fun i : Fin n => i ∉ I) = Finset.univ \ I := by
-        ext x
-        simp
-      rw [this, Finset.card_sdiff_of_subset (Finset.subset_univ I),
-        Finset.card_univ, Fintype.card_fin]
 
 end Heap

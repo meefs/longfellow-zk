@@ -4,8 +4,7 @@ import Merkle.RandomOracle
 /-!
 # Lazy sampling: adaptive executions on a fixed slot layout
 
-This is the step that `ROMBindingGame` assumes and that `ExtractionROM` will need in exactly the
-same form: **connecting a syntactically bounded adaptive execution to a fixed family of
+This is the step every random-oracle bound here needs: **connecting a syntactically bounded adaptive execution to a fixed family of
 answer-tape slots.**
 
 The difficulty is that an adaptive adversary chooses *which* query to make after seeing earlier
@@ -22,7 +21,7 @@ Lazy sampling resolves it.  Answer the `i`-th *distinct* query from tape slot `i
 
 So the covering family is `slotPairs T t = {(i,j) : i < j < t}` — fixed, independent of both the
 tape and the adversary.  Adaptivity moves the *contents* of the slots, never their indices.  That
-is `traceCollision_pairCollision`, and `lazy_traceCollision_card_le` is the counting corollary.
+is `traceCollision_pairCollision`.
 -/
 
 open Finset
@@ -79,13 +78,6 @@ theorem slotPairs_card_le (T t : ℕ) : (slotPairs T t).card ≤ t * (t - 1) / 2
     omega
   rw [hcard]
   exact (Finset.card_le_card himg).trans (hbound.trans (le_of_eq hgauss))
-
-/-- Trace collisions are decidable, which the counting statement needs in order to filter on
-them. -/
-instance traceCollisionDecidable [DecidableEq Q] [DecidableEq D] (tr : List (Q × D)) :
-    Decidable (TraceCollision tr) := by
-  unfold TraceCollision
-  infer_instance
 
 /-! ## Lazy execution -/
 
@@ -178,14 +170,6 @@ theorem lazyRun_seen_length_le_trace (tape : Fin T → D) (dflt : D) :
         (tapeAt tape dflt ((if q ∈ seen then seen else seen ++ [q]).idxOf q)))
         (if q ∈ seen then seen else seen ++ [q])
       by_cases h : q ∈ seen <;> simp only [h, if_true, if_false] at ih ⊢ <;> simp at ih ⊢ <;> omega
-
-/-- Trace-length form of `lazyRun_slot_lt`. -/
-theorem lazyRun_slot_lt_trace (tape : Fin T → D) (dflt : D) {fuel : ℕ} (c : Tree Q D A fuel)
-    (seen : List Q) (r : Q) (hr : r ∈ (lazyRun tape dflt c seen).2.1) :
-    (lazyRun tape dflt c seen).2.1.idxOf r <
-      seen.length + (lazyRun tape dflt c seen).2.2.length :=
-  lt_of_lt_of_le (List.idxOf_lt_length_of_mem hr)
-    (lazyRun_seen_length_le_trace tape dflt c seen)
 
 /-- Distinct queries keep distinct slots. -/
 theorem lazyRun_seen_nodup (tape : Fin T → D) (dflt : D) :
@@ -336,46 +320,6 @@ theorem shiftTape_congr (L : ℕ) (tape tape' : Fin T → D) (dflt : D)
   · exact h ⟨L + i.val, hlt⟩ (Nat.le_add_right L i.val)
   · rfl
 
-/-- **Early queries take early slots.**  A query among the first `N` of an execution occupies a slot
-below `seen.length + N`, because slots are handed out in order of first occurrence.
-
-This is what "already determined when slot `j` is read" means in the slot model: if every query a value
-depends on lies in the first `N` of the run, and `j ≥ seen.length + N`, then that value is a function of
-the tape *off* slot `j`, which is exactly `HitTarget`'s obligation. -/
-theorem lazyRun_slot_lt_of_mem_take (tape : Fin T → D) (dflt : D) :
-    ∀ {fuel : ℕ} (c : Tree Q D A fuel) (seen : List Q) (N : ℕ),
-      ∀ q ∈ ((lazyRun tape dflt c seen).2.2.map Prod.fst).take N,
-        (lazyRun tape dflt c seen).2.1.idxOf q < seen.length + N
-  | _, .done _, _, _, q, hq => by simp at hq
-  | _, .query _ _, _, 0, q, hq => by simp at hq
-  | _, .query q₀ next, seen, (N + 1), q, hq => by
-      rw [lazyRun_query] at hq ⊢
-      dsimp only at hq ⊢
-      simp only [List.map_cons, List.take_succ_cons, List.mem_cons] at hq
-      set seen' := if q₀ ∈ seen then seen else seen ++ [q₀] with hseen'
-      set y := tapeAt tape dflt (seen'.idxOf q₀) with hy
-      have hmemq : q₀ ∈ seen' := by
-        by_cases h : q₀ ∈ seen
-        · simp [hseen', h]
-        · simp [hseen', h]
-      have hpref : seen' <+: (lazyRun tape dflt (next y) seen').2.1 :=
-        lazyRun_seen_prefix tape dflt (next y) seen'
-      have hstable : ∀ r ∈ seen',
-          (lazyRun tape dflt (next y) seen').2.1.idxOf r = seen'.idxOf r := by
-        intro r hr
-        obtain ⟨rest, hrest⟩ := hpref
-        rw [← hrest, List.idxOf_append_of_mem hr]
-      have hseenlen : seen'.length ≤ seen.length + 1 := by
-        by_cases h : q₀ ∈ seen
-        · simp [hseen', h]
-        · simp [hseen', h]
-      rcases hq with rfl | hq
-      · rw [hstable _ hmemq]
-        have h1 := List.idxOf_lt_length_of_mem hmemq
-        omega
-      · have ih := lazyRun_slot_lt_of_mem_take tape dflt (next y) seen' N q hq
-        omega
-
 /-- Every slot used lies below the query budget, so the tape is never read out of range and
 `tapeAt`'s default branch is dead. -/
 theorem lazyRun_slot_lt (tape : Fin T → D) (dflt : D) {fuel : ℕ} (c : Tree Q D A fuel)
@@ -428,32 +372,6 @@ theorem traceCollision_pairCollision (tape : Fin T → D) (dflt : D) {t : ℕ}
   · exact ⟨(i₀, i₁), Finset.mem_filter.mpr ⟨Finset.mem_univ _, hlt, hlt₁⟩, htape⟩
   · have hlt' : i₁.val < i₀.val := by omega
     exact ⟨(i₁, i₀), Finset.mem_filter.mpr ⟨Finset.mem_univ _, hlt', hlt₀⟩, htape.symm⟩
-
-/-- **The own-collision bound.**
-
-A `t`-query adaptive adversary produces a trace collision on at most `t(t-1)/2 · |D|^(T-1)` of the
-`|D|^T` answer tapes — the sharp birthday count, with no assumption connecting the adversary to the
-slot layout, because lazy sampling supplies that connection.
-
-This is `ROMBindingGame`'s `own_card` field, discharged. -/
-theorem lazy_traceCollision_card_le [Fintype Q] [Fintype D] [DecidableEq D]
-    (dflt : D) {t : ℕ} (c : Tree Q D A t) (ht : t ≤ T) :
-    (Finset.univ.filter fun tape : Fin T → D =>
-        TraceCollision (lazyRun tape dflt c []).2.2).card
-      ≤ t * (t - 1) / 2 * (Fintype.card D) ^ (T - 1) := by
-  classical
-  calc
-    (Finset.univ.filter fun tape : Fin T → D =>
-          TraceCollision (lazyRun tape dflt c []).2.2).card
-        ≤ (Finset.univ.filter (PairCollision (D := D) T (slotPairs T t))).card := by
-          apply Finset.card_le_card
-          intro tape htape
-          simp only [Finset.mem_filter, Finset.mem_univ, true_and] at htape ⊢
-          exact traceCollision_pairCollision tape dflt c ht htape
-    _ ≤ (slotPairs T t).card * (Fintype.card D) ^ (T - 1) :=
-        answerTape_pairCollision_card_le T (slotPairs T t) slotPairs_distinct
-    _ ≤ t * (t - 1) / 2 * (Fintype.card D) ^ (T - 1) :=
-        Nat.mul_le_mul_right _ (slotPairs_card_le T t)
 
 /-! ## Slots are determined by the slots before them
 

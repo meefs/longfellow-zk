@@ -50,17 +50,6 @@ def Tree.run {Q : Type uQ} {D : Type uD} {A : Type uA} {fuel : ℕ} :
       let out := (next (H q)).run H
       (out.1, (q, H q) :: out.2) := rfl
 
-/-- Execution never exceeds the syntactic query budget. -/
-theorem Tree.trace_length_le {Q : Type uQ} {D : Type uD} {A : Type uA}
-    {fuel : ℕ} (c : Tree Q D A fuel) (H : Q → D) :
-    (c.run H).2.length ≤ fuel := by
-  induction c with
-  | done a => simp
-  | @query fuel q next ih =>
-      simp only [Tree.run_query, List.length_cons]
-      have htail := ih (H q)
-      omega
-
 /-- Every answer in an execution trace is the answer of the oracle used for
 that execution. -/
 theorem Tree.trace_sound {Q : Type uQ} {D : Type uD} {A : Type uA}
@@ -103,7 +92,7 @@ presents a programmed input, reprogramming leaves the execution — output and t
 
 This is where the simulator's licence comes from, in the hiding argument and in any Fiat–Shamir
 simulator that has to force a challenge.  Nothing here is about Merkle trees or about any particular
-programmed set: `Merkle.MH.reprogramLeaves` is the instance at the honest leaf inputs.
+programmed set.
 
 Note which representation programming acts on.  An oracle here is a *function* `Q → D`, and
 programming patches the function.  Counting happens in the tape representation
@@ -170,19 +159,6 @@ answer. -/
 def TraceCollision {Q : Type uQ} {D : Type uD} (tr : List (Q × D)) : Prop :=
   ∃ qa₀ ∈ tr, ∃ qa₁ ∈ tr, qa₀.1 ≠ qa₁.1 ∧ qa₀.2 = qa₁.2
 
-/-- A collision in an adaptive execution trace is a non-injectivity witness
-for the total oracle. -/
-theorem Tree.not_injective_of_traceCollision
-    {Q : Type uQ} {D : Type uD} {A : Type uA}
-    {fuel : ℕ} (c : Tree Q D A fuel) (H : Q → D)
-    (hcol : TraceCollision (c.run H).2) : ¬Function.Injective H := by
-  rcases hcol with ⟨qa₀, h₀, qa₁, h₁, hne, hans⟩
-  intro hinj
-  apply hne
-  apply hinj
-  rw [← Tree.trace_sound c H qa₀ h₀, ← Tree.trace_sound c H qa₁ h₁]
-  exact hans
-
 /-- A regression example whose second query genuinely depends on the first
 answer. -/
 def adaptiveSecondQuery : Tree (Fin 3) Bool Bool 2 :=
@@ -238,77 +214,6 @@ theorem fixed_pair_card_le [Fintype Q] [DecidableEq Q]
       congr 1
       simp
 
-/-- Coarse birthday bound obtained by a union bound over ordered distinct
-pairs. The sharper unordered-pair factor `1/2` can be layered on later; this
-form is sufficient as a conservative adaptive answer-tape bound. -/
-theorem noninjective_card_le_square [Fintype Q] [DecidableEq Q]
-    [Fintype D] [DecidableEq D] :
-    (Finset.filter (fun H : Q → D => ¬Function.Injective H)
-      Finset.univ).card ≤
-      Fintype.card Q * Fintype.card Q *
-        (Fintype.card D) ^ (Fintype.card Q - 1) := by
-  classical
-  let pairs : Finset (Q × Q) :=
-    (Finset.univ ×ˢ Finset.univ).filter (fun p => p.1 ≠ p.2)
-  let Bad : (Q × Q) → (Q → D) → Prop := fun p H => H p.1 = H p.2
-  have hevent :
-      Finset.filter (fun H : Q → D => ¬Function.Injective H) Finset.univ =
-      Finset.filter (fun H : Q → D => ∃ p ∈ pairs, Bad p H) Finset.univ := by
-    ext H
-    simp only [Finset.mem_filter, Finset.mem_univ, true_and]
-    constructor
-    · intro h
-      rw [Function.not_injective_iff] at h
-      rcases h with ⟨q₀, q₁, heq, hne⟩
-      exact ⟨(q₀, q₁), by simp [pairs, hne], heq⟩
-    · rintro ⟨⟨q₀, q₁⟩, hp, heq⟩ hinj
-      have hne : q₀ ≠ q₁ := by simpa [pairs] using hp
-      exact hne (hinj heq)
-  rw [hevent]
-  calc
-    (Finset.filter (fun H : Q → D => ∃ p ∈ pairs, Bad p H)
-        Finset.univ).card
-        ≤ ∑ p ∈ pairs,
-            (Finset.filter (Bad p) Finset.univ).card :=
-      by
-        let pieces : Q × Q → Finset (Q → D) :=
-          fun p => Finset.filter (Bad p) Finset.univ
-        have hp : Finset.filter
-              (fun H : Q → D => ∃ p ∈ pairs, Bad p H) Finset.univ =
-            pairs.biUnion pieces := by
-          ext H
-          simp [pieces]
-        rw [hp]
-        exact Finset.card_biUnion_le
-    _ ≤ ∑ _p ∈ pairs,
-          (Fintype.card D) ^ (Fintype.card Q - 1) := by
-      apply Finset.sum_le_sum
-      intro p hp
-      change (Finset.filter (fun H : Q → D => H p.1 = H p.2)
-        Finset.univ).card ≤ (Fintype.card D) ^ (Fintype.card Q - 1)
-      exact fixed_pair_card_le (D := D) p.1 p.2
-        (by simpa [pairs] using hp)
-    _ = pairs.card * (Fintype.card D) ^ (Fintype.card Q - 1) := by simp
-    _ ≤ (Fintype.card Q * Fintype.card Q) *
-          (Fintype.card D) ^ (Fintype.card Q - 1) := by
-      apply Nat.mul_le_mul_right
-      calc
-        pairs.card ≤ (Finset.univ ×ˢ (Finset.univ : Finset Q)).card :=
-          Finset.card_le_card (Finset.filter_subset _ _)
-        _ = Fintype.card Q * Fintype.card Q := by simp
-    _ = Fintype.card Q * Fintype.card Q *
-          (Fintype.card D) ^ (Fintype.card Q - 1) := rfl
-
-/-- Conservative `t`-answer-tape birthday bound used by lazy-sampling
-executions. Adaptive query choices do not affect this count because the tape
-coordinates are sampled independently before execution. -/
-theorem answerTape_birthday_card_le_square [Fintype D] [DecidableEq D]
-    (t : ℕ) :
-    (Finset.filter (fun answers : Fin t → D =>
-      ¬Function.Injective answers) Finset.univ).card ≤
-      t * t * (Fintype.card D) ^ (t - 1) := by
-  simpa using (noninjective_card_le_square (Q := Fin t) (D := D))
-
 /-- Exact fresh-pair kernel on an answer tape. -/
 theorem answerTape_fixed_pair_card_le [Fintype D] [DecidableEq D]
     (t : ℕ) (i j : Fin t) (hne : i ≠ j) :
@@ -362,84 +267,6 @@ theorem answerTape_pairCollision_card_le
         answerTape_fixed_pair_card_le T p.1 p.2 (hne p hp))
     _ = pairs.card * (Fintype.card D) ^ (T - 1) := by simp
 
-/-- Generic union bound for a finite family of oracle bad events. -/
-theorem card_iUnion_bad_le [Fintype Q] [DecidableEq Q]
-    [Fintype D] [DecidableEq D]
-    {ι : Type*} [DecidableEq ι]
-    (s : Finset ι) (Bad : ι → (Q → D) → Prop)
-    [∀ i, DecidablePred (Bad i)] :
-    (Finset.filter (fun H => ∃ i ∈ s, Bad i H) Finset.univ).card ≤
-      ∑ i ∈ s, (Finset.filter (Bad i) Finset.univ).card := by
-  classical
-  let pieces : ι → Finset (Q → D) :=
-    fun i => Finset.filter (Bad i) Finset.univ
-  have heq : Finset.filter (fun H => ∃ i ∈ s, Bad i H) Finset.univ =
-      s.biUnion pieces := by
-    ext H
-    simp [pieces]
-  rw [heq]
-  exact Finset.card_biUnion_le
-
-/-- A fixed set of guesses hits an injectively encoded uniform secret on at
-most one secret per guess. This is the deterministic counting core of the
-salt one-time lemma. -/
-theorem injective_secret_hit_card_le
-    {S : Type*} [Fintype S] [DecidableEq S]
-    [Fintype Q] [DecidableEq Q]
-    (encode : S → Q) (hinj : Function.Injective encode)
-    (guesses : Finset Q) :
-    (Finset.filter (fun s : S => encode s ∈ guesses) Finset.univ).card ≤
-      guesses.card := by
-  let f : {s : S // encode s ∈ guesses} → {q : Q // q ∈ guesses} :=
-    fun s => ⟨encode s.val, s.property⟩
-  have hf : Function.Injective f := by
-    intro s t h
-    apply Subtype.ext
-    exact hinj (congrArg Subtype.val h)
-  rw [← Fintype.card_subtype]
-  simpa using Fintype.card_le_of_injective f hf
-
-/-! ## Finite coupling interface -/
-
-/-- Under a common finite coupling, every distinguisher's real acceptance
-count is at most its simulated acceptance count plus the number of samples on
-which the coupled views differ. -/
-theorem real_count_le_sim_add_disagreement
-    {Ω : Type*} {V : Type*}
-    [Fintype Ω] [DecidableEq Ω] [DecidableEq V]
-    (real sim : Ω → V) (P : V → Prop) [DecidablePred P] :
-    (Finset.filter (fun ω => P (real ω)) Finset.univ).card ≤
-      (Finset.filter (fun ω => P (sim ω)) Finset.univ).card +
-      (Finset.filter (fun ω => real ω ≠ sim ω) Finset.univ).card := by
-  let realEvent := Finset.filter (fun ω => P (real ω)) Finset.univ
-  let simEvent := Finset.filter (fun ω => P (sim ω)) Finset.univ
-  let bad := Finset.filter (fun ω => real ω ≠ sim ω) Finset.univ
-  calc
-    realEvent.card ≤ (simEvent ∪ bad).card := by
-      apply Finset.card_le_card
-      intro ω hω
-      have hreal : P (real ω) := by simpa [realEvent] using hω
-      by_cases hsim : P (sim ω)
-      · exact Finset.mem_union_left _ (by simp [simEvent, hsim])
-      · apply Finset.mem_union_right
-        simp only [bad, Finset.mem_filter, Finset.mem_univ, true_and]
-        intro heq
-        apply hsim
-        rwa [← heq]
-    _ ≤ simEvent.card + bad.card := Finset.card_union_le _ _
-
-/-- Symmetric half of the finite coupling bound. Together with the preceding
-theorem this bounds the absolute distinguishing-count gap. -/
-theorem sim_count_le_real_add_disagreement
-    {Ω : Type*} {V : Type*}
-    [Fintype Ω] [DecidableEq Ω] [DecidableEq V]
-    (real sim : Ω → V) (P : V → Prop) [DecidablePred P] :
-    (Finset.filter (fun ω => P (sim ω)) Finset.univ).card ≤
-      (Finset.filter (fun ω => P (real ω)) Finset.univ).card +
-      (Finset.filter (fun ω => real ω ≠ sim ω) Finset.univ).card := by
-  simpa [ne_comm] using
-    (real_count_le_sim_add_disagreement sim real P)
-
 /-! ## Counting closeness and certified couplings -/
 
 /-- Two views on a common finite uniform sample space are `eps`-close when
@@ -476,111 +303,6 @@ theorem CountingClose.of_certificate
       by_contra hnot
       exact hω (cert.agrees ω hnot)
     _ ≤ eps := cert.bad_card
-
-/-- Counting closeness bounds both directions of every distinguisher's
-acceptance-count gap. -/
-theorem CountingClose.distinguisher
-    {Ω : Type*} {V : Type*}
-    [Fintype Ω] [DecidableEq Ω] [DecidableEq V]
-    {eps : ℕ} {real sim : Ω → V}
-    (hclose : CountingClose eps real sim)
-    (P : V → Prop) [DecidablePred P] :
-    (Finset.filter (fun ω => P (real ω)) Finset.univ).card ≤
-        (Finset.filter (fun ω => P (sim ω)) Finset.univ).card + eps ∧
-      (Finset.filter (fun ω => P (sim ω)) Finset.univ).card ≤
-        (Finset.filter (fun ω => P (real ω)) Finset.univ).card + eps := by
-  constructor
-  · exact (real_count_le_sim_add_disagreement real sim P).trans
-      (Nat.add_le_add_left hclose _)
-  · exact (sim_count_le_real_add_disagreement real sim P).trans
-      (Nat.add_le_add_left hclose _)
-
-/-- Hybrid/triangle rule on a common coupling space. -/
-theorem CountingClose.trans
-    {Ω : Type*} {V : Type*}
-    [Fintype Ω] [DecidableEq Ω] [DecidableEq V]
-    {e₀ e₁ : ℕ} {v₀ v₁ v₂ : Ω → V}
-    (h₀ : CountingClose e₀ v₀ v₁)
-    (h₁ : CountingClose e₁ v₁ v₂) :
-    CountingClose (e₀ + e₁) v₀ v₂ := by
-  let bad₀ := Finset.filter (fun ω => v₀ ω ≠ v₁ ω) Finset.univ
-  let bad₁ := Finset.filter (fun ω => v₁ ω ≠ v₂ ω) Finset.univ
-  calc
-    (Finset.filter (fun ω => v₀ ω ≠ v₂ ω) Finset.univ).card ≤
-        (bad₀ ∪ bad₁).card := by
-      apply Finset.card_le_card
-      intro ω hω
-      simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hω
-      by_cases hmid : v₀ ω = v₁ ω
-      · apply Finset.mem_union_right
-        simp only [bad₁, Finset.mem_filter, Finset.mem_univ, true_and]
-        intro hlast
-        exact hω (hmid.trans hlast)
-      · exact Finset.mem_union_left _ (by simp [bad₀, hmid])
-    _ ≤ bad₀.card + bad₁.card := Finset.card_union_le _ _
-    _ ≤ e₀ + e₁ := Nat.add_le_add h₀ h₁
-
-/-- Exact ratio form of finite statistical closeness.  It states that the
-disagreement probability is at most `numer / denom` by cross multiplication,
-and therefore remains meaningful when the sample space contains arbitrary
-additional oracle, simulator, or adversary coins. -/
-def CountingCloseRatio {Ω : Type*} {V : Type*} [Fintype Ω]
-    [DecidableEq Ω] [DecidableEq V]
-    (numer denom : ℕ) (real sim : Ω → V) : Prop :=
-  (Finset.filter (fun ω => real ω ≠ sim ω) Finset.univ).card * denom ≤
-    numer * Fintype.card Ω
-
-/-- A good-outside-bad coupling plus a normalized bound on `bad` yields an
-exact statistical-distance ratio. -/
-theorem CountingCloseRatio.of_bad
-    {Ω : Type*} {V : Type*}
-    [Fintype Ω] [DecidableEq Ω] [DecidableEq V]
-    (numer denom : ℕ) (real sim : Ω → V) (bad : Finset Ω)
-    (hbad : bad.card * denom ≤ numer * Fintype.card Ω)
-    (hagrees : ∀ ω ∉ bad, real ω = sim ω) :
-    CountingCloseRatio numer denom real sim := by
-  have hsub : Finset.filter (fun ω => real ω ≠ sim ω) Finset.univ ⊆ bad := by
-    intro ω hω
-    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hω
-    by_contra hnot
-    exact hω (hagrees ω hnot)
-  exact (Nat.mul_le_mul_right denom (Finset.card_le_card hsub)).trans hbad
-
-/-- Ratio closeness bounds the cross-multiplied acceptance counts of every
-distinguisher in both directions. -/
-theorem CountingCloseRatio.distinguisher
-    {Ω : Type*} {V : Type*}
-    [Fintype Ω] [DecidableEq Ω] [DecidableEq V]
-    {numer denom : ℕ} {real sim : Ω → V}
-    (hclose : CountingCloseRatio numer denom real sim)
-    (P : V → Prop) [DecidablePred P] :
-    (Finset.filter (fun ω => P (real ω)) Finset.univ).card * denom ≤
-        (Finset.filter (fun ω => P (sim ω)) Finset.univ).card * denom +
-          numer * Fintype.card Ω ∧
-      (Finset.filter (fun ω => P (sim ω)) Finset.univ).card * denom ≤
-        (Finset.filter (fun ω => P (real ω)) Finset.univ).card * denom +
-          numer * Fintype.card Ω := by
-  let disagree :=
-    (Finset.filter (fun ω => real ω ≠ sim ω) Finset.univ).card
-  have hr := real_count_le_sim_add_disagreement real sim P
-  have hs := sim_count_le_real_add_disagreement real sim P
-  constructor
-  · calc
-      (Finset.filter (fun ω => P (real ω)) Finset.univ).card * denom ≤
-          ((Finset.filter (fun ω => P (sim ω)) Finset.univ).card +
-            disagree) * denom := Nat.mul_le_mul_right denom hr
-      _ = (Finset.filter (fun ω => P (sim ω)) Finset.univ).card * denom +
-            disagree * denom := Nat.add_mul _ _ _
-      _ ≤ (Finset.filter (fun ω => P (sim ω)) Finset.univ).card * denom +
-            numer * Fintype.card Ω := Nat.add_le_add_left hclose _
-  · calc
-      (Finset.filter (fun ω => P (sim ω)) Finset.univ).card * denom ≤
-          ((Finset.filter (fun ω => P (real ω)) Finset.univ).card +
-            disagree) * denom := Nat.mul_le_mul_right denom hs
-      _ = (Finset.filter (fun ω => P (real ω)) Finset.univ).card * denom +
-            disagree * denom := Nat.add_mul _ _ _
-      _ ≤ (Finset.filter (fun ω => P (real ω)) Finset.univ).card * denom +
-            numer * Fintype.card Ω := Nat.add_le_add_left hclose _
 
 end RandomOracle
 

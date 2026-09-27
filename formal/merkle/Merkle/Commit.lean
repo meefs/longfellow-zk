@@ -56,18 +56,9 @@ def Codec.withOracle (C : Codec Salt M D Enc) (H : Enc → D) :
   toCodec := C
   H := H
 
-@[simp] theorem Codec.withOracle_H (C : Codec Salt M D Enc) (H : Enc → D) :
-    (C.withOracle H).H = H := rfl
-
-@[simp] theorem Codec.withOracle_leafEnc (C : Codec Salt M D Enc)
-    (H : Enc → D) : (C.withOracle H).leafEnc = C.leafEnc := rfl
-
-@[simp] theorem Codec.withOracle_nodeEnc (C : Codec Salt M D Enc)
-    (H : Enc → D) : (C.withOracle H).nodeEnc = C.nodeEnc := rfl
-
 /-- Both role encodings are injective.  Range *overlap* between the two roles
-stays permitted — see `Instantiate.concrete_ranges_overlap_iff`; only
-same-role injectivity is ever used. -/
+stays permitted (the concrete untagged codec of `Instantiate.lean` has it);
+only same-role injectivity is ever used. -/
 structure Codec.Inj (C : Codec Salt M D Enc) : Prop where
   leaf : Function.Injective C.leafEnc
   node : Function.Injective C.nodeEnc
@@ -179,23 +170,6 @@ theorem checkValues_node (n : ℕ) (I : Finset (Fin n)) (a : Fin n → M)
   have hfront : v ∉ Heap.frontier n I := fun hf =>
     (Finset.disjoint_left.mp (Heap.frontier_disjoint_pathSet n I)) hf hv.2.2
   simp [show ¬(n ≤ v ∧ v < 2 * n) by omega, hfront, hv]
-
-/-- Reconstruction observes claimed messages only at opened indices.  This is
-the formal reason the opening simulator can be given `m[I]` rather than the
-unopened message coordinates, even though a total function is convenient at
-the Lean API boundary. -/
-theorem checkValues_congr_on_claims (n : ℕ) (I : Finset (Fin n))
-    (a b : Fin n → M) (pf : Opening n I Salt D)
-    (hclaim : ∀ i, i ∈ I → a i = b i) :
-    ∀ v, checkValues S n I a pf v =
-      checkValues S n I b pf v := by
-  intro v
-  fun_induction checkValues S n I a pf v
-  case case5 v _ _ hp ih2 ih1 =>
-    rw [checkValues_node S n I b pf v hp, ih2, ih1]
-  all_goals rw [checkValues]
-  all_goals try split_ifs
-  all_goals simp_all
 
 /-- Core acceptance: the query set is nonempty and the reconstructed root is
 the claimed root. Shape/list errors belong to `checkWire`. -/

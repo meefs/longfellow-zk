@@ -78,14 +78,6 @@ theorem inIndexTrace_of_atVertexTrace (n : ℕ) (I : Finset (Fin n)) (a : Fin n 
   · exact Or.inl ⟨hx, hv ▸ hy⟩
   · exact Or.inr ⟨v, hv, hlt, hx, hy⟩
 
-/-- The vertex a located query sits at is on the path. -/
-theorem atVertexTrace_mem_pathOf (n : ℕ) (I : Finset (Fin n)) (a : Fin n → M)
-    (pf : Opening n I Salt D) (i : Fin n) (hi : i ∈ I) (v : ℕ) (x : Enc) (y : D)
-    (h : AtVertexTrace S n I a pf i hi v x y) : v ∈ Heap.pathOf n i := by
-  rcases h with ⟨hv, -, -⟩ | ⟨hv, -, -, -, -⟩
-  · exact hv ▸ Heap.leaf_mem_pathOf n i
-  · exact hv
-
 /-- If two checks disagree at a vertex on a common leaf path but agree at the
 root, their node queries collide at the first parent where the values merge —
 and at the *same* parent on both sides. -/
@@ -245,29 +237,6 @@ theorem mh_binding_of_collision (hinj : S.Inj) (n : ℕ)
   exact mh_collision S hinj n out.rt
     out.I₀ out.I₁ out.a₀ out.a₁ out.pf₀ out.pf₁ out.accepts₀ out.accepts₁
     i hi₀ hi₁ hmsg
-
-/-! ## Assumption-boundary regression -/
-
-/-- If the leaf encoding is not injective, two different messages can open
-the same one-leaf root without producing a collision. This executable theorem
-guards the injectivity hypothesis of `mh_collision_lemma`. -/
-theorem constant_leaf_encoding_break_without_collision :
-    let S : Scheme Unit Bool Unit Unit :=
-      { leafEnc := fun _ => (), nodeEnc := fun _ => (), H := fun _ => () }
-    let I : Finset (Fin 1) := Finset.univ
-    let pf : Opening 1 I Unit Unit :=
-      { nonce := fun _ => (), frontierValue := fun _ => () }
-    Accepts S 1 () I (fun _ => false) pf ∧
-    Accepts S 1 () I (fun _ => true) pf ∧
-    (∀ i : Fin 1, (fun _ : Fin 1 => false) i ≠ (fun _ : Fin 1 => true) i) ∧
-    ¬Collision S.H := by
-  dsimp
-  refine ⟨⟨by simp, Subsingleton.elim _ _⟩,
-    ⟨by simp, Subsingleton.elim _ _⟩, ?_, ?_⟩
-  · intro i
-    decide
-  · rintro ⟨x₀, x₁, hne, _⟩
-    exact hne (Subsingleton.elim _ _)
 
 end MH
 

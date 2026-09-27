@@ -67,39 +67,6 @@ theorem mh_trapdoor_completeness (S : Scheme Salt M D Enc) [Inhabited D] (n : �
   rw [openFromTrapdoor_honest]
   exact mh_core_completeness S n I hI nonce m
 
-/-- A trapdoor determines its openings: two trapdoors agreeing on the opened nonces and on the
-frontier labels open identically.  This is the uniqueness half that
-`mh_extract_explains_of_trace_subset` will need in order to conclude *literal* proof equality
-rather than "some other accepting proof". -/
-theorem openFromTrapdoor_congr {n : ℕ} (td td' : Trapdoor n Salt D) (I : Finset (Fin n))
-    (hnonce : ∀ i ∈ I, td.nonce i = td'.nonce i)
-    (hlabel : ∀ v, ∀ hv : v ∈ Heap.frontier n I,
-      td.label v (Heap.mem_frontier_iff.mp hv).2.1
-        = td'.label v (Heap.mem_frontier_iff.mp hv).2.1) :
-    openFromTrapdoor td I = openFromTrapdoor td' I := by
-  have hext : ∀ a b : Opening n I Salt D,
-      a.nonce = b.nonce → a.frontierValue = b.frontierValue → a = b := by
-    intro a b h1 h2
-    cases a; cases b; simp_all
-  refine hext _ _ ?_ ?_
-  · funext i
-    exact hnonce i.val i.property
-  · funext v
-    exact hlabel v.val v.property
-
-/-! ## Status
-
-What is here: the storage layer (item 1 of the README's implementation order).
-
-What is not, and what `ExtractionROM.lean` still needs (the deterministic extraction theorems
-`mh_extract_complete` and `mh_extract_explains_of_trace_subset` are done in `Extraction.lean`):
-
-* trace-extension stability, for which `RandomOracle.Tree.run_congr_on_trace` is the primitive;
-* the three-event failure cover, for which `RandomOracle.lazy_traceCollision_card_le` now supplies
-  the commitment-collision term with the sharp `t(t-1)/2` constant;
-* the multi-commitment version, which BCS needs and which nothing here addresses.
--/
-
 end MH
 
 end Merkle
