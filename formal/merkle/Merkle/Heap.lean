@@ -471,10 +471,9 @@ def frontierList (n : ℕ) (I : Finset (Fin n)) : List ℕ :=
 path vertex, so the frontier — and hence the digest list a proof transmits — has at most
 `|I| · (heapDepth n + 1)` entries.
 
-This is the crude bound: it charges every level for every opened leaf.  A multiproof at `q` leaves
-really transmits at most `min q (2^l - q)` siblings at level `l`, which is what a serialized-size
-model wants (`Gero.paths`); proving *that* needs a level-slice decomposition of the frontier, which
-is not here. -/
+This bound charges every level for every opened leaf. The sharper complete-tree
+bound in `Merkle.MultiproofSize` counts shared upper paths only once and is
+connected to the canonical wire serializer in Polyfold's size certificate. -/
 theorem frontier_card_le (n : ℕ) (I : Finset (Fin n)) :
     (frontier n I).card ≤ I.card * (heapDepth n + 1) := by
   classical
