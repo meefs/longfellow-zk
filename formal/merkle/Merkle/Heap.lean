@@ -472,8 +472,7 @@ path vertex, so the frontier — and hence the digest list a proof transmits —
 `|I| · (heapDepth n + 1)` entries.
 
 This bound charges every level for every opened leaf. The sharper complete-tree
-bound in `Merkle.MultiproofSize` counts shared upper paths only once and is
-connected to the canonical wire serializer in Polyfold's size certificate. -/
+bound in `Merkle.MultiproofSize` counts shared upper paths only once. -/
 theorem frontier_card_le (n : ℕ) (I : Finset (Fin n)) :
     (frontier n I).card ≤ I.card * (heapDepth n + 1) := by
   classical
