@@ -44,14 +44,14 @@ def RegisteredCircuit.witnessWidth (c : RegisteredCircuit) : ℕ :=
 
 /-- Bind every reported profile to the exact implementation layout and field order. -/
 def RegisteredCircuit.Matches (c : RegisteredCircuit) : Prop :=
-  (c.version = 6 ∨ c.version = 7) ∧
+  c.version = 7 ∧
   c.profile.result.certificate.k = c.block ∧
   c.profile.result.certificate.n = c.columns ∧
   c.profile.result.certificate.d = c.columns - c.block + 1 ∧
   c.profile.result.certificate.fieldSize = c.component.fieldSize ∧
   c.profile.result.openings = c.queries ∧
-  c.queries = (if c.version < 7 then 128 else 132) ∧
-  c.rateInv = (if c.version < 7 then 4 else 7) ∧
+  c.queries = 132 ∧
+  c.rateInv = 7 ∧
   c.nwrow = (c.ninputs - c.npublic + c.padSize + c.witnessWidth - 1) /
     c.witnessWidth ∧
   c.nqtriples = (c.nlayers + c.witnessWidth - 1) / c.witnessWidth ∧
@@ -62,8 +62,7 @@ def RegisteredCircuit.Matches (c : RegisteredCircuit) : Prop :=
 def RegisteredCircuit.matchesBool (c : RegisteredCircuit) : Bool :=
   @decide c.Matches (by unfold Matches; infer_instance)
 
-/-- All four attribute counts for each of the two supported circuit versions,
-with both component fields represented explicitly. -/
+/-- All four V7 attribute counts, with both component fields represented explicitly. -/
 def registeredCircuits : List RegisteredCircuit := [
   { version := 7
     attributes := 1
@@ -184,130 +183,10 @@ def registeredCircuits : List RegisteredCircuit := [
     nlayers := 17
     nwrow := 273
     nqtriples := 1
-    profile := v7Hash4Certified },
-  { version := 6
-    attributes := 1
-    component := .signature
-    bundleId := "137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6"
-    circuitId := "2845210af05740e6e3e054762f9e35ff5fc4fb23088716e369f7cf73eb61df2d"
-    blockEnc := 2945
-    rateInv := 4
-    queries := 128
-    ninputs := 3739
-    npublic := 900
-    padSize := 1147
-    nlayers := 21
-    nwrow := 11
-    nqtriples := 1
-    profile := v6SigCertified },
-  { version := 6
-    attributes := 2
-    component := .signature
-    bundleId := "b4bb6f01b7043f4f51d8302a30b36e3d4d2d0efc3c24557ab9212ad524a9764e"
-    circuitId := "2845210af05740e6e3e054762f9e35ff5fc4fb23088716e369f7cf73eb61df2d"
-    blockEnc := 2945
-    rateInv := 4
-    queries := 128
-    ninputs := 3739
-    npublic := 900
-    padSize := 1147
-    nlayers := 21
-    nwrow := 11
-    nqtriples := 1
-    profile := v6SigCertified },
-  { version := 6
-    attributes := 3
-    component := .signature
-    bundleId := "b2211223b954b34a1081e3fbf71b8ea2de28efc888b4be510f532d6ba76c2010"
-    circuitId := "2845210af05740e6e3e054762f9e35ff5fc4fb23088716e369f7cf73eb61df2d"
-    blockEnc := 2945
-    rateInv := 4
-    queries := 128
-    ninputs := 3739
-    npublic := 900
-    padSize := 1147
-    nlayers := 21
-    nwrow := 11
-    nqtriples := 1
-    profile := v6SigCertified },
-  { version := 6
-    attributes := 4
-    component := .signature
-    bundleId := "c70b5f44a1365c53847eb8948ad5b4fdc224251a2bc02d958c84c862823c49d6"
-    circuitId := "2845210af05740e6e3e054762f9e35ff5fc4fb23088716e369f7cf73eb61df2d"
-    blockEnc := 2945
-    rateInv := 4
-    queries := 128
-    ninputs := 3739
-    npublic := 900
-    padSize := 1147
-    nlayers := 21
-    nwrow := 11
-    nqtriples := 1
-    profile := v6SigCertified },
-  { version := 6
-    attributes := 1
-    component := .hash
-    bundleId := "137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6"
-    circuitId := "039bed19b94d5d732e1de555fa5c5c4b9b189b8c7908d3f1ee4ecb9e72f38532"
-    blockEnc := 4096
-    rateInv := 4
-    queries := 128
-    ninputs := 75098
-    npublic := 944
-    padSize := 1065
-    nlayers := 15
-    nwrow := 136
-    nqtriples := 1
-    profile := v6Hash1Certified },
-  { version := 6
-    attributes := 2
-    component := .hash
-    bundleId := "b4bb6f01b7043f4f51d8302a30b36e3d4d2d0efc3c24557ab9212ad524a9764e"
-    circuitId := "998d8a96af09bdb7d66574c3375a649078b3fbf6cb863f8ba0407d3a3d73a0cd"
-    blockEnc := 4025
-    rateInv := 4
-    queries := 128
-    ninputs := 79902
-    npublic := 1720
-    padSize := 1069
-    nlayers := 15
-    nwrow := 146
-    nqtriples := 1
-    profile := v6Hash2Certified },
-  { version := 6
-    attributes := 3
-    component := .hash
-    bundleId := "b2211223b954b34a1081e3fbf71b8ea2de28efc888b4be510f532d6ba76c2010"
-    circuitId := "6fef452320934ed0cf63924b22a0ff3ec20771c7647b3950326305fff3908157"
-    blockEnc := 4121
-    rateInv := 4
-    queries := 128
-    ninputs := 84706
-    npublic := 2496
-    padSize := 1073
-    nlayers := 15
-    nwrow := 149
-    nqtriples := 1
-    profile := v6Hash3Certified },
-  { version := 6
-    attributes := 4
-    component := .hash
-    bundleId := "c70b5f44a1365c53847eb8948ad5b4fdc224251a2bc02d958c84c862823c49d6"
-    circuitId := "2822c136eacd67fa250d300b1a3f5e090efcf8e4b0b2ace13c9d1b82f172e7d9"
-    blockEnc := 4283
-    rateInv := 4
-    queries := 128
-    ninputs := 89510
-    npublic := 3272
-    padSize := 1073
-    nlayers := 15
-    nwrow := 149
-    nqtriples := 1
-    profile := v6Hash4Certified }
+    profile := v7Hash4Certified }
 ]
 
-theorem registered_circuit_count : registeredCircuits.length = 16 := by native_decide
+theorem registered_circuit_count : registeredCircuits.length = 8 := by native_decide
 
 theorem registered_layouts_checked :
     registeredCircuits.all RegisteredCircuit.matchesBool = true := by native_decide

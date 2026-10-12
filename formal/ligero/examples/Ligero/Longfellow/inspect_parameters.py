@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 import argparse,hashlib,json,re,subprocess,struct
 from pathlib import Path
-parser=argparse.ArgumentParser(description='Verify registered circuit IDs and extract actual Ligero parameters.')
+parser=argparse.ArgumentParser(description='Verify registered V7 circuit IDs and extract actual Ligero parameters.')
 parser.add_argument('--source',type=Path,default=Path(__file__).resolve().parents[5])
 parser.add_argument('--output',type=Path,default=Path('extracted-parameters.json'))
 args=parser.parse_args()
 ROOT=args.source.resolve()
 SPECS=ROOT/'lib/circuits/mdoc/zk_spec.cc'
-pattern=re.compile(r'\{"longfellow-libzk-v1",\s*"([0-9a-f]{64})",\s*(\d+),\s*([67]),\s*(\d+),\s*(\d+)\}')
+pattern=re.compile(r'\{"longfellow-libzk-v1",\s*"([0-9a-f]{64})",\s*(\d+),\s*(7),\s*(\d+),\s*(\d+)\}')
 class Reader:
  def __init__(self,data):self.data=data;self.offset=0
  def take(self,n):
@@ -52,7 +52,7 @@ for digest,attributes,version,enc_hash,enc_sig in pattern.findall(SPECS.read_tex
  assert [c['field_id'] for c in circuits]==[1,4]
  assert hashlib.sha256(b''.join(bytes.fromhex(c['circuit_id']) for c in circuits)).hexdigest()==digest
  for circuit,enc,component in zip(circuits,[int(enc_sig),int(enc_hash)],['sig','hash']):
-  rate=7 if version=='7' else 4;queries=132 if version=='7' else 128
+  rate=7;queries=132
   block=(enc+1)//(2+rate);dblock=2*block-1;n=enc-dblock;w=block-queries
   nwrow=(circuit['nw']+w-1)//w;nqtriples=(circuit['nq']+w-1)//w
   rows.append(dict(version=int(version),attributes=int(attributes),component=component,artifact=str(file.relative_to(ROOT)),artifact_sha256=actual,circuit_id=circuit['circuit_id'],field='P256Base' if component=='sig' else 'GF2_128',field_size=2**256-2**224+2**192+2**96-1 if component=='sig' else 2**128,block_enc=enc,rateinv=rate,queries=queries,k=block,n=n,w=w,d_base=n-block+1,response_dimension_model=2*block,response_dimension_implementation=dblock,nw=circuit['nw'],nq=circuit['nq'],nwrow=nwrow,nqtriples=nqtriples,nrow=nwrow+3*nqtriples+3,pad_size=circuit['pad_size'],ninputs=circuit['ninputs'],npublic=circuit['npublic'],layer_logw=[x['logw'] for x in circuit['layers']]))
