@@ -2,7 +2,9 @@
 
 This directory contains the Lean 4 formalizations and mathematical proofs of
 soundness and completeness for the Elliptic Curve (EC) and ECDSA Zero-Knowledge
-(ZK) circuits.
+(ZK) circuits, together with Ligero V1 soundness and certified Longfellow V7
+parameters. See [ligero/README.md](ligero/README.md) for the exact Ligero theorem,
+its numerical bounds, and its assumptions.
 
 ## Directory Structure
 
@@ -14,6 +16,9 @@ soundness and completeness for the Elliptic Curve (EC) and ECDSA Zero-Knowledge
 -   `circuits/tests/ec/`: Contains the projective public key validation circuit
     constraint logic (`PkCircuit.lean`) and its symbolic polynomial evaluation
     model (`PkCircuitPoly.lean`).
+-   `ligero/`: Ligero V1, coding and agreement results, and the V7 soundness
+    theorem in `examples/Ligero/Longfellow/V7.lean`.
+-   `merkle/`, `bcs/`, and `sumcheck/`: Imported proof dependencies.
 -   `lakefile.toml` / `lake-manifest.json` / `lean-toolchain`: Standard Lean
     package configuration files.
 
@@ -46,3 +51,8 @@ cd privacy/proofs/zk/formal/
 # Build the targets
 lake build
 ```
+
+The Lake default targets check the ECDSA and public-key circuit proofs together
+with the imported proof libraries and the V7 soundness theorem. This package uses
+Lean 4.31.0 and a compatible Mathlib checkout at `../../mathlib4`, relative to
+`formal/`.

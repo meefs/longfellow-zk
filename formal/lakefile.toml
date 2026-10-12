@@ -1,6 +1,7 @@
+
 name = "formal_circuits"
 version = "0.1.0"
-defaultTargets = ["ECDSA", "pk_circuit"]
+defaultTargets = ["ECDSA", "pk_circuit", "JBAgreement", "Merkle", "Bcs", "Ligero.APITest", "Sumcheck", "examples.Ligero.Longfellow.V7"]
 
 [leanOptions]
 autoImplicit = false
@@ -9,8 +10,74 @@ relaxedAutoImplicit = false
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
-path = "../../../lean/mathlib4"
+path = "../../mathlib4"
 rev = "v4.31.0"
+
+
+[[lean_lib]]
+name = "ReedSolomon"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "CodingTheory"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "AffineAgreement"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "CorrelatedAgreement"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "SelectedMCA"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "LigeroFamily"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "Ligero"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "JBAgreement"
+srcDir = "ligero"
+globs = ["JBAgreement", "JBAgreement.+"]
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+[[lean_lib]]
+name = "examples"
+srcDir = "ligero"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+
+[[lean_lib]]
+name = "Sumcheck"
+srcDir = "sumcheck"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false }
+
+
+[[lean_lib]]
+name = "Merkle"
+srcDir = "merkle"
+
+
+[[lean_lib]]
+name = "Bcs"
+srcDir = "bcs"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, warningAsError = true }
+
+
 
 [[lean_lib]]
 name = "ECDSA"
