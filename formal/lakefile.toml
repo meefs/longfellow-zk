@@ -1,7 +1,7 @@
 
 name = "proofs"
 version = "0.1.0"
-defaultTargets = ["JBAgreement", "Merkle", "Bcs", "Ligero.APITest", "Sumcheck", "examples.Ligero.Longfellow.Parameters"]
+defaultTargets = ["JBAgreement", "Merkle", "Bcs", "Ligero.APITest", "Sumcheck", "examples.Ligero.Longfellow.V7"]
 
 [[require]]
 name = "mathlib"
