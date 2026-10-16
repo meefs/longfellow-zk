@@ -434,8 +434,7 @@ MdocProverErrorCode run_mdoc_prover(
   std::unique_ptr<Circuit<Fp256Base>> c_sig = nullptr;
   std::unique_ptr<Circuit<f_128>> c_hash = nullptr;
   /* scope for the bytes array */ {
-    size_t len = kCircuitSizeMax;
-    std::vector<uint8_t> bytes(len);
+    std::vector<uint8_t> bytes;  // sized by decompress from the frame header
     size_t full_size = decompress(bytes, bcp, bcsz);
 
     if (full_size == 0) {
@@ -596,8 +595,14 @@ MdocVerifierErrorCode run_mdoc_verifier(
   const f2_p256 p256_2(p256_base);
 
   // Parse circuits from cached byte representation.
-  size_t len = kCircuitSizeMax;
-  std::vector<uint8_t> bytes(len);
+  //
+  // Scoped, the way the prover already scopes its copy: the decompressed
+  // circuit is needed only until CircuitReader has built c_sig and c_hash, and
+  // holding it for the whole verification adds its full size to the peak.
+  std::unique_ptr<Circuit<Fp256Base>> c_sig;
+  std::unique_ptr<Circuit<f_128>> c_hash;
+  { /* scope for the bytes array */
+  std::vector<uint8_t> bytes;
   size_t full_size = decompress(bytes, bcp, bcsz);
 
   // For now, we are not using the ZKSpec version anywhere and assuming no
@@ -607,19 +612,20 @@ MdocVerifierErrorCode run_mdoc_verifier(
 
   ReadBuffer rb_circuit(bytes.data(), full_size);
   CircuitReader<Fp256Base> cr_s(p256_base, P256_ID);
-  auto c_sig = cr_s.from_bytes(rb_circuit, enforce_circuit_id_in_verifier);
+  c_sig = cr_s.from_bytes(rb_circuit, enforce_circuit_id_in_verifier);
   if (c_sig == nullptr) {
     log(ERROR, "signature circuit could not be parsed");
     return MDOC_VERIFIER_CIRCUIT_PARSING_FAILURE;
   }
 
   CircuitReader<f_128> cr_h(Fs, GF2_128_ID);
-  auto c_hash = cr_h.from_bytes(rb_circuit, enforce_circuit_id_in_verifier);
+  c_hash = cr_h.from_bytes(rb_circuit, enforce_circuit_id_in_verifier);
 
   if (c_hash == nullptr) {
     log(ERROR, "circuit could not be parsed");
     return MDOC_VERIFIER_CIRCUIT_PARSING_FAILURE;
   }
+  } /* bytes freed here */
   log(INFO, "circuit created. h[in:%zu], s[in:%zu]", c_hash->ninputs,
       c_sig->ninputs);
 
